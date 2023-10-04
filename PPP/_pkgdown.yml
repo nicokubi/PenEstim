@@ -1,0 +1,156 @@
+destination: inst/docs
+reference:
+- title: One-step master function
+  desc: >
+    The master function for an arbitrary combination of genes and cancers. 
+  contents:
+  - PPP
+  
+- title: One-step master function with predefined models
+  desc: >
+    Functions that takes pedigree and master database with predefined
+    set of genes and cancers.
+  contents:
+  - BRCAPRO
+  - BRCAPRO5
+  - BRCAPRO6
+  - MMRPRO
+  - PanelPRO11
+  - PanelPRO22
+  
+- title: Pedigree Checks and Age Imputation
+  desc: >
+    A handful of functions to check pedigree structual validity and impute missingness.
+  contents:
+  - checkFam
+  - ageImpute
+  - .boundAgeFromRelatives
+  - .boundAffectionAges
+  - .pedStructureCheck
+  - .checkHeredity
+  - .checkMating
+  - .checkGender
+  - .checkTwins
+  - .currentAgeImpute
+  - .cancerAgeImpute
+  - .removeDisconnected
+  - .findIDs 
+  - .getOtherRels
+  - .getAgeFromPed
+  - .categorize.1st.birth.age
+  - getCBCParams
+  - CBCnoncarrierCrude
+
+- title: Database Preparation
+  desc: >
+    Modify master database with specified model
+  contents:
+  - PanelPRODatabase
+  - MaleCBCNoncarrierArray
+  - buildDatabase
+  - checkGeneCancerAssociations
+  - starts_with(".customize")
+  - checkGeneCancerAssociations
+  - .categorize.1st.birth.age
+  - getCBCParams
+  - CBCnoncarrierCrude
+
+- title: Genotyping and Risk prediction
+  desc: >
+    Calculation of posterior probability of germline mutations and future risk
+  contents:
+  - PanelPROCalc
+  - pp.peelingParing
+  - .calPostProb
+  - visRisk
+  - .peelingParing
+  - ends_with("Contrib")
+  - starts_with("calc")
+  - subsetCancerPenetrance
+  - .twinsLikMod
+  - starts_with(".cal")
+  - starts_with(".pp")
+  - fr.cbc
+
+- title: Sample pedigrees
+  desc: >
+    Example pedigrees which are included in the package
+  contents:
+  - test_fam_1
+  - test_fam_2
+  - test_fam_3
+  - test_fam_4
+  - test_fam_5
+  - test_fam_6
+  - test_fam_7
+  - test_fam_8
+  - test_fam_9
+  - test_fam_10
+  - test_fam_11
+  - test_fam_12
+  - test_fam_13
+  - test_fam_14
+  - err_fam_1
+  
+- title: Misc
+  desc: >
+    Miscellaneous functions and variables
+  contents:
+  - adrop_one
+  - AgeDistribution
+  - ALL_GENE_VARIANT_TYPES
+  - ANCESTRY_TYPES
+  - CANCER_NAME_MAP
+  - CANCER_TYPES
+  - CBC_GENE_TYPES
+  - check.inputs.bcrat
+  - condense
+  - DEFAULT_VARIANTS
+  - .firstDegreeRelative
+  - .fix_gender_cancer
+  - .forceFalse
+  - .getCancersFromFam
+  - .getChildrenIdxs
+  - .getFatherIdx
+  - .getMatesIdxs
+  - .getMotherIdx
+  - .getOtherMatesIdxs
+  - .getPossibleGenotype
+  - .getSibsIdxs
+  - .getSpouses
+  - .ifContains
+  - .mapCancerNames
+  - .mapDict
+  - .mapGenderNames
+  - .parallelCalc
+  - .safeGet
+  - .secondDegreeRelative
+  - fix_with_rep
+  - forcingNA_ifnot_contains
+  - formatGeneNames
+  - GENE_TYPES
+  - get_rand_state
+  - get_relation_list
+  - HOMOZYGOUS_VARIANT_TYPES
+  - log.rr.bcrat
+  - MARKER_TESTING
+  - MAXAGE
+  - MODELPARAMS
+  - PENET_TYPES
+  - postIntervHR
+  - postIntervRR
+  - RACE_TYPES
+  - recode.inputs.bcrat
+  - RISKMODS
+  - riskmod_perfam
+  - rr.ref
+  - safe_apply
+  - set_rand_state
+  - SEX_TYPES
+  - subset_array
+  - UNKNOWN_ANCESTRY
+  - UNKNOWN_RACE
+
+template:
+  params:
+    bootswatch: lumen

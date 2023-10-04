@@ -1,0 +1,67 @@
+Package: PPP
+Type: Package
+Title: PPP: multi-syndrome and multi-gene modeling
+Version: 1.1.0
+Depends: R (>= 3.5.0)
+Authors@R: c(
+    person("BayesMendel", "Lab", email = "bmendel@jimmy.harvard.edu", role = c("aut", "cre")),
+    person("Theo", "Huang", role = "aut"), 
+    person("Gavin", "Lee", role = "aut"),
+    person("Jane", "Liang", role = "aut"),
+    person("Tom", "Madsen", role = "aut"),
+    person("Qing", "Zhang", role = "aut"),
+    person("Stephen", "Knapp", role = "ctb"))
+Description: An R package for multi-gene multi-syndrome modeling from family history.
+License: file LICENSE
+Encoding: UTF-8
+LazyData: true
+LazyDataCompression: xz
+Imports:
+    Rcpp (>= 1.0.3),
+    kinship2,
+    abind,
+    doParallel,
+    parallel,
+    foreach,
+    crayon,
+    rlang,
+    ggplot2,
+    dplyr,
+    plotly,
+    doRNG,
+    htmltools,
+    iterators,
+    stats,
+    devtools
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 2.1.0)
+LinkingTo: Rcpp, RcppArmadillo
+RoxygenNote: 7.2.3
+Roxygen: list(markdown = TRUE)
+VignetteBuilder: knitr
+SystemRequirements: C++11
+Collate: 
+    'ModLikelihood.R'
+    'ModPenetrance.R'
+    'PPP-package.R'
+    'RcppExports.R'
+    'bcratHelpers.R'
+    'helpers.R'
+    'buildDatabase.R'
+    'calcCancerPenetrance.R'
+    'calcFutureRisk.R'
+    'calcLik.R'
+    'checkFam.R'
+    'checkFamHelpers.R'
+    'checkGeneCancerAssociations.R'
+    'docData.R'
+    'imputeAges.R'
+    'internalVars.R'
+    'masterFunction.R'
+    'outputHelpers.R'
+    'packageStartUp.R'
+    'peelingParing.R'
+    'ppHelpers.R'
+    'visRisk.R'

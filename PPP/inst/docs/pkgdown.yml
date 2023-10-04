@@ -1,0 +1,8 @@
+pandoc: 2.19.2
+pkgdown: 2.0.7
+pkgdown_sha: ~
+articles:
+  building-pedigrees: building-pedigrees.html
+  rcpp-functions: rcpp-functions.html
+last_built: 2023-02-28T19:18Z
+

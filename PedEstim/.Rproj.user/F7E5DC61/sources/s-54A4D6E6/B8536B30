@@ -1,0 +1,26 @@
+{
+    "id": "B8536B30",
+    "path": "~/Documents/Master Statistics/Master Thesis/Code/PedEstim/R/mcmcPenetrance.R",
+    "project_path": "R/mcmcPenetrance.R",
+    "type": "r_source",
+    "hash": "998885661",
+    "contents": "",
+    "dirty": false,
+    "created": 1696394814922.0,
+    "source_on_save": false,
+    "relative_order": 11,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "236,10",
+        "scrollLine": "220"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1696397144,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1696397144645,
+    "read_only": false,
+    "read_only_alternatives": []
+}
