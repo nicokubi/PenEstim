@@ -5,7 +5,7 @@ Work related to the Master Thesis at the BayesMendel Lab at Harvard University u
 The PenEstim Package works as an extension to the PanelPRO R Package developed by the BayesMendel Lab. The pacakge is used to estimate age-specific penetrance for complex family-based data in a format compatible with PanelPRO.
 
 Additional Notes:
-- Dependencies: `PPP` (adapted version of PanelPRO), `stats`
+- Dependencies: `PPP` (adapted version of PanelPRO), `stats`. PPP needs to be installed before loading the PenEstim package. 
 - Applies independent Metropolis Hastings algorithm to draw from the posterior distribution to estimate the parameters of a four-parameter Weibull distibution
 - Assumes that Proposal = Prior distribution
 - Parameters of the prior/proposal can be adapted from default values
