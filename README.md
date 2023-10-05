@@ -1,4 +1,4 @@
-# hvd-thesis
+# Thesis: Methods and Software for Penetrance Estimation in Complex Family-based Studies
 Work related to the Master Thesis at the BayesMendel Lab at Harvard University under the supervision of Prof. Giovanni Parmegiani (Harvard), Dr. Danielle Braun (Harvard), and Dr. Markus Kalisch (ETH Zurich), 
 
 ## PenEstim
