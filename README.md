@@ -1,5 +1,5 @@
 # hvd-thesis
-Work related to the Master Thesis at Harvard and DFCI 
+Work related to the Master Thesis at the BayesMendel Lab at Harvard University. 
 
 ## PenEstim
 The PenEstim Package works as an extension to the PanelPRO R Package developed by the BayesMendel Lab. The pacakge is used to estimate age-specific penetrance for complex family-based data in a format compatible with PanelPRO.
