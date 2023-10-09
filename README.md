@@ -10,7 +10,6 @@ Additional Notes:
 - Assumes that Proposal = Prior distribution
 - Parameters of the prior/proposal can be adapted from default values
  
-
 ## Simulated Families
 The following three types of families were used for the simulation study. All families were simulated without censoring and with different parameters for the four-parameter Weibull distribution: 
 - simFamilies_A_475_nocen (n=475)
@@ -25,5 +24,8 @@ Additional Scripts used as part of this thesis:
 - `Plot_Families.R` was used to generate plots to display the empirical penetrance curves from the simulated families. 
 - `Sim_Families.R` was used to generate the Families for the simulation study. 
 
-
+## Results
+Contains the results from the simulation study. 
+- `MLE Results` contains the results from the log-likelihood evaluation for the simulated Families A, B, and C.
+- `results_mcmc.rds` contains the results from applying the mcmc approach to Families C. 
 
