@@ -1,7 +1,7 @@
-# Likelihood Evaluator
+# Likelihood Evaluation
 library(PPP)
 library(numDeriv)
-library(plyr) #need to load plyr before dplyr
+library(plyr) 
 library(truncnorm)
 library(PanelPRO)
 library(tidyverse)
@@ -126,35 +126,82 @@ par(mar = c(5, 5, 4, 2) + 0.1)
 # Create a 2x2 layout of plots with square dimensions
 par(mfrow = c(2, 2))
 
+# Families A
 # Plot for alpha
 plot(results_mle_A_famA$alpha, results_mle_A_famA$logLikelihood, type = "l", col = "blue", 
-     xlab = "Alpha", ylab = "Loglikelihood", 
+     xlab = "Alpha", ylab = "Log-likelihood", 
      main = "Shape Parameter (Alpha)")
-abline(v = 2.5, col = "red", lty = 2)  # Red dashed line for beta = 501
+abline(v = 2.5, col = "red", lty = 2)  
 
 # Plot for beta
 plot(results_mle_B_famA$beta, results_mle_B_famA$logLikelihood, type = "l", col = "blue", 
-     xlab = "Beta", ylab = "Loglikelihood", 
+     xlab = "Beta", ylab = "Log-likelihood", 
      main = "Scale Parameter (Beta)")
-abline(v = 14, col = "red", lty = 2)  # Red dashed line for beta = 50
+abline(v = 14, col = "red", lty = 2)  
 
 # Plot for gamma
 plot(results_mle_G_famA$gamma, results_mle_G_famA$logLikelihood, type = "l", col = "blue", 
-     xlab = "Gamma", ylab = "Loglikelihood", 
+     xlab = "Gamma", ylab = "Log-likelihood", 
      main = "Asymptote Parameter (Gamma)")
-abline(v = 0.8, col = "red", lty = 2)  # Red dashed line for beta = 50
+abline(v = 0.8, col = "red", lty = 2)  
 
 # Plot for delta
 plot(results_mle_D_famA$delta, results_mle_D_famA$logLikelihood, type = "l", col = "blue", 
-     xlab = "Delta", ylab = "Loglikelihood", 
+     xlab = "Delta", ylab = "Log-likelihood", 
      main = "Shift Parameter (Delta)")
-abline(v = 60, col = "red", lty = 2)  # Red dashed line for beta = 50
+abline(v = 60, col = "red", lty = 2)  
 
-# Reset the layout and margins to default values
-par(mfrow = c(1, 1))
-par(oma = c(0, 0, 0, 0))
-par(mar = c(5, 4, 4, 2) + 0.1)
-# Close the PDF file
-dev.off()
+
+# Families B
+# Plot for alpha
+plot(results_mle_A_famB$alpha, results_mle_A_famB$logLikelihood, type = "l", col = "blue", 
+     xlab = "Alpha", ylab = "Log-likelihood", 
+     main = "Shape Parameter (Alpha)")
+abline(v = 2.5, col = "red", lty = 2)  
+
+# Plot for beta
+plot(results_mle_B_famB$beta, results_mle_B_famB$logLikelihood, type = "l", col = "blue", 
+     xlab = "Beta", ylab = "Log-likelihood", 
+     main = "Scale Parameter (Beta)")
+abline(v = 14, col = "red", lty = 2)  
+
+# Plot for gamma
+plot(results_mle_G_famB$gamma, results_mle_G_famB$logLikelihood, type = "l", col = "blue", 
+     xlab = "Gamma", ylab = "Log-likelihood", 
+     main = "Asymptote Parameter (Gamma)")
+abline(v = 0.8, col = "red", lty = 2)  
+
+# Plot for delta
+plot(results_mle_D_famB$delta, results_mle_D_famB$logLikelihood, type = "l", col = "blue", 
+     xlab = "Delta", ylab = "Log-likelihood", 
+     main = "Shift Parameter (Delta)")
+abline(v = 20, col = "red", lty = 2)  
+
+#Families C
+# Plot for alpha
+plot(results_mle_A_famC$alpha, results_mle_A_famC$logLikelihood, type = "l", col = "blue", 
+     xlab = "Alpha", ylab = "Log-likelihood", 
+     main = "Shape Parameter (Alpha)")
+abline(v = 2.5, col = "red", lty = 2)  
+
+# Plot for beta
+plot(results_mle_B_famC$beta, results_mle_B_famC$logLikelihood, type = "l", col = "blue", 
+     xlab = "Beta", ylab = "Log-likelihood", 
+     main = "Scale Parameter (Beta)")
+abline(v = 50, col = "red", lty = 2)  
+
+# Plot for gamma
+plot(results_mle_G_famC$gamma, results_mle_G_famC$logLikelihood, type = "l", col = "blue", 
+     xlab = "Gamma", ylab = "Log-likelihood", 
+     main = "Asymptote Parameter (Gamma)")
+abline(v = 0.9, col = "red", lty = 2)  
+
+# Plot for delta
+plot(results_mle_D_famC$delta, results_mle_D_famC$logLikelihood, type = "l", col = "blue", 
+     xlab = "Delta", ylab = "Log-likelihood", 
+     main = "Shift Parameter (Delta)")
+abline(v = 20, col = "red", lty = 2)  
+
+
 
 

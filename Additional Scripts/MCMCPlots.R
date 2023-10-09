@@ -1,10 +1,6 @@
-# Function to perform burn-in
-burn_in_chain <- function(samples, burn_in_percentage) {
-  n_samples <- length(samples)
-  burn_in_count <- round(n_samples * burn_in_percentage)
-  samples[(burn_in_count + 1):n_samples]
-}
+# Functions to use for diagnostic and inference of the MCMC approach
 
+# Function to extract the samples from the different chains
 extract_samples <- function(results) {
   list(
     median_samples = do.call(c, lapply(results, function(x) x$median_samples)),
@@ -74,11 +70,36 @@ plot_trace <- function(results, n_chains) {
   }
 }
 
-# Function to perform burn-in
-burn_in_chain <- function(samples, burn_in_percentage) {
-  n_samples <- length(samples)
-  burn_in_count <- round(n_samples * burn_in_percentage)
-  samples[(burn_in_count + 1):n_samples]
+# Print the rejection Rates
+rejection_rates <- sapply(output, function(x) x$rejection_rate)
+cat("Rejection rates: ", rejection_rates, "\n")
+
+# Apply burn-in
+apply_burn_in <- function(extracted_data, burn_in) {
+  # Ensure extracted_data is a list and has at least one element (parameter)
+  if (!is.list(extracted_data) || length(extracted_data) < 1) {
+    stop("extracted_data must be a list with at least one parameter.")
+  }
+  
+  # Ensure burn_in_percentage is numeric and between 0 and 1
+  if (!is.numeric(burn_in_percentage) || burn_in <= 0 || burn_in >= 1) {
+    stop("burn_in must be a numeric value between 0 and 1.")
+  }
+  
+  # Function to perform burn-in on a single parameter (numeric vector)
+  burn_in_chain <- function(samples, burn_in) {
+    n_samples <- length(samples)
+    burn_in_count <- round(n_samples * burn_in)
+    if (burn_in_count >= n_samples) {
+      stop("burn_in_count must be less than the total number of samples (n_samples).")
+    }
+    samples[(burn_in_count + 1):n_samples]
+  }
+  
+  # Apply burn-in to all parameters
+  lapply(extracted_data, function(param) {
+    burn_in_chain(param, burn_in_percentage)
+  })
 }
 
 
