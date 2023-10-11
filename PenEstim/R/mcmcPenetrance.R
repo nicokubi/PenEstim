@@ -20,17 +20,43 @@
 
 
 mhChain <- function(seed, n_iter, chain_id, data, save_interval,
-                    m1, m2, max_age, shift_prior_min, shift_prior_max,
-                    p0, q1, q2, g1, g2,PanelPRODatabase) {
+                    proposal_dist, proposal_params, max_age, PanelPRODatabase) {
 
   set.seed(seed)
 
-  # Initialize parameters using random draws from the proposal distributions
-  median_start <- 60
-  asymptote_start <- 0.8
-  shift_start <- 24
-  first_quartile_start <- 50
+ # Recover the SEER lifetime risk for the cancer 
+  gene <- "SEER"
+  cancer <- "Breast"
+  race <- "All_Races"
+  female <- "Female"
+  male <- "Male"
+  type <- "Crude"
+  
+  # Find the indices for the resp. attributes
+  dim_names <- attr(PanelPRODatabase$Penetrance, "dimnames")
+  gene_index <- which(dim_names$Gene == gene)
+  cancer_index <- which(dim_names$Cancer == cancer)
+  race_index <- which(dim_names$Race == race)
+  sex_index <- which(dim_names$Sex == female)
+  type_index <- which(dim_names$PenetType == type)
 
+  # Calculate the cummunlative risk for every age up until max. age 
+  lifetime_risk_cum <- cumsum(PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, ,type_index])
+  total_prob <- sum(lifetime_risk)
+  midpoint_prob <- total_prob / 2
+
+  # Identify the index where cumulative probability crosses the midpoint
+  midpoint_index <- which(lifetime_risk_cum >= midpoint_prob)[1]
+
+  # Identify the age at which the cumulative probability crosses the midpoint
+  baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index]
+
+  # Initialize parameters using random draws from the proposal distributions
+  shift_start <- proposal_dist$shift(proposal_params$shift)
+  median_start <- proposal_dist$median_(proposal_params$median)
+  first_quartile_start <- proposal_dist$quartile(proposal_params$quartile)
+  asymptote_start <- proposal_dist$asymptote(proposal_params$asymptote)
+  
 
   # Initialize parameters using the provided starting values
   median_current <- median_start
@@ -50,21 +76,11 @@ mhChain <- function(seed, n_iter, chain_id, data, save_interval,
 
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
-    # generate aysmptote parameter (gamma)
-    asymptote_proposal <- rbeta(1,g1,g2)
-    asymptote_proposal <- p0 + asymptote_proposal *(1-p0)
-
-    # generate shift parameter (delta)
-    shift_proposal <- runif(1, shift_prior_min, shift_prior_max)
-
-    # generate median
-    median_proposal <- rbeta(1,m1,m2)
-    median_proposal <- (median_proposal)*(max_age-shift_proposal) + shift_proposal
-
-    # generate first quartile
-    first_quartile_proposal <- rbeta(1,q1,q2)
-    first_quartile_proposal <- (first_quartile_proposal)*(median_proposal-shift_proposal) + shift_proposal
-
+    asymptote_proposal <- proposal_dist$asymptote(proposal_params$asymptote)
+    shift_proposal <- proposal_dist$shift(proposal_params$shift)
+    median_proposal <- proposal_dist$median(proposal_params$median)
+    first_quartile_proposal <- proposal_dist$quartile(proposal_params$quartile)
+    
     # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood(paras = c(median_current,first_quartile_current,asymptote_current,
                                                        shift_current), families  = data,
@@ -139,13 +155,10 @@ mhChain <- function(seed, n_iter, chain_id, data, save_interval,
 
 #' @export
 
-PenEstim <- function(data,n_chains, n_iter_per_chain,save_interval=200,
-                      max_age=94, shift_prior_min=0, shift_prior_max=25,
-                     p0=0.15, m1=2, m2=2,q1=6, q2=3, g1=9, g2=1) {
+PenEstim <- function(data, n_chains, n_iter_per_chain, save_interval=200,
+                     max_age=94, proposal_dist, proposal_params){
 
   seeds <- sample.int(1000, n_chains)
-
-
 
   cl <- makeCluster(n_chains)
 
@@ -156,17 +169,17 @@ PenEstim <- function(data,n_chains, n_iter_per_chain,save_interval=200,
 
   clusterExport(cl, c("mhChain", "mhLogLikelihood", "seeds", "n_iter_per_chain",
                       "data", "save_interval",
-                      "m1", "m2", "max_age", "shift_prior_min", "shift_prior_max",
+                      "m1", "m2", "eps","max_age", "shift_prior_min", "shift_prior_max",
                       "p0", "q1", "q2", "g1", "g2"), envir=environment())
 
-  results <- parLapply(cl,1:n_chains, function(i) {
+  results <- parLapply(cl, 1:n_chains, function(i) {
     mhChain(seeds[i], n_iter = n_iter_per_chain, chain_id = i,
             data = data,
             PanelPRODatabase = PanelPRODatabase,
             save_interval = save_interval,
-            m1 = m1, m2 = m2, max_age = max_age,
-            shift_prior_min = shift_prior_min, shift_prior_max = shift_prior_max,
-            p0 = p0, q1 = q1, q2 = q2, g1 = g1, g2 = g2)
+            proposal_dist = proposal_dist,
+            proposal_params = proposal_params,
+            max_age = max_age)
   })
 
   stopCluster(cl)
