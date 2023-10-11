@@ -36,6 +36,7 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase) {
   alpha <- params$alpha
   beta <- params$beta
   
+
   # Now use alpha and beta in your simulation
   penetrance.mod.f <- dweibull(age - delta, alpha, beta) * gamma
   

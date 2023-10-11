@@ -20,17 +20,48 @@
 
 
 mhChain <- function(seed, n_iter, chain_id, data, save_interval,
-                    m1, m2, max_age, shift_prior_min, shift_prior_max,
+                    eps, max_age, shift_prior_min, shift_prior_max,
                     p0, q1, q2, g1, g2,PanelPRODatabase) {
 
   set.seed(seed)
 
-  # Initialize parameters using random draws from the proposal distributions
-  median_start <- 60
-  asymptote_start <- 0.8
-  shift_start <- 24
-  first_quartile_start <- 50
+ # Recover the SEER lifetime risk for the cancer 
+  gene <- "SEER"
+  cancer <- "Breast"
+  race <- "All_Races"
+  female <- "Female"
+  male <- "Male"
+  type <- "Crude"
+  
+  # Find the indices for the resp. attributes
+  dim_names <- attr(PanelPRODatabase$Penetrance, "dimnames")
+  gene_index <- which(dim_names$Gene == gene)
+  cancer_index <- which(dim_names$Cancer == cancer)
+  race_index <- which(dim_names$Race == race)
+  sex_index <- which(dim_names$Sex == female)
+  type_index <- which(dim_names$PenetType == type)
 
+  # Calculate the cummunlative risk for every age up until max. age 
+  lifetime_risk <- PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, ,type_index]
+  lifetime_risk_cum <- cumsum(PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, ,type_index])
+  total_prob <- sum(lifetime_risk)
+  midpoint_prob <- total_prob / 2
+  str(lifetime_risk)
+
+
+# Identify the index where cumulative probability crosses the midpoint
+  midpoint_index <- which(lifetime_risk_cum >= midpoint_prob)[1]
+
+# Identify the age at which the cumulative probability crosses the midpoint
+  midpoint_age <- as.numeric(names(lifetime_risk_cum)[midpoint_index])
+  midpoint_age
+
+  
+   # Initialize parameters using random draws from the proposal distributions
+  shift_start <- runif(1, shift_prior_min, shift_prior_max)
+  median_start <- runif(1, midpoint_age-eps*max_age, midpoint_age+eps*max_age)
+  first_quartile_start <- rbeta(1, q1, q2) * (median_start - shift_start) + shift_start
+  asymptote_start <- p0 + rbeta(1, g1, g2) * (1 - p0)
 
   # Initialize parameters using the provided starting values
   median_current <- median_start
@@ -58,8 +89,7 @@ mhChain <- function(seed, n_iter, chain_id, data, save_interval,
     shift_proposal <- runif(1, shift_prior_min, shift_prior_max)
 
     # generate median
-    median_proposal <- rbeta(1,m1,m2)
-    median_proposal <- (median_proposal)*(max_age-shift_proposal) + shift_proposal
+    median_proposal <- runif(1, midpoint_age-eps*max_age, midpoint_age+eps*max_age)
 
     # generate first quartile
     first_quartile_proposal <- rbeta(1,q1,q2)
@@ -141,11 +171,9 @@ mhChain <- function(seed, n_iter, chain_id, data, save_interval,
 
 PenEstim <- function(data,n_chains, n_iter_per_chain,save_interval=200,
                       max_age=94, shift_prior_min=0, shift_prior_max=25,
-                     p0=0.15, m1=2, m2=2,q1=6, q2=3, g1=9, g2=1) {
+                     p0=0.15,eps=0.1,q1=6, q2=3, g1=9, g2=1) {
 
   seeds <- sample.int(1000, n_chains)
-
-
 
   cl <- makeCluster(n_chains)
 
@@ -155,8 +183,7 @@ PenEstim <- function(data,n_chains, n_iter_per_chain,save_interval=200,
   })
 
   clusterExport(cl, c("mhChain", "mhLogLikelihood", "seeds", "n_iter_per_chain",
-                      "data", "save_interval",
-                      "m1", "m2", "max_age", "shift_prior_min", "shift_prior_max",
+                      "data", "save_interval", "eps", "max_age", "shift_prior_min", "shift_prior_max",
                       "p0", "q1", "q2", "g1", "g2"), envir=environment())
 
   results <- parLapply(cl,1:n_chains, function(i) {
@@ -164,7 +191,7 @@ PenEstim <- function(data,n_chains, n_iter_per_chain,save_interval=200,
             data = data,
             PanelPRODatabase = PanelPRODatabase,
             save_interval = save_interval,
-            m1 = m1, m2 = m2, max_age = max_age,
+            eps=eps, max_age = max_age,
             shift_prior_min = shift_prior_min, shift_prior_max = shift_prior_max,
             p0 = p0, q1 = q1, q2 = q2, g1 = g1, g2 = g2)
   })
