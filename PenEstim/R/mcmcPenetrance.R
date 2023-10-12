@@ -53,7 +53,7 @@ mhChain <- function(seed, n_iter, chain_id, data, save_interval,
   midpoint_index <- which(lifetime_risk_cum >= midpoint_prob)[1]
 
 # Identify the age at which the cumulative probability crosses the midpoint
-  baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index]
+  baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index])
 
   
    # Initialize parameters using random draws from the proposal distributions
