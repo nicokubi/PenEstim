@@ -9,17 +9,12 @@
 #' @param max_age Maximum age to be considered.
 #' @param shift_prior_min Minimum possible value for the shift parameter.
 #' @param shift_prior_max Maximum possible value for the shift parameter.
-#' @param p0 baseline lifetime risk.
-#' @param q1 parameter of the beta distribution for the first quartile.
-#' @param q2 parameter of the beta distribution for the first quartile.
-#' @param g1 parameter of the beta distribution for the shift.
-#' @param g2 parameter of the beta distribution for the shift.
 #' @return A list with samples and rejection rate.
 #' @importFrom parallel makeCluster stopCluster parLapply clusterExport clusterEvalQ
 #' @importFrom PPP PPP
 
 
-mhChain <- function(seed, n_iter, chain_id, data, save_interval,
+mhChain <- function(seed, n_iter, chain_id, data,
                     proposal_dist, proposal_params, max_age, PanelPRODatabase) {
 
   set.seed(seed)
@@ -108,16 +103,6 @@ mhChain <- function(seed, n_iter, chain_id, data, save_interval,
     first_quartile_samples[i] <- first_quartile_current
     asymptote_samples[i] <- asymptote_current
 
-    if (i %% save_interval == 0) {
-      save_file_name <- paste0("MH_chain_state_", chain_id, "_iter_", i, ".RDS")
-      save_state <- list(median_samples = median_samples[1:i],
-                         shift_samples = shift_samples[1:i],
-                         first_quartile_samples = first_quartile_samples[1:i],
-                         asymptote_samples = asymptote_samples[1:i])
-      saveRDS(save_state, save_file_name)
-      cat("Saved state at iteration", i, "\n")
-    }
-
   }
   # Return the result as a list
   list(median_samples = median_samples,
@@ -155,7 +140,7 @@ mhChain <- function(seed, n_iter, chain_id, data, save_interval,
 
 #' @export
 
-PenEstim <- function(data, n_chains, n_iter_per_chain, save_interval=200,
+PenEstim <- function(data, n_chains, n_iter_per_chain,
                      max_age=94, proposal_dist, proposal_params){
 
   seeds <- sample.int(1000, n_chains)
@@ -168,15 +153,13 @@ PenEstim <- function(data, n_chains, n_iter_per_chain, save_interval=200,
   })
 
   clusterExport(cl, c("mhChain", "mhLogLikelihood", "seeds", "n_iter_per_chain",
-                      "data", "save_interval",
-                      "m1", "m2", "eps","max_age", "shift_prior_min", "shift_prior_max",
-                      "p0", "q1", "q2", "g1", "g2"), envir=environment())
+                      "data", "proposal_dist", "proposal_params"
+                      "max_age"), envir=environment())
 
   results <- parLapply(cl, 1:n_chains, function(i) {
     mhChain(seeds[i], n_iter = n_iter_per_chain, chain_id = i,
             data = data,
             PanelPRODatabase = PanelPRODatabase,
-            save_interval = save_interval,
             proposal_dist = proposal_dist,
             proposal_params = proposal_params,
             max_age = max_age)
