@@ -4,15 +4,12 @@
 #' @param n_iter Number of iterations for the chain.
 #' @param chain_id Identifier for the chain.
 #' @param data List of families data.
-#' @param m1 parameter for the beta distribution for the median.
-#' @param m2 parameter for the beta distribution fo the median.
-#' @param max_age Maximum age to be considered.
-#' @param shift_prior_min Minimum possible value for the shift parameter.
-#' @param shift_prior_max Maximum possible value for the shift parameter.
+#' @param proposal_dist List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters. 
+#' @param proposal_params List of the parameters for the distributions of the proposal. 
+#' @param max_age Maximum age to be considered. 
 #' @return A list with samples and rejection rate.
 #' @importFrom parallel makeCluster stopCluster parLapply clusterExport clusterEvalQ
 #' @importFrom PPP PPP
-
 
 mhChain <- function(seed, n_iter, chain_id, data,
                     proposal_dist, proposal_params, max_age, PanelPRODatabase) {
@@ -118,20 +115,12 @@ mhChain <- function(seed, n_iter, chain_id, data,
 #' Independent Metropolis-Hastings algorithm. It leverages parallel computing and requires
 #' the `stats`, `parallel`, and `PPP` packages.
 #'
+#' @param data List of families data.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
-#' @param save_interval Interval after which states should be saved.
-#' @param m1 parameter for the beta distribution for the median.
-#' @param m2 parameter for the beta distribution fo the median.
+#' @param proposal_dist List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters. 
+#' @param proposal_params List of the parameters for the distributions of the proposal. 
 #' @param max_age Maximum age to be considered.
-#' @param shift_prior_min Minimum possible value for the shift parameter.
-#' @param shift_prior_max Maximum possible value for the shift parameter.
-#' @param p0 baseline lifetime risk.
-#' @param q1 parameter of the beta distribution for the first quartile.
-#' @param q2 parameter of the beta distribution for the first quartile.
-#' @param g1 parameter of the beta distribution for the shift.
-#' @param g2 parameter of the beta distribution for the shift.
-#' @param data List of families data.
 #' @return A list containing results for each chain.
 #'
 #' @importFrom stats rbeta runif dweibull
