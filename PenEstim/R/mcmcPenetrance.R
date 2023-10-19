@@ -4,9 +4,9 @@
 #' @param n_iter Number of iterations for the chain.
 #' @param chain_id Identifier for the chain.
 #' @param data List of families data.
-#' @param proposal_dist List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters. 
-#' @param proposal_params List of the parameters for the distributions of the proposal. 
-#' @param max_age Maximum age to be considered. 
+#' @param proposal_dist List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.
+#' @param proposal_params List of the parameters for the distributions of the proposal.
+#' @param max_age Maximum age to be considered.
 #' @return A list with samples and rejection rate.
 #' @importFrom parallel makeCluster stopCluster parLapply clusterExport clusterEvalQ
 #' @importFrom PPP PPP
@@ -16,14 +16,14 @@ mhChain <- function(seed, n_iter, chain_id, data,
 
   set.seed(seed)
 
- # Recover the SEER lifetime risk for the cancer 
+ # Recover the SEER lifetime risk for the cancer
   gene <- "SEER"
   cancer <- "Breast"
   race <- "All_Races"
   female <- "Female"
   male <- "Male"
   type <- "Crude"
-  
+
   # Find the indices for the resp. attributes
   dim_names <- attr(PanelPRODatabase$Penetrance, "dimnames")
   gene_index <- which(dim_names$Gene == gene)
@@ -32,7 +32,7 @@ mhChain <- function(seed, n_iter, chain_id, data,
   sex_index <- which(dim_names$Sex == female)
   type_index <- which(dim_names$PenetType == type)
 
-  # Calculate the cummunlative risk for every age up until max. age 
+  # Calculate the cummunlative risk for every age up until max. age
   lifetime_risk_cum <- cumsum(PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, ,type_index])
   total_prob <- sum(lifetime_risk)
   midpoint_prob <- total_prob / 2
@@ -41,14 +41,14 @@ mhChain <- function(seed, n_iter, chain_id, data,
   midpoint_index <- which(lifetime_risk_cum >= midpoint_prob)[1]
 
   # Identify the age at which the cumulative probability crosses the midpoint
-  baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index]
+  baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index])
 
   # Initialize parameters using random draws from the proposal distributions
   shift_start <- proposal_dist$shift(proposal_params$shift)
   median_start <- proposal_dist$median_(proposal_params$median)
   first_quartile_start <- proposal_dist$quartile(proposal_params$quartile)
   asymptote_start <- proposal_dist$asymptote(proposal_params$asymptote)
-  
+
 
   # Initialize parameters using the provided starting values
   median_current <- median_start
@@ -72,7 +72,7 @@ mhChain <- function(seed, n_iter, chain_id, data,
     shift_proposal <- proposal_dist$shift(proposal_params$shift)
     median_proposal <- proposal_dist$median(proposal_params$median)
     first_quartile_proposal <- proposal_dist$quartile(proposal_params$quartile)
-    
+
     # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood(paras = c(median_current,first_quartile_current,asymptote_current,
                                                        shift_current), families  = data,
@@ -118,8 +118,8 @@ mhChain <- function(seed, n_iter, chain_id, data,
 #' @param data List of families data.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
-#' @param proposal_dist List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters. 
-#' @param proposal_params List of the parameters for the distributions of the proposal. 
+#' @param proposal_dist List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.
+#' @param proposal_params List of the parameters for the distributions of the proposal.
 #' @param max_age Maximum age to be considered.
 #' @return A list containing results for each chain.
 #'
@@ -142,7 +142,7 @@ PenEstim <- function(data, n_chains, n_iter_per_chain,
   })
 
   clusterExport(cl, c("mhChain", "mhLogLikelihood", "seeds", "n_iter_per_chain",
-                      "data", "proposal_dist", "proposal_params"
+                      "data", "proposal_dist", "proposal_params",
                       "max_age"), envir=environment())
 
   results <- parLapply(cl, 1:n_chains, function(i) {

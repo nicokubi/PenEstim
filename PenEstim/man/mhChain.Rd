@@ -9,17 +9,9 @@ mhChain(
   n_iter,
   chain_id,
   data,
-  save_interval,
-  m1,
-  m2,
+  proposal_dist,
+  proposal_params,
   max_age,
-  shift_prior_min,
-  shift_prior_max,
-  p0,
-  q1,
-  q2,
-  g1,
-  g2,
   PanelPRODatabase
 )
 }
@@ -32,25 +24,11 @@ mhChain(
 
 \item{data}{List of families data.}
 
-\item{m1}{parameter for the beta distribution for the median.}
+\item{proposal_dist}{List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.}
 
-\item{m2}{parameter for the beta distribution fo the median.}
+\item{proposal_params}{List of the parameters for the distributions of the proposal.}
 
 \item{max_age}{Maximum age to be considered.}
-
-\item{shift_prior_min}{Minimum possible value for the shift parameter.}
-
-\item{shift_prior_max}{Maximum possible value for the shift parameter.}
-
-\item{p0}{baseline lifetime risk.}
-
-\item{q1}{parameter of the beta distribution for the first quartile.}
-
-\item{q2}{parameter of the beta distribution for the first quartile.}
-
-\item{g1}{parameter of the beta distribution for the shift.}
-
-\item{g2}{parameter of the beta distribution for the shift.}
 }
 \value{
 A list with samples and rejection rate.
