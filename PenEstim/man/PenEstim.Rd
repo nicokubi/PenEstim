@@ -9,8 +9,13 @@ PenEstim(
   n_chains,
   n_iter_per_chain,
   max_age = 94,
-  proposal_dist,
-  proposal_params
+  proposal_params,
+  summary_stats = TRUE,
+  rejection_rates = TRUE,
+  density_plots = TRUE,
+  trace_plots = TRUE,
+  burn_in_length = 0,
+  thinning_factor = 1
 )
 }
 \arguments{
@@ -22,9 +27,9 @@ PenEstim(
 
 \item{max_age}{Maximum age to be considered.}
 
-\item{proposal_dist}{List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.}
-
 \item{proposal_params}{List of the parameters for the distributions of the proposal.}
+
+\item{proposal_dist}{List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.}
 }
 \value{
 A list containing results for each chain.

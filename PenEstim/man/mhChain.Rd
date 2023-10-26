@@ -9,7 +9,6 @@ mhChain(
   n_iter,
   chain_id,
   data,
-  proposal_dist,
   proposal_params,
   max_age,
   PanelPRODatabase
@@ -24,11 +23,11 @@ mhChain(
 
 \item{data}{List of families data.}
 
-\item{proposal_dist}{List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.}
-
 \item{proposal_params}{List of the parameters for the distributions of the proposal.}
 
 \item{max_age}{Maximum age to be considered.}
+
+\item{proposal_dist}{List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.}
 }
 \value{
 A list with samples and rejection rate.

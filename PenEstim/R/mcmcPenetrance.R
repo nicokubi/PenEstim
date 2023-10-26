@@ -4,7 +4,6 @@
 #' @param n_iter Number of iterations for the chain.
 #' @param chain_id Identifier for the chain.
 #' @param data List of families data.
-#' @param proposal_dist List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.
 #' @param proposal_params List of the parameters for the distributions of the proposal.
 #' @param max_age Maximum age to be considered.
 #' @return A list with samples and rejection rate.
@@ -12,7 +11,7 @@
 #' @importFrom PPP PPP
 
 mhChain <- function(seed, n_iter, chain_id, data,
-                    proposal_dist, proposal_params, max_age, PanelPRODatabase) {
+                    proposal_params, max_age, PanelPRODatabase) {
 
   set.seed(seed)
 
@@ -33,6 +32,7 @@ mhChain <- function(seed, n_iter, chain_id, data,
   type_index <- which(dim_names$PenetType == type)
 
   # Calculate the cummunlative risk for every age up until max. age
+  lifetime_risk <- PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, ,type_index]
   lifetime_risk_cum <- cumsum(PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, ,type_index])
   total_prob <- sum(lifetime_risk)
   midpoint_prob <- total_prob / 2
@@ -43,12 +43,23 @@ mhChain <- function(seed, n_iter, chain_id, data,
   # Identify the age at which the cumulative probability crosses the midpoint
   baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index])
 
-  # Initialize parameters using random draws from the proposal distributions
-  shift_start <- proposal_dist$shift(proposal_params$shift)
-  median_start <- proposal_dist$median_(proposal_params$median)
-  first_quartile_start <- proposal_dist$quartile(proposal_params$quartile)
-  asymptote_start <- proposal_dist$asymptote(proposal_params$asymptote)
+   # Extract proposal parameters
+  m1 <- proposal_params$m1
+  m2 <- proposal_params$m2
+  g1 <- proposal_params$g1
+  g2 <- proposal_params$g2
+  eps <- proposal_params$eps
+  shift_prior_min <- proposal_params$shift_prior_min
+  shift_prior_max <- proposal_params$shift_prior_max
+  q1 <- proposal_params$q1
+  q2 <- proposal_params$q2
+  p0 <- proposal_params$p0
 
+  # Initialize parameters using random draws from the proposal distributions
+  shift_start <- runif(1, shift_prior_min, shift_prior_max)
+  median_start <- rbeta(1, m1, m2) * (baseline_mid + eps - shift_start) + shift_start
+  first_quartile_start <- rbeta(1, q1, q2) * (median_start - shift_start) + shift_start
+  asymptote_start <- p0 + rbeta(1, g1, g2) * (1 - p0)
 
   # Initialize parameters using the provided starting values
   median_current <- median_start
@@ -56,22 +67,37 @@ mhChain <- function(seed, n_iter, chain_id, data,
   shift_current <- shift_start
   first_quartile_current <- first_quartile_start
 
-  # Set up empty vectors
-  median_samples <- numeric(n_iter)
-  first_quartile_samples <- numeric(n_iter)
-  asymptote_samples <- numeric(n_iter)
-  shift_samples <- numeric(n_iter)
-
   num_rejections <- 0
+
+  # Set up an object to record the results for one chain
+  out <- list(
+    median_samples = numeric(n_iter),
+    shift_samples = numeric(n_iter),
+    first_quartile_samples = numeric(n_iter),
+    asymptote_samples = numeric(n_iter),
+    loglikelihood_current = numeric(n_iter),
+    loglikelihood_proposal = numeric(n_iter),
+    acceptance_ratio = numeric(n_iter),
+    rejection_rate = numeric(n_iter)
+  )
 
   cat("Starting Chain", chain_id, "\n")
 
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
-    asymptote_proposal <- proposal_dist$asymptote(proposal_params$asymptote)
-    shift_proposal <- proposal_dist$shift(proposal_params$shift)
-    median_proposal <- proposal_dist$median(proposal_params$median)
-    first_quartile_proposal <- proposal_dist$quartile(proposal_params$quartile)
+    # generate aysmptote parameter (gamma)
+    asymptote_proposal <- rbeta(1, g1, g2)
+    asymptote_proposal <- p0 + asymptote_proposal * (1 - p0)
+
+    # generate shift parameter (delta)
+    shift_proposal <- runif(1, shift_prior_min, shift_prior_max)
+
+    # generate median
+    median_proposal <- rbeta(1, m1, m2) * (baseline_mid + eps - shift_proposal) + shift_proposal
+
+    # generate first quartile
+    first_quartile_proposal <- rbeta(1, q1, q2)
+    first_quartile_proposal <- (first_quartile_proposal) * (median_proposal - shift_proposal) + shift_proposal
 
     # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood(paras = c(median_current,first_quartile_current,asymptote_current,
@@ -94,19 +120,19 @@ mhChain <- function(seed, n_iter, chain_id, data,
       num_rejections <- num_rejections + 1  # Increment the rejection counter
     }
 
-    # Store the samples
-    median_samples[i] <- median_current
-    shift_samples[i] <- shift_current
-    first_quartile_samples[i] <- first_quartile_current
-    asymptote_samples[i] <- asymptote_current
-
+    # Update the outputs 
+    out$median_samples[i] <- median_current
+    out$shift_samples[i] <- shift_current
+    out$first_quartile_samples[i] <- first_quartile_current
+    out$asymptote_samples[i] <- asymptote_current
+    out$loglikelihood_current[i] <- loglikelihood_current
+    out$loglikelihood_proposal[i] <- loglikelihood_proposal
+    out$acceptance_ratio[i] <- acceptance_ratio
+    out$rejection_rate <- num_rejections / n_iter
   }
+  
   # Return the result as a list
-  list(median_samples = median_samples,
-       shift_samples = shift_samples,
-       first_quartile_samples = first_quartile_samples,
-       asymptote_samples = asymptote_samples,
-       rejection_rate = num_rejections / n_iter)
+  return(out)
 }
 
 #' Bayesian Inference using Independent Metropolis-Hastings for Penetrance Estimation
@@ -118,48 +144,97 @@ mhChain <- function(seed, n_iter, chain_id, data,
 #' @param data List of families data.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
-#' @param proposal_dist List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.
 #' @param proposal_params List of the parameters for the distributions of the proposal.
-#' @param max_age Maximum age to be considered.
+#' @param burn_in The fraction roportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0. 
+#' @param thinning_factor The factor by which to thin the results (positive integer). The default thinning factor is 1, which implies no thinning. 
+#' @param max_age Maximum age to be considered. Default is 94, based on PanelPRO settings.
+#' @param summary_stats Includes summary statistics in the function output.
+#' @param rejection_rates Includes the rejection rates for each chain in the function output.
+#' @param density_plots Includes simple density plots for the posterior samples in the function output.
+#' @param trace_plots Includes the trace plots for the individual chains in the function output.
 #' @return A list containing results for each chain.
-#'
 #' @importFrom stats rbeta runif dweibull
 #' @importFrom parallel makeCluster stopCluster parLapply
 #' @importFrom PPP PPP
 
 #' @export
 
+
 PenEstim <- function(data, n_chains, n_iter_per_chain,
-                     max_age=94, proposal_dist, proposal_params){
+                     proposal_params,
+                     max_age = 94, 
+                     summary_stats = TRUE,
+                     rejection_rates = TRUE,
+                     density_plots = TRUE,
+                     trace_plots = TRUE,
+                     burn_in = 0,
+                     thinning_factor = 1) {
 
   seeds <- sample.int(1000, n_chains)
 
-  cl <- makeCluster(n_chains)
+  cl <- parallel::makeCluster(n_chains)
 
   clusterEvalQ(cl, {
-    library(PPP)
-    PanelPRODatabase
+    library(PPP)  # Load the "PPP" library
   })
 
-  clusterExport(cl, c("mhChain", "mhLogLikelihood", "seeds", "n_iter_per_chain",
-                      "data", "proposal_dist", "proposal_params",
-                      "max_age"), envir=environment())
+  clusterExport(cl, c("mhChain", "mhLogLikelihood","seeds", "n_iter_per_chain",
+                      "data","proposal_params", "max_age",
+                      "PanelPRODatabase"), envir=environment())
 
-  results <- parLapply(cl, 1:n_chains, function(i) {
+  results <- parallel::parLapply(cl, 1:n_chains, function(i) {
     mhChain(seeds[i], n_iter = n_iter_per_chain, chain_id = i,
             data = data,
             PanelPRODatabase = PanelPRODatabase,
-            proposal_dist = proposal_dist,
             proposal_params = proposal_params,
             max_age = max_age)
   })
 
-  stopCluster(cl)
+  parallel::stopCluster(cl)
+
 
   # Check rejection rates and issue a warning if they are all above 90%
   all_high_rejections <- all(sapply(results, function(x) x$rejection_rate > 0.9))
-  if(all_high_rejections) {
+  if (all_high_rejections) {
     warning("Low acceptance rate. Please consider running the chain longer.")
   }
 
-  return(results)}
+  # Apply burn-in and thinning (assuming you have these functions defined)
+  if (burn_in > 0) {
+    results <- apply_burn_in(results, burn_in)
+  }
+  if (thinning_factor > 1) {
+    results <- apply_thinning(results, thinning_factor)
+  }
+
+  # Extract samples from the chains
+  combined_chains <- combine_chains(results)
+
+  # Initialize variables
+  output <- list()
+
+  if (trace_plots) {
+    # Generate trace plots
+    output$plot_trace <- plot_trace(results, n_chains)
+  }
+
+  if (rejection_rates) {
+    # Generate rejection rates
+    output$rejection_rates <- printRejectionRates(results)
+  }
+
+  if (summary_stats) {
+    # Generate summary statistics
+    output$summary_stats <- generate_summary(combined_chains)
+  }
+
+  if (density_plots) {
+    # Generate density plots
+    output$density_plots <- generate_density_plots(combined_chains)
+  }
+
+  output$combined_chains <- combined_chains
+  output$results <- results
+
+  return(output)
+}
