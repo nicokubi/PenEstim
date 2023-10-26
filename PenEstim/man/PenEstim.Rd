@@ -8,17 +8,14 @@ PenEstim(
   data,
   n_chains,
   n_iter_per_chain,
-  save_interval = 200,
   max_age = 94,
-  shift_prior_min = 0,
-  shift_prior_max = 25,
-  p0 = 0.15,
-  m1 = 2,
-  m2 = 2,
-  q1 = 6,
-  q2 = 3,
-  g1 = 9,
-  g2 = 1
+  proposal_params,
+  summary_stats = TRUE,
+  rejection_rates = TRUE,
+  density_plots = TRUE,
+  trace_plots = TRUE,
+  burn_in_length = 0,
+  thinning_factor = 1
 )
 }
 \arguments{
@@ -28,27 +25,11 @@ PenEstim(
 
 \item{n_iter_per_chain}{Number of iterations for each chain.}
 
-\item{save_interval}{Interval after which states should be saved.}
-
 \item{max_age}{Maximum age to be considered.}
 
-\item{shift_prior_min}{Minimum possible value for the shift parameter.}
+\item{proposal_params}{List of the parameters for the distributions of the proposal.}
 
-\item{shift_prior_max}{Maximum possible value for the shift parameter.}
-
-\item{p0}{baseline lifetime risk.}
-
-\item{m1}{parameter for the beta distribution for the median.}
-
-\item{m2}{parameter for the beta distribution fo the median.}
-
-\item{q1}{parameter of the beta distribution for the first quartile.}
-
-\item{q2}{parameter of the beta distribution for the first quartile.}
-
-\item{g1}{parameter of the beta distribution for the shift.}
-
-\item{g2}{parameter of the beta distribution for the shift.}
+\item{proposal_dist}{List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.}
 }
 \value{
 A list containing results for each chain.
