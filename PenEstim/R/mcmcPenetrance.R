@@ -12,10 +12,10 @@
 
 mhChain <- function(seed, n_iter, chain_id, data,
                     proposal_params, max_age, PanelPRODatabase) {
-
+  
   set.seed(seed)
 
- # Recover the SEER lifetime risk for the cancer
+  # Recover the SEER lifetime risk for the cancer
   gene <- "SEER"
   cancer <- "Breast"
   race <- "All_Races"
@@ -93,42 +93,46 @@ mhChain <- function(seed, n_iter, chain_id, data,
     shift_proposal <- runif(1, shift_prior_min, shift_prior_max)
 
     # generate median
-    median_proposal <- rbeta(1, m1, m2) * (baseline_mid + eps - shift_proposal) + shift_proposal
+    median_proposal <- rbeta(1, m1, m2) * (baseline_mid + eps - shift_proposal)
+    +shift_proposal
 
     # generate first quartile
     first_quartile_proposal <- rbeta(1, q1, q2)
-    first_quartile_proposal <- (first_quartile_proposal) * (median_proposal - shift_proposal) + shift_proposal
+    first_quartile_proposal <- (first_quartile_proposal)*(median_proposal - shift_proposal) + shift_proposal
 
-    # Compute the likelihood for the current and proposed
-    loglikelihood_current <- mhLogLikelihood(paras = c(median_current,first_quartile_current,asymptote_current,
-                                                       shift_current), families  = data,
-                                             max_age = max_age,PanelPRODatabase = PanelPRODatabase)
-    loglikelihood_proposal <- mhLogLikelihood(paras = c(median_proposal,first_quartile_proposal,
-                                                        asymptote_proposal,shift_proposal),
-                                              families = data,max_age = max_age,PanelPRODatabase = PanelPRODatabase)
+  # Compute the likelihood for the current and proposed
+  loglikelihood_current <- mhLogLikelihood(paras = c(median_current,
+  first_quartile_current,asymptote_current,
+  shift_current), families  = data,
+  max_age = max_age,PanelPRODatabase = PanelPRODatabase)
 
-    # Compute the acceptance ratio (likelihood ratio)
-    acceptance_ratio <- exp(loglikelihood_proposal - loglikelihood_current)
+  loglikelihood_proposal <- mhLogLikelihood(paras =
+  c(median_proposal,first_quartile_proposal,
+  asymptote_proposal,shift_proposal), families = data,
+  max_age = max_age,PanelPRODatabase = PanelPRODatabase)
 
-    # Accept or reject the proposal
-    if (runif(1) < acceptance_ratio) {
-      median_current <- median_proposal
-      shift_current <- shift_proposal
-      first_quartile_current <- first_quartile_proposal
-      asymptote_current <- asymptote_proposal
+  # Compute the acceptance ratio (likelihood ratio)
+  acceptance_ratio <- exp(loglikelihood_proposal - loglikelihood_current)
+
+  # Accept or reject the proposal
+  if (runif(1) < acceptance_ratio) {
+    median_current <- median_proposal
+    shift_current <- shift_proposal
+    first_quartile_current <- first_quartile_proposal
+    asymptote_current <- asymptote_proposal
     } else {
       num_rejections <- num_rejections + 1  # Increment the rejection counter
     }
 
-    # Update the outputs 
-    out$median_samples[i] <- median_current
-    out$shift_samples[i] <- shift_current
-    out$first_quartile_samples[i] <- first_quartile_current
-    out$asymptote_samples[i] <- asymptote_current
-    out$loglikelihood_current[i] <- loglikelihood_current
-    out$loglikelihood_proposal[i] <- loglikelihood_proposal
-    out$acceptance_ratio[i] <- acceptance_ratio
-    out$rejection_rate <- num_rejections / n_iter
+  # Update the outputs 
+  out$median_samples[i] <- median_current
+  out$shift_samples[i] <- shift_current
+  out$first_quartile_samples[i] <- first_quartile_current
+  out$asymptote_samples[i] <- asymptote_current
+  out$loglikelihood_current[i] <- loglikelihood_current
+  out$loglikelihood_proposal[i] <- loglikelihood_proposal
+  out$acceptance_ratio[i] <- acceptance_ratio
+  out$rejection_rate <- num_rejections / n_iter
   }
   
   # Return the result as a list

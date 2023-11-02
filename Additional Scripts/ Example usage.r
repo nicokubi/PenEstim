@@ -26,8 +26,36 @@ proposal_params <- list(
   q1 = 0.5, q2 = 2.0,
   p0 = 0.1
 )
-
-
 # Example call of PenEstim with proposal_fns and proposal_params.
 out3 <- PenEstim(simFamilies_C_1000_nocen_selected, 4, 3,proposal_params=proposal_params,density_plots=FALSE, trace_plots=FALSE)
 out3
+
+# Example for the automatic prior elictiation
+
+# Example usage:
+# Simulating penetrance data
+set.seed(42)  # for reproducibility
+
+ages <- seq(20, 80, by=5)  # ages from 20 to 80 in 5 year intervals
+a <- 0.2  # controls the steepness of the curve
+b <- 50  # median age of penetrance
+penetrance_prob <- 1 / (1 + exp(-(a * (ages - b))))
+
+# Add some noise to the penetrance probabilities
+penetrance_prob <- penetrance_prob + rnorm(length(ages), 0, 0.05)
+penetrance_prob <- pmin(pmax(penetrance_prob, 0), 1)  # Ensure values are between 0 and 1
+
+# Create the dataframe
+dataframe <- data.frame(age = ages, penetrance_prob = penetrance_prob)
+
+# Simulating at-risk data (assuming a decreasing number at risk with age)
+total_samples <- seq(1000, 500, length.out=length(ages))
+at_risk <- total_samples - cumsum(rpois(length(ages), lambda=20))  # some events occurring at each age
+samples_table <- data.frame(age = ages, total_samples = total_samples, at_risk = at_risk)
+
+distributions <- create_distributions(dataframe, samples_table)
+print(distributions$asymptote_distribution(1))
+print(distributions$shift_distribution(1))
+print(distributions$median_distribution(1))
+print(distributions$first_quartile_distribution(1))
+
