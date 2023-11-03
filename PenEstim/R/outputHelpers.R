@@ -1,5 +1,5 @@
-#' Combine Chains 
-#' Function to combine the posterior samples from the multiple chains. 
+#' Combine Chains
+#' Function to combine the posterior samples from the multiple chains.
 #'
 #' @param results A list of MCMC chain results.
 #'
@@ -29,7 +29,7 @@ combine_chains <- function(results) {
 #' @examples
 #' summary_stats <- generate_summary(combine_results)
 #'
-generate_summary <- function(data){
+generate_summary <- function(data) {
   summary_data <- data.frame(
     Median = data$median_results,
     Shift = data$shift_results,
@@ -40,7 +40,7 @@ generate_summary <- function(data){
 }
 
 #' Generate Density Plots
-#' 
+#'
 #' @param data A list with combined results.
 #'
 #' @examples
@@ -51,7 +51,7 @@ generate_density_plots <- function(data) {
   for (name in names(data)) {
     mod_name <- gsub("_", " ", name)
     mod_name <- paste0(toupper(substring(mod_name, 1, 1)), substring(mod_name, 2))
-    
+
     xlim <- if (name %in% c("median_samples", "first_quartile_samples", "shift_samples")) {
       c(0, 100)
     } else if (name == "asymptote_samples") {
@@ -59,13 +59,13 @@ generate_density_plots <- function(data) {
     } else {
       NULL
     }
-    
-    hist(data[[name]], 
-         main = paste("Density Plot of", mod_name), 
-         xlab = mod_name,
-         freq=FALSE,
-         xlim = xlim,
-         xaxp = c(min(xlim), max(xlim), 10) 
+
+    hist(data[[name]],
+      main = paste("Density Plot of", mod_name),
+      xlab = mod_name,
+      freq = FALSE,
+      xlim = xlim,
+      xaxp = c(min(xlim), max(xlim), 10)
     )
   }
 }
@@ -78,14 +78,14 @@ generate_density_plots <- function(data) {
 #' plot_trace(mcmc_results, n_chains = 4)
 #'
 plot_trace <- function(results, n_chains) {
-  par(mfrow = c(n_chains, 4))  # Set up a grid for the plots
+  par(mfrow = c(n_chains, 4)) # Set up a grid for the plots
   for (chain_id in 1:n_chains) {
     # Extract results for the current chain
     median_results <- results[[chain_id]]$median_results
     shift_results <- results[[chain_id]]$shift_results
     first_quartile_results <- results[[chain_id]]$first_quartile_results
     asymptote_results <- results[[chain_id]]$asymptote_results
-    
+
     # Create trace plots for the current chain
     plot(median_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Median"), xlab = "Iteration", ylab = "Median")
     plot(shift_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Shift"), xlab = "Iteration", ylab = "Shift")
@@ -102,13 +102,13 @@ plot_trace <- function(results, n_chains) {
 #'
 printRejectionRates <- function(results) {
   rejection_rates <- sapply(results, function(x) x$rejection_rate)
-cat("Rejection rates: ", rejection_rates, "\n")
+  cat("Rejection rates: ", rejection_rates, "\n")
 }
 
 #' Apply Burn-In
-#' 
+#'
 #' @param results A list of MCMC chain results.
-#' @param burn_in The fraction roportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0. 
+#' @param burn_in The fraction roportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0.
 #'
 #' @return A list of results with burn-in applied.
 #'
@@ -120,12 +120,12 @@ apply_burn_in <- function(results, burn_in) {
   if (!is.list(results) || length(results) < 1) {
     stop("results must be a list with at least one chain.")
   }
-  
+
   # Ensure 'burn_in' is numeric and between 0 and 1
   if (!is.numeric(burn_in) || burn_in <= 0 || burn_in >= 1) {
     stop("burn_in must be a numeric value between 0 and 1.")
   }
-  
+
   # Function to perform burn-in on a single chain (list of numeric vectors)
   burn_in_chain <- function(chain, burn_in) {
     lapply(chain, function(param_results) {
@@ -137,7 +137,7 @@ apply_burn_in <- function(results, burn_in) {
       param_results[(burn_in_count + 1):n_results]
     })
   }
-  
+
   # Apply burn-in to all results
   lapply(results, function(chain) {
     burn_in_chain(chain, burn_in)
@@ -147,7 +147,7 @@ apply_burn_in <- function(results, burn_in) {
 #' Apply Thinning
 #'
 #' @param results A list of MCMC chain results.
-#' @param thinning_factor The factor by which to thin the results (positive integer). The default thinning factor is 1, which implies no thinning. 
+#' @param thinning_factor The factor by which to thin the results (positive integer). The default thinning factor is 1, which implies no thinning.
 #'
 #' @return A list of results with thinning applied.
 #'
@@ -159,12 +159,12 @@ apply_thinning <- function(results, thinning_factor) {
   if (!is.list(results) || length(results) < 1) {
     stop("results must be a list with at least one chain.")
   }
-  
+
   # Ensure 'thinning_factor' is a positive integer
   if (!is.numeric(thinning_factor) || thinning_factor <= 0 || !is.integer(thinning_factor)) {
     stop("thinning_factor must be a positive integer.")
   }
-  
+
   # Function to perform thinning on a single chain (list of numeric vectors)
   thin_chain <- function(chain, thinning_factor) {
     lapply(chain, function(param_results) {
@@ -174,7 +174,7 @@ apply_thinning <- function(results, thinning_factor) {
       param_results[seq(1, length(param_results), by = thinning_factor)]
     })
   }
-  
+
   # Apply thinning to all chains
   lapply(results, function(chain) {
     thin_chain(chain, thinning_factor)
