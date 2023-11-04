@@ -40,7 +40,7 @@ generate_summary <- function(data) {
 }
 
 #' Generate Density Plots
-#'
+#' 
 #' @param data A list with combined results.
 #'
 #' @examples

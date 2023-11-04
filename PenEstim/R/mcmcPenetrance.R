@@ -44,10 +44,14 @@ mhChain <- function(
   baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index])
 
   # Initialize parameters using random draws from the proposal distributions
+  asymptote_start <- total_prob +
+    proposal_distributions$asymptote_distribution(1) * (1 - total_prob)
   shift_start <- proposal_distributions$shift_distribution(1)
-  median_start <- proposal_distributions$median_distribution(1)
-  first_quartile_start <- proposal_distributions$first_quartile_distribution(1)
-  asymptote_start <- proposal_distributions$asymptote_distribution(1)
+  median_start <- proposal_distributions$median_distribution(1) *
+    (baseline_mid + 5 - shift_start) + shift_start
+  first_quartile_start <-
+    proposal_distributions$first_quartile_distribution(1) *
+    (median_start - shift_start) + shift_start
 
   # Initialize parameters using the provided starting values
   median_current <- median_start
@@ -74,18 +78,20 @@ mhChain <- function(
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
     # generate aysmptote parameter (gamma)
-    asymptote_proposal <- proposal_distributions$asymptote_distribution(1)
-    asymptote_proposal <- total_prob + asymptote_proposal * (1 - total_prob)
+    asymptote_proposal <- total_prob +
+      proposal_distributions$asymptote_distribution(1) * (1 - total_prob)
 
     # generate shift parameter (delta)
     shift_proposal <- proposal_distributions$shift_distribution(1)
 
     # generate median
-    median_proposal <- proposal_distributions$median_distribution(1)
+    median_proposal <- proposal_distributions$median_distribution(1) *
+      (baseline_mid + 5 - shift_proposal) + shift_proposal
 
     # generate first quartile
     first_quartile_proposal <-
-      proposal_distributions$first_quartile_distribution(1)
+      proposal_distributions$first_quartile_distribution(1) *
+      (median_proposal - shift_proposal) + shift_proposal
 
     # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood(

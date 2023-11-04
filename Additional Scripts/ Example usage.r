@@ -26,10 +26,6 @@ proposal_params <- list(
   q1 = 0.5, q2 = 2.0,
   p0 = 0.1
 )
-# Example call of PenEstim with proposal_fns and proposal_params.
-out5 <- PenEstim(simFamilies_C_1000_nocen_selected, 3, 4, 
-proposal_distributions=proposal_distributions,density_plots=FALSE, trace_plots=FALSE)
-
 
 # Example for the automatic prior elictiation
 
@@ -54,8 +50,18 @@ total_samples <- seq(1000, 500, length.out=length(ages))
 at_risk <- total_samples - cumsum(rpois(length(ages), lambda=20))  # some events occurring at each age
 samples_table <- data.frame(age = ages, total_samples = total_samples, at_risk = at_risk)
 
-proposal_distributions =create_distributions(dataframe, samples_table)
+proposal_distributions =create_distributions()
 print(proposal_distributions$asymptote_distribution(1))
 print(proposal_distributions$shift_distribution(1))
 print(proposal_distributions$median_distribution(1))
 print(proposal_distributions$first_quartile_distribution(1))
+
+# Output
+library(parallel)
+library(PPP)
+
+# Example call of PenEstim with proposal_fns and proposal_params.
+out6 <- PenEstim(simFamilies_C_1000_nocen_selected, 4, 2,
+proposal_distributions = proposal_distributions, density_plots = FALSE,
+trace_plots = FALSE
+)
