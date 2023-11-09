@@ -11,13 +11,15 @@
 #' @importFrom PPP PPP
 
 mhChain <- function(
-    seed, n_iter, chain_id, data,
-    max_age, PanelPRODatabase, proposal_distributions) {
+  seed, n_iter, chain_id, data,
+  max_age, PanelPRODatabase, proposal_distributions, gene_input, cancer_type
+) {
+
   set.seed(seed)
 
   # Recover the SEER lifetime risk for the cancer
   gene <- "SEER"
-  cancer <- "Breast"
+  cancer <- cancer_type
   race <- "All_Races"
   female <- "Female"
   male <- "Male"
@@ -100,7 +102,10 @@ mhChain <- function(
         first_quartile_current, asymptote_current,
         shift_current
       ), families = data,
-      max_age = max_age, PanelPRODatabase = PanelPRODatabase
+      max_age = max_age,
+      gene_input = gene_input,
+      cancer_type = cancer_type,
+      PanelPRODatabase = PanelPRODatabase
     )
 
     loglikelihood_proposal <- mhLogLikelihood(
@@ -109,7 +114,10 @@ mhChain <- function(
           median_proposal, first_quartile_proposal,
           asymptote_proposal, shift_proposal
         ), families = data,
-      max_age = max_age, PanelPRODatabase = PanelPRODatabase
+      max_age = max_age,
+      gene_input = gene_input,
+      cancer_type = cancer_type,
+      PanelPRODatabase = PanelPRODatabase
     )
 
     # Compute the acceptance ratio (likelihood ratio)
@@ -147,10 +155,11 @@ mhChain <- function(
 #' the `stats`, `parallel`, and `PPP` packages.
 #'
 #' @param data List of families data.
+#' @param cancer_type The type of cancer to estimate penetrance for.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
 #' @param proposal_params List of the parameters for the distributions of the proposal.
-#' @param burn_in The fraction roportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0.
+#' @param burn_in The fraction proportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0.
 #' @param thinning_factor The factor by which to thin the results (positive integer). The default thinning factor is 1, which implies no thinning.
 #' @param max_age Maximum age to be considered. Default is 94, based on PanelPRO settings.
 #' @param summary_stats Includes summary statistics in the function output.
@@ -161,11 +170,11 @@ mhChain <- function(
 #' @importFrom stats rbeta runif dweibull
 #' @importFrom parallel makeCluster stopCluster parLapply
 #' @importFrom PPP PPP
-
+#'
 #' @export
 
-
-PenEstim <- function(data, n_chains, n_iter_per_chain,
+PenEstim <- function(data, cancer_type, gene_input, n_chains,
+                     n_iter_per_chain,
                      proposal_distributions,
                      max_age = 94,
                      summary_stats = TRUE,
@@ -185,7 +194,7 @@ PenEstim <- function(data, n_chains, n_iter_per_chain,
   clusterExport(cl, c(
     "mhChain", "mhLogLikelihood", "seeds", "n_iter_per_chain",
     "data", "proposal_distributions", "max_age",
-    "PanelPRODatabase"
+    "PanelPRODatabase", "cancer_type", "gene_input"
   ), envir = environment())
 
   results <- parallel::parLapply(cl, 1:n_chains, function(i) {
@@ -194,12 +203,13 @@ PenEstim <- function(data, n_chains, n_iter_per_chain,
       data = data,
       PanelPRODatabase = PanelPRODatabase,
       proposal_distributions = proposal_distributions,
-      max_age = max_age
+      max_age = max_age,
+      cancer_type = cancer_type,
+      gene_input = gene_input
     )
   })
 
   parallel::stopCluster(cl)
-
 
   # Check rejection rates and issue a warning if they are all above 90%
   all_high_rejections <- all(sapply(results, function(x) x$rejection_rate > 0.9))

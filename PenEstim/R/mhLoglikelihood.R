@@ -2,18 +2,16 @@
 #'
 #' @param paras Vector of parameters for which likelihood is to be computed.
 #' @param data List of families data.
+#' @param max_age Maximum age to be considered.
+#' @param cancer_type The type of cancer for which to estimate penetrance.
+#' @param gene_input The gene for which to estimate penetrance.
+#' @param PanelPRODatabase List containing penetrance data for different cancer types.
 #' @return Log-likelihood value.
 #' @importFrom PPP PPP
 
-
-mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase) {
+mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, gene_input, cancer_type) {
   # set age, same as in DB
   age <- seq(1, max_age, 1)
-  # use same BRCA1 frequency (not estimated)
-  BRCA1freq <- 0.9
-  PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV", 1]] <- BRCA1freq
-  PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV", 2]] <- BRCA1freq
-  PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV", 3]] <- BRCA1freq
 
   # Parameters, drawn from prior/proposal
   given_median <- paras[1]
@@ -40,8 +38,9 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase) {
   penetrance.mod.f <- dweibull(age - delta, alpha, beta) * gamma
 
   # For now focus on just one vector of penetrance estimates
-  gene <- "BRCA1_hetero_anyPV"
-  cancer <- "Breast"
+  gene_adj <- paste(gene_input, "_hetero_anyPV", sep = "")
+  gene <- gene_adj
+  cancer <- cancer_type
   race <- "All_Races"
   female <- "Female"
   male <- "Male"
@@ -55,14 +54,13 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase) {
   sex_index <- which(dim_names$Sex == female)
   type_index <- which(dim_names$PenetType == type)
 
-
   # overwrite the penetrance in the PanelPro Database
   PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, , ] <- penetrance.mod.f
 
-  #  Male Penetrance
+  #  Male Penetrance
   sex_index <- which(dim_names$Sex == male)
 
-  # Male penetrance funciton
+  # Male penetrance function
   penetrance.mod.m <- 0
   # overwrite the penetrance in the PanelPro Database
   PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, , ] <- penetrance.mod.m
@@ -73,9 +71,9 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase) {
   for (i in 1:length(data)) {
     data <- families[[i]] # Get the data for the current family
 
-    # Access the posterior probabilities (not normalized) and estimates for BRCA1 gene in Breast cancer
-    postprobs <- PPP(pedigree = data, genes = c("BRCA1"), cancers = "Breast", database = PanelPRODatabase)$posterior.prob[[1]] # check bug
-    estimate <- postprobs[postprobs$genes == "BRCA1_hetero_anyPV", "estimate"]
+    # Access the posterior probabilities (not normalized) and estimates for the specified gene and cancer type
+    postprobs <- PPP(pedigree = data, genes = c(gene_input), cancers = cancer_type, database = PanelPRODatabase)$posterior.prob[[1]]
+    estimate <- postprobs[postprobs$genes == gene_adj, "estimate"]
 
     if (is.nan(estimate) || estimate <= 0) {
       # Handle NaN or zero probabilities by adding a small value and/or penalizing
