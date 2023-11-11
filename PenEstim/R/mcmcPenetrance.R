@@ -12,35 +12,16 @@
 
 mhChain <- function(
   seed, n_iter, chain_id, data,
-  max_age, PanelPRODatabase, proposal_distributions, gene_input, cancer_type
+  max_age, PanelPRODatabase, proposal_distributions, cancer_type, gene_input
 ) {
 
+  # set seed
   set.seed(seed)
 
-  # Recover the SEER lifetime risk for the cancer
-  gene <- "SEER"
-  cancer <- cancer_type
-  race <- "All_Races"
-  female <- "Female"
-  male <- "Male"
-  type <- "Crude"
-
-  # Find the indices for the resp. attributes
-  dim_names <- attr(PanelPRODatabase$Penetrance, "dimnames")
-  gene_index <- which(dim_names$Gene == gene)
-  cancer_index <- which(dim_names$Cancer == cancer)
-  race_index <- which(dim_names$Race == race)
-  sex_index <- which(dim_names$Sex == female)
-  type_index <- which(dim_names$PenetType == type)
-
-  # Calculate the cummunlative risk for every age up until max. age
-  lifetime_risk <- PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
-  lifetime_risk_cum <- cumsum(PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index])
-  total_prob <- sum(lifetime_risk)
-  midpoint_prob <- total_prob / 2
-
   # Identify the index where cumulative probability crosses the midpoint
-  midpoint_index <- which(lifetime_risk_cum >= midpoint_prob)[1]
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER")
+  midpoint_prob <- SEER_baseline$total_probability/ 2
+  midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
 
   # Identify the age at which the cumulative probability crosses the midpoint
   baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index])
