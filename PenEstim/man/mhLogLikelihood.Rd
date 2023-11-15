@@ -4,10 +4,25 @@
 \alias{mhLogLikelihood}
 \title{Log-Likelihood Calculation for Metropolis-Hastings}
 \usage{
-mhLogLikelihood(paras, families, max_age, PanelPRODatabase)
+mhLogLikelihood(
+  paras,
+  families,
+  max_age,
+  PanelPRODatabase,
+  cancer_type,
+  gene_input
+)
 }
 \arguments{
 \item{paras}{Vector of parameters for which likelihood is to be computed.}
+
+\item{max_age}{Maximum age to be considered.}
+
+\item{PanelPRODatabase}{List containing penetrance data for different cancer types.}
+
+\item{cancer_type}{The type of cancer for which to estimate penetrance.}
+
+\item{gene_input}{The gene for which to estimate penetrance.}
 
 \item{data}{List of families data.}
 }

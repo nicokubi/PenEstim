@@ -47,19 +47,33 @@ generate_summary <- function(data) {
 #' generate_density_plots(combine_results)
 #'
 generate_density_plots <- function(data) {
+  # Set the plotting parameters
   par(mfrow = c(2, 2), las = 1, mar = c(5, 4, 4, 2) + 0.1)
-  for (name in names(data)) {
+
+  # Define the specific vectors to plot
+  plot_names <- c("median_results", "first_quartile_results", "asymptote_results", "shift_results")
+
+  for (name in plot_names) {
+    if (is.null(data[[name]]) || length(data[[name]]) == 0) {
+      next # Skip this iteration if the data is empty
+    }
+
     mod_name <- gsub("_", " ", name)
     mod_name <- paste0(toupper(substring(mod_name, 1, 1)), substring(mod_name, 2))
 
-    xlim <- if (name %in% c("median_samples", "first_quartile_samples", "shift_samples")) {
+    # Set xlim based on the name of the vector
+    xlim <- if (name %in% c("median_results", "first_quartile_results", "shift_results")) {
       c(0, 100)
-    } else if (name == "asymptote_samples") {
+    } else if (name == "asymptote_results") {
       c(0.15, 1)
-    } else {
-      NULL
     }
 
+    # Ensure xlim is finite and valid
+    if (any(is.infinite(xlim))) {
+      xlim <- c(min(data[[name]], na.rm = TRUE), max(data[[name]], na.rm = TRUE))
+    }
+
+    # Create the histogram
     hist(data[[name]],
       main = paste("Density Plot of", mod_name),
       xlab = mod_name,
@@ -69,6 +83,8 @@ generate_density_plots <- function(data) {
     )
   }
 }
+
+generate_density_plots(out10$combined_chains)
 
 #' Plot Trace
 #' @param results A list of MCMC chain results.

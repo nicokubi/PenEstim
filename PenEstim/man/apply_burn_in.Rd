@@ -9,7 +9,7 @@ apply_burn_in(results, burn_in)
 \arguments{
 \item{results}{A list of MCMC chain results.}
 
-\item{burn_in}{The proportion of results to discard as burn-in (0 to 1).}
+\item{burn_in}{The fraction roportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0.}
 }
 \value{
 A list of results with burn-in applied.

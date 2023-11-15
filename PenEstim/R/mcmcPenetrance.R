@@ -9,31 +9,30 @@
 #' @return A list with samples and rejection rate.
 #' @importFrom parallel makeCluster stopCluster parLapply clusterExport clusterEvalQ
 #' @importFrom PPP PPP
+#'
+#'
 
+# Main mhChain function
 mhChain <- function(
-  seed, n_iter, chain_id, data,
-  max_age, PanelPRODatabase, proposal_distributions, cancer_type, gene_input
-) {
+    seed, n_iter, chain_id, data,
+    max_age, PanelPRODatabase, proposal_distributions, cancer_type, gene_input) {
 
-  # set seed
+  # Set the right seed
   set.seed(seed)
 
-  # Identify the index where cumulative probability crosses the midpoint
+  # Calculate SEER baseline and midpoint
   SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER")
-  midpoint_prob <- SEER_baseline$total_probability/ 2
+  midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
-
-  # Identify the age at which the cumulative probability crosses the midpoint
-  baseline_mid <- as.numeric(names(lifetime_risk_cum)[midpoint_index])
+  baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
 
   # Initialize parameters using random draws from the proposal distributions
-  asymptote_start <- total_prob +
-    proposal_distributions$asymptote_distribution(1) * (1 - total_prob)
-  shift_start <- proposal_distributions$shift_distribution(1)
-  median_start <- proposal_distributions$median_distribution(1) *
+  asymptote_start <- SEER_baseline$total_prob +
+    do.call(proposal_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
+  shift_start <- do.call(proposal_distributions$shift_distribution, list(1))
+  median_start <- do.call(proposal_distributions$median_distribution, list(1)) *
     (baseline_mid + 5 - shift_start) + shift_start
-  first_quartile_start <-
-    proposal_distributions$first_quartile_distribution(1) *
+  first_quartile_start <- do.call(proposal_distributions$first_quartile_distribution, list(1)) *
     (median_start - shift_start) + shift_start
 
   # Initialize parameters using the provided starting values
@@ -60,20 +59,20 @@ mhChain <- function(
 
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
-    # generate aysmptote parameter (gamma)
-    asymptote_proposal <- total_prob +
-      proposal_distributions$asymptote_distribution(1) * (1 - total_prob)
+    # generate asymptote parameter (gamma)
+    asymptote_proposal <- SEER_baseline$total_prob +
+      do.call(proposal_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
 
     # generate shift parameter (delta)
-    shift_proposal <- proposal_distributions$shift_distribution(1)
+    shift_proposal <- do.call(proposal_distributions$shift_distribution, list(1))
 
     # generate median
-    median_proposal <- proposal_distributions$median_distribution(1) *
+    median_proposal <- do.call(proposal_distributions$median_distribution, list(1)) *
       (baseline_mid + 5 - shift_proposal) + shift_proposal
 
     # generate first quartile
     first_quartile_proposal <-
-      proposal_distributions$first_quartile_distribution(1) *
+      do.call(proposal_distributions$first_quartile_distribution, list(1)) *
       (median_proposal - shift_proposal) + shift_proposal
 
     # Compute the likelihood for the current and proposed
@@ -129,6 +128,7 @@ mhChain <- function(
   return(out)
 }
 
+
 #' Bayesian Inference using Independent Metropolis-Hastings for Penetrance Estimation
 #'
 #' This function employs a Bayesian approach for penetrance estimation, utilizing the
@@ -154,17 +154,56 @@ mhChain <- function(
 #'
 #' @export
 
-PenEstim <- function(data, cancer_type, gene_input, n_chains,
-                     n_iter_per_chain,
-                     proposal_distributions,
+PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
+                     n_iter_per_chain = 200,
                      max_age = 94,
                      summary_stats = TRUE,
                      rejection_rates = TRUE,
                      density_plots = TRUE,
                      trace_plots = TRUE,
                      burn_in = 0,
-                     thinning_factor = 1) {
+                     thinning_factor = 1,
+                     dataframe = NULL,
+                     samples_table = NULL,
+                     sample_size = NULL,
+                     ratio = NULL,
+                     custom_params = proposal_dist,
+                     median_atrisk = 0.5,
+                     quartile_atrisk = 0.9,
+                     max_age_atrisk = 0.1) {
+  # Validate inputs
+  if (missing(data)) {
+    stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
+  }
+  if (missing(cancer_type)) {
+    stop("Error: 'cancer_type' parameter is missing. Please specify the type of cancer for penetrance estimation.")
+  }
+  if (missing(gene_input)) {
+    stop("Error: 'gene_input' parameter is missing. Please provide the gene.")
+  }
+  if (missing(n_chains) || !is.numeric(n_chains) || n_chains <= 0) {
+    stop("Error: 'n_chains' parameter is missing or invalid.
+    Please specify the number of chains to be run (on seperate cores).
+    It must be a positive integer.")
+  }
+  if (missing(n_iter_per_chain) || !is.numeric(n_iter_per_chain) || n_iter_per_chain <= 0) {
+    stop("Error: 'n_iter_per_chain' parameter is missing or invalid. It must be a positive integer.")
+  }
+
+  # create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
+
+  prop <- create_distributions(
+    dataframe = dataframe,
+    samples_table = samples_table,
+    sample_size = sample_size,
+    cancer = cancer_type,
+    ratio = ratio,
+    custom_params = custom_params,
+    median_atrisk = median_atrisk,
+    quartile_atrisk = quartile_atrisk,
+    max_age_atrisk = max_age_atrisk
+  )
 
   cl <- parallel::makeCluster(n_chains)
 
@@ -173,8 +212,10 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains,
   })
 
   clusterExport(cl, c(
-    "mhChain", "mhLogLikelihood", "seeds", "n_iter_per_chain",
-    "data", "proposal_distributions", "max_age",
+    "mhChain", "mhLogLikelihood", "calculate_lifetime_risk",
+    "generate_proposal",
+    "seeds", "n_iter_per_chain",
+    "data", "prop", "max_age",
     "PanelPRODatabase", "cancer_type", "gene_input"
   ), envir = environment())
 
@@ -183,7 +224,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains,
       n_iter = n_iter_per_chain, chain_id = i,
       data = data,
       PanelPRODatabase = PanelPRODatabase,
-      proposal_distributions = proposal_distributions,
+      proposal_distributions = prop,
       max_age = max_age,
       cancer_type = cancer_type,
       gene_input = gene_input

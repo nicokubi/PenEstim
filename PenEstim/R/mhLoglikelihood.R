@@ -9,7 +9,7 @@
 #' @return Log-likelihood value.
 #' @importFrom PPP PPP
 
-mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, gene_input, cancer_type) {
+mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_type, gene_input) {
   # set age, same as in DB
   age <- seq(1, max_age, 1)
 
@@ -68,14 +68,15 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, gene_inp
   # Storing the estimates
   log_likelihood <- 0
 
-  for (i in 1:length(data)) {
+  for (i in 1:length(families)) {
     data <- families[[i]] # Get the data for the current family
 
     # Access the posterior probabilities (not normalized) and estimates for the specified gene and cancer type
     postprobs <- PPP(pedigree = data, genes = c(gene_input), cancers = cancer_type, database = PanelPRODatabase)$posterior.prob[[1]]
     estimate <- postprobs[postprobs$genes == gene_adj, "estimate"]
 
-    if (is.nan(estimate) || estimate <= 0) {
+    # Check for NA or NaN before proceeding to if condition
+       if (is.nan(estimate) || estimate <= 0) {
       # Handle NaN or zero probabilities by adding a small value and/or penalizing
       estimate <- 1e-28
       ll <- log(estimate)

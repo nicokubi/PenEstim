@@ -6,30 +6,51 @@
 \usage{
 PenEstim(
   data,
-  n_chains,
-  n_iter_per_chain,
+  cancer_type,
+  gene_input,
+  n_chains = 4,
+  n_iter_per_chain = 200,
   max_age = 94,
-  proposal_params,
   summary_stats = TRUE,
   rejection_rates = TRUE,
   density_plots = TRUE,
   trace_plots = TRUE,
-  burn_in_length = 0,
-  thinning_factor = 1
+  burn_in = 0,
+  thinning_factor = 1,
+  dataframe = NULL,
+  samples_table = NULL,
+  sample_size = NULL,
+  ratio = NULL,
+  custom_params = NULL,
+  median_atrisk = 0.5,
+  quartile_atrisk = 0.9,
+  max_age_atrisk = 0.1
 )
 }
 \arguments{
 \item{data}{List of families data.}
 
+\item{cancer_type}{The type of cancer to estimate penetrance for.}
+
 \item{n_chains}{Number of chains for parallel computation.}
 
 \item{n_iter_per_chain}{Number of iterations for each chain.}
 
-\item{max_age}{Maximum age to be considered.}
+\item{max_age}{Maximum age to be considered. Default is 94, based on PanelPRO settings.}
+
+\item{summary_stats}{Includes summary statistics in the function output.}
+
+\item{rejection_rates}{Includes the rejection rates for each chain in the function output.}
+
+\item{density_plots}{Includes simple density plots for the posterior samples in the function output.}
+
+\item{trace_plots}{Includes the trace plots for the individual chains in the function output.}
+
+\item{burn_in}{The fraction proportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0.}
+
+\item{thinning_factor}{The factor by which to thin the results (positive integer). The default thinning factor is 1, which implies no thinning.}
 
 \item{proposal_params}{List of the parameters for the distributions of the proposal.}
-
-\item{proposal_dist}{List of the statistical distribution for the proposal distributions for the median, first quartile, shift and asymptote parameters.}
 }
 \value{
 A list containing results for each chain.

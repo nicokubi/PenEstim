@@ -27,7 +27,7 @@ samples_table <- data.frame(age = ages, total_samples = total_samples, at_risk =
 
 print(penetrance_df)
 print(samples_table)
-proposal_distributions = create_distributions(penetrance_df,sample_size =1000)
+proposals = create_distributions()
 print(proposal_distributions$asymptote_distribution(1))
 print(proposal_distributions$shift_distribution(1))
 print(proposal_distributions$median_distribution(1))
@@ -63,13 +63,16 @@ par(mfrow = c(1, 1))
 # Output
 library(parallel)
 library(PPP)
+library(PenEstim)
+
 
 load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated Families/simFamilies_C_1000_nocen_selected.RData")
 
 # Example call of PenEstim with proposal_fns and proposal_params.
-out7 <- PenEstim(
-data=simFamilies_C_1000_nocen_selected, cancer_type = "Breast",
-gene_input = "BRCA1", n_chains = 2, n_iter_per_chain = 2,
-proposal_distributions = proposal_distributions, density_plots = FALSE,
-trace_plots = FALSE
+out10 <- PenEstim(
+data = simFamilies_C_1000_nocen_selected, cancer_type = "Breast",
+gene_input = "BRCA1", n_chains = 2, n_iter_per_chain = 2, density_plots = FALSE,
+trace_plots = FALSE,
 )
+
+PenEstim()

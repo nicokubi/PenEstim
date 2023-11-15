@@ -9,7 +9,7 @@ apply_thinning(results, thinning_factor)
 \arguments{
 \item{results}{A list of MCMC chain results.}
 
-\item{thinning_factor}{The factor by which to thin the results (positive integer).}
+\item{thinning_factor}{The factor by which to thin the results (positive integer). The default thinning factor is 1, which implies no thinning.}
 }
 \value{
 A list of results with thinning applied.
