@@ -1,24 +1,33 @@
-
-# Default parameter settings 
-proposal_dist_default <- list(
+# Default parameter settings
+proposal_params_default <- list(
   asymptote = list(g1 = 1, g2 = 1),
   shift = list(min = 0, max = 25),
   median = list(m1 = 2, m2 = 2),
-  quartile = list(q1 = 6, q2 = 3)
+  first_quartile = list(q1 = 6, q2 = 3)
 )
 
-# Function to create the proposal distributions
-create_distributions <- function(
-    dataframe = NULL,
-    samples_table = NULL,
-    sample_size = NULL,
-    cancer = NULL,
-    ratio = NULL,
-    custom_params = proposal_dist,
-    median_atrisk = 0.5,
-    quartile_atrisk = 0.9,
-    max_age_atrisk = 0.1) {
+# Dataframe with the default proportions of poeple at risk
+risk_proportion_default <- data.frame(
+  median = 0.5,
+  first_quartile = 0.9,
+  max_age = 0.1
+)
 
+# Create a data frame with row names
+distribution_data_default <- data.frame(
+  row.names = c("min", "first_quartile", "median", "max"),
+  age = c(NA, NA, NA, NA),
+  at_risk = c(NA, NA, NA, NA)
+)
+
+#  Function to create the proposal distributions
+create_distributions <- function(
+    data,
+    sample_size,
+    cancer,
+    ratio,
+    proposal_params,
+    risk_proportion) {
   # Helper function definitions
   # Define the scaling transformation
   normalize_median <- function(x) {
@@ -30,7 +39,7 @@ create_distributions <- function(
     return((x - min_age) / (median_age - min_age))
   }
 
-  # Compute beta distribution parameters for median
+  # Function: Compute beta distribution parameters for median
   compute_parameters_median <- function(stat, at_risk) {
     median_norm <- normalize_median(stat)
 
@@ -40,7 +49,7 @@ create_distributions <- function(
     return(list(m1 = alpha, m2 = beta))
   }
 
-  # Compute beta distribution parameters for first quartile
+  # Function: Compute beta distribution parameters for first quartile
   compute_parameters_quartile <- function(stat, at_risk) {
     quartile_norm <- normalize_first_quartile(stat)
 
@@ -50,7 +59,7 @@ create_distributions <- function(
     return(list(q1 = alpha, q2 = beta))
   }
 
-  # Compute beta distribution parameters for asymptote parameter
+  # Function: Compute beta distribution parameters for asymptote parameter
   compute_parameters_asymptote <- function(stat, at_risk) {
     max_age_norm <- normalize_median(stat)
     alpha <- max_age_norm * at_risk
@@ -59,61 +68,50 @@ create_distributions <- function(
   }
 
   # Main logic for setting the parameters of the proposal distribution
-  # Check if dataframe and samples table and ratio are NULL, then use proposal_params as it is
-  if (is.null(dataframe) && is.null(samples_table)) {
-    # Default parameter settings
-    proposal_params <- custom_params
+  # Checking for various data and parameters conditions
+  if (is.null(data) || all(is.na(data))) {
+    proposal_params <- proposal_params_default
   } else {
-    # If dataframe is provided, compute the median and first quartile ages
-    if (!is.null(dataframe) && all(c("age", "penetrance_prob") %in% names(dataframe))) {
-      max_age <- max(dataframe$age)
-      min_age <- min(dataframe$age)
-      median_index <- which.min(abs(dataframe$penetrance_prob - 0.5))
-      median_age <- dataframe$age[median_index]
-      first_quartile <- quantile(dataframe$age, 0.25)
-    } else {
-      stop("The 'dataframe' argument must contain 'age' and 'penetrance_prob' columns.")
+    # Check if all age entries are present
+    if (any(is.na(data$age)) || any(!sapply(data$age, is.numeric))) {
+      stop("Missing or non-numeric age entries in the data. Add numeric ages.")
     }
-    # If samples table is provided, extract the risk numbers
-    if (!is.null(samples_table) && all(c("age", "at_risk") %in% names(samples_table))) {
-      risk_median <- ifelse(any(samples_table$age == median_age),
-        samples_table$at_risk[samples_table$age == median_age], median_atrisk * sample_size
-      )
-      risk_quartile <- ifelse(any(samples_table$age == first_quartile),
-        samples_table$at_risk[samples_table$age == first_quartile], quartile_atrisk * sample_size
-      )
-      risk_max_age <- ifelse(any(samples_table$age == max_age),
-        samples_table$at_risk[samples_table$age == max_age], max_age_atrisk * sample_size
-      )
+    max_age <- data["max", "age"]
+    min_age <- data["min", "age"]
+    first_quartile_age <- data["first_quartile", "age"]
+    median_age <- data["median", "age"]
+
+    if (!is.null(data) && all(!is.na(data$age)) && all(is.na(data$at_risk)) && !is.null(sample_size)) {
+      risk_median <- risk_proportion$median * sample_size
+      risk_first_quartile <- risk_proportion$first_quartile * sample_size
+      risk_max_age <- risk_proportion$max_age * sample_size
     } else {
-      if (!is.null(sample_size)) {
-        risk_median <- median_atrisk * sample_size
-        risk_quartile <- quartile_atrisk * sample_size
-        risk_max_age <- max_age_atrisk * sample_size
-      } else {
-        stop("Sample size parameter required.")
+      if (any(is.na(data$at_risk)) || any(!sapply(data$at_risk, is.numeric))) {
+        stop("Missing or non-numeric risk entries in the data. Add individuals at risk or total sample size.")
       }
-      # Calculate the parameters
-      res_median <- compute_parameters_median(median_age, risk_median)
-      res_quartile <- compute_parameters_quartile(first_quartile, risk_quartile)
-      res_asymptote <- compute_parameters_asymptote(max_age, risk_max_age)
-
-      proposal_params <- list(
-        asymptote = list(g1 = res_asymptote$g1, g2 = res_asymptote$g2),
-        shift = list(min = 0, max = min_age),
-        median = list(m1 = res_median$m1, m2 = res_median$m2),
-        quartile = list(q1 = res_quartile$q1, q2 = res_quartile$q2)
-      )
+      risk_median <- data$at_risk[data$age == median_age]
+      risk_first_quartile <- data$at_risk[data$age == first_quartile_age]
+      risk_max_age <- data$at_risk[data$age == max_age]
     }
-  }
 
+    # Calculate the parameters
+    res_median <- compute_parameters_median(median_age, risk_median)
+    res_first_quartile <- compute_parameters_quartile(first_quartile_age, risk_first_quartile)
+    res_asymptote <- compute_parameters_asymptote(max_age, risk_max_age)
+
+    proposal_params <- list(
+      asymptote = list(g1 = res_asymptote$alpha, g2 = res_asymptote$beta),
+      shift = list(min = 0, max = min_age),
+      median = list(m1 = res_median$alpha, m2 = res_median$beta),
+      first_quartile = list(q1 = res_first_quartile$alpha, q2 = res_first_quartile$beta)
+    )
+  }
   # If Ratio is provided, compute the asymptote parameters based on the ratio
   # This will overwrite any other inputs for the asymptote
   if (!is.null(ratio) && !is.null(cancer)) {
     SERR_baseline <- calculate_lifetime_risk(cancer = cancer, gene = "SEER")
     proposal_params$asymptote <- list(g1 = SERR_baseline * ratio, g2 = SERR_baseline * ratio)
   }
-
 
   # Asymptote distribution using either custom or default g1 and g2
   asymptote_distribution <- function(n) {
@@ -132,7 +130,7 @@ create_distributions <- function(
 
   # First quartile distribution using parameters from compute_parameters_quartile
   first_quartile_distribution <- function(n) {
-    qbeta(runif(n), proposal_params$quartile$q1, proposal_params$quartile$q2)
+    qbeta(runif(n), proposal_params$first_quartile$q1, proposal_params$first_quartile$q2)
   }
 
   # Create a list with the distributions
@@ -146,3 +144,4 @@ create_distributions <- function(
   # Return the proposal_distributions list
   return(proposal_distributions)
 }
+

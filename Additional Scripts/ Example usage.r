@@ -28,10 +28,10 @@ samples_table <- data.frame(age = ages, total_samples = total_samples, at_risk =
 print(penetrance_df)
 print(samples_table)
 proposals = create_distributions()
-print(proposal_distributions$asymptote_distribution(1))
-print(proposal_distributions$shift_distribution(1))
-print(proposal_distributions$median_distribution(1))
-print(proposal_distributions$first_quartile_distribution(1))
+print(dis$asymptote_distribution(1))
+print(dis$shift_distribution(1))
+print(dis$median_distribution(1))
+print(dis$first_quartile_distribution(1))
 
 # Create a list to store the results
 results_list <- list()
@@ -74,5 +74,14 @@ data = simFamilies_C_1000_nocen_selected, cancer_type = "Breast",
 gene_input = "BRCA1", n_chains = 2, n_iter_per_chain = 2, density_plots = FALSE,
 trace_plots = FALSE,
 )
+
+ dis <- create_distributions(
+   data = distribution_data_default,
+   sample_size = NULL,
+   cancer = "Breast",
+   ratio = NULL,
+   proposal_params = proposal_params_default,
+   risk_proportion = risk_proportion_default
+ )
 
 PenEstim()

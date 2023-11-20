@@ -9,14 +9,12 @@
 #' @return A list with samples and rejection rate.
 #' @importFrom parallel makeCluster stopCluster parLapply clusterExport clusterEvalQ
 #' @importFrom PPP PPP
-#'
-#'
 
 # Main mhChain function
 mhChain <- function(
     seed, n_iter, chain_id, data,
-    max_age, PanelPRODatabase, proposal_distributions, cancer_type, gene_input) {
-
+    max_age, PanelPRODatabase, proposal_distributions, cancer_type, gene_input,
+    median_max = TRUE) {
   # Set the right seed
   set.seed(seed)
 
@@ -30,8 +28,14 @@ mhChain <- function(
   asymptote_start <- SEER_baseline$total_prob +
     do.call(proposal_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
   shift_start <- do.call(proposal_distributions$shift_distribution, list(1))
-  median_start <- do.call(proposal_distributions$median_distribution, list(1)) *
-    (baseline_mid + 5 - shift_start) + shift_start
+  # Initialize median_start with an if-statement to choose between baseline_mid and max_age
+  if (median_max == TRUE) {
+    median_start <- do.call(proposal_distributions$median_distribution, list(1)) *
+      (baseline_mid - shift_start) + shift_start
+  } else {
+    median_start <- do.call(proposal_distributions$median_distribution, list(1)) *
+      (max_age - shift_start) + shift_start
+  }
   first_quartile_start <- do.call(proposal_distributions$first_quartile_distribution, list(1)) *
     (median_start - shift_start) + shift_start
 
@@ -67,8 +71,13 @@ mhChain <- function(
     shift_proposal <- do.call(proposal_distributions$shift_distribution, list(1))
 
     # generate median
-    median_proposal <- do.call(proposal_distributions$median_distribution, list(1)) *
-      (baseline_mid + 5 - shift_proposal) + shift_proposal
+    if (median_max == TRUE) {
+      median_proposal <- do.call(proposal_distributions$median_distribution, list(1)) *
+        (baseline_mid - shift_proposal) + shift_proposal
+    } else {
+      median_proposal <- do.call(proposal_distributions$median_distribution, list(1)) *
+        (max_age - shift_proposal) + shift_proposal
+    }
 
     # generate first quartile
     first_quartile_proposal <-
@@ -163,14 +172,12 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      trace_plots = TRUE,
                      burn_in = 0,
                      thinning_factor = 1,
-                     dataframe = NULL,
-                     samples_table = NULL,
+                     distribution_data = distribution_data_default,
                      sample_size = NULL,
                      ratio = NULL,
-                     custom_params = proposal_dist,
-                     median_atrisk = 0.5,
-                     quartile_atrisk = 0.9,
-                     max_age_atrisk = 0.1) {
+                     proposal_params = proposal_params_default,
+                     risk_proportion = risk_proportion_default
+                     )  {
   # Validate inputs
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
@@ -193,17 +200,15 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   # create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
 
-  prop <- create_distributions(
-    dataframe = dataframe,
-    samples_table = samples_table,
-    sample_size = sample_size,
-    cancer = cancer_type,
-    ratio = ratio,
-    custom_params = custom_params,
-    median_atrisk = median_atrisk,
-    quartile_atrisk = quartile_atrisk,
-    max_age_atrisk = max_age_atrisk
-  )
+ # Create the proposal distributions
+ prop <- create_distributions(
+   data = distribution_data,
+   sample_size = sample_size,
+   cancer = cancer_type,
+   ratio = ratio,
+   proposal_params = proposal_params,
+   risk_proportion = risk_proportion
+ )
 
   cl <- parallel::makeCluster(n_chains)
 
