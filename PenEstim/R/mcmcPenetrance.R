@@ -155,7 +155,6 @@ mhChain <- function(
 #' @param summary_stats Includes summary statistics in the function output.
 #' @param rejection_rates Includes the rejection rates for each chain in the function output.
 #' @param density_plots Includes simple density plots for the posterior samples in the function output.
-#' @param trace_plots Includes the trace plots for the individual chains in the function output.
 #' @return A list containing results for each chain.
 #' @importFrom stats rbeta runif dweibull
 #' @importFrom parallel makeCluster stopCluster parLapply
@@ -166,17 +165,16 @@ mhChain <- function(
 PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      n_iter_per_chain = 200,
                      max_age = 94,
-                     summary_stats = TRUE,
-                     rejection_rates = TRUE,
-                     density_plots = TRUE,
-                     trace_plots = TRUE,
                      burn_in = 0,
                      thinning_factor = 1,
                      distribution_data = distribution_data_default,
                      sample_size = NULL,
                      ratio = NULL,
                      proposal_params = proposal_params_default,
-                     risk_proportion = risk_proportion_default
+                     risk_proportion = risk_proportion_default,
+                     summary_stats = TRUE,
+                     rejection_rates = TRUE,
+                     density_plots = TRUE
                      )  {
   # Validate inputs
   if (missing(data)) {
@@ -237,6 +235,8 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   })
 
   parallel::stopCluster(cl)
+  saveRDS(results, file = "intermediate_results.RDS")
+
 
   # Check rejection rates and issue a warning if they are all above 90%
   all_high_rejections <- all(sapply(results, function(x) x$rejection_rate > 0.9))
@@ -244,7 +244,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
     warning("Low acceptance rate. Please consider running the chain longer.")
   }
 
-  # Apply burn-in and thinning (assuming you have these functions defined)
+  # Apply burn-in and thinning 
   if (burn_in > 0) {
     results <- apply_burn_in(results, burn_in)
   }
@@ -257,11 +257,6 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
   # Initialize variables
   output <- list()
-
-  if (trace_plots) {
-    # Generate trace plots
-    output$plot_trace <- plot_trace(results, n_chains)
-  }
 
   if (rejection_rates) {
     # Generate rejection rates

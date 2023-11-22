@@ -68,19 +68,23 @@ create_distributions <- function(
   }
 
   # Main logic for setting the parameters of the proposal distribution
-  # Checking for various data and parameters conditions
+  # Setting 1: When there is no user input in the data_distribution, then the default parameter settings are applied.
+  # Setting 2: If the user has modified the proposal_params_default object, the customized parameter settings will be applied. 
   if (is.null(data) || all(is.na(data))) {
     proposal_params <- proposal_params_default
   } else {
+    # Setting 3: Extracting the user inputs from the data_distribution_default dataframe for the prior elicitation. 
     # Check if all age entries are present
     if (any(is.na(data$age)) || any(!sapply(data$age, is.numeric))) {
       stop("Missing or non-numeric age entries in the data. Add numeric ages.")
     }
+    # Extract the ages from the user input. 
     max_age <- data["max", "age"]
     min_age <- data["min", "age"]
     first_quartile_age <- data["first_quartile", "age"]
     median_age <- data["median", "age"]
 
+    # Setting 3b: If the user did not provide the number of people at risk, the risk proportions are applied to calculate the number of people at risk
     if (!is.null(data) && all(!is.na(data$age)) && all(is.na(data$at_risk)) && !is.null(sample_size)) {
       risk_median <- risk_proportion$median * sample_size
       risk_first_quartile <- risk_proportion$first_quartile * sample_size
@@ -89,16 +93,18 @@ create_distributions <- function(
       if (any(is.na(data$at_risk)) || any(!sapply(data$at_risk, is.numeric))) {
         stop("Missing or non-numeric risk entries in the data. Add individuals at risk or total sample size.")
       }
+      # Setting 3a: If all the data is provided, extract the number of people at risk from the dataframe
       risk_median <- data$at_risk[data$age == median_age]
       risk_first_quartile <- data$at_risk[data$age == first_quartile_age]
       risk_max_age <- data$at_risk[data$age == max_age]
     }
 
-    # Calculate the parameters
+    # Calculate the parameters based on the extracted statistics above
     res_median <- compute_parameters_median(median_age, risk_median)
     res_first_quartile <- compute_parameters_quartile(first_quartile_age, risk_first_quartile)
     res_asymptote <- compute_parameters_asymptote(max_age, risk_max_age)
 
+    # Update the proposal_params object with the newly calculated parameters
     proposal_params <- list(
       asymptote = list(g1 = res_asymptote$alpha, g2 = res_asymptote$beta),
       shift = list(min = 0, max = min_age),
@@ -106,7 +112,7 @@ create_distributions <- function(
       first_quartile = list(q1 = res_first_quartile$alpha, q2 = res_first_quartile$beta)
     )
   }
-  # If Ratio is provided, compute the asymptote parameters based on the ratio
+  # Setting 3c: If OR/RR ratio is provided, compute the asymptote parameters based on the ratio
   # This will overwrite any other inputs for the asymptote
   if (!is.null(ratio) && !is.null(cancer)) {
     SERR_baseline <- calculate_lifetime_risk(cancer = cancer, gene = "SEER")

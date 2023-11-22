@@ -84,8 +84,6 @@ generate_density_plots <- function(data) {
   }
 }
 
-generate_density_plots(out10$combined_chains)
-
 #' Plot Trace
 #' @param results A list of MCMC chain results.
 #' @param n_chains The number of chains.
@@ -97,12 +95,13 @@ plot_trace <- function(results, n_chains) {
   par(mfrow = c(n_chains, 4)) # Set up a grid for the plots
   for (chain_id in 1:n_chains) {
     # Extract results for the current chain
-    median_results <- results[[chain_id]]$median_results
-    shift_results <- results[[chain_id]]$shift_results
-    first_quartile_results <- results[[chain_id]]$first_quartile_results
-    asymptote_results <- results[[chain_id]]$asymptote_results
+    median_results <- results[chain_id]$median_results
+    shift_results <- results[chain_id]$shift_results
+    first_quartile_results <- results[chain_id]$first_quartile_results
+    asymptote_results <- results[chain_id]$asymptote_results
 
     # Create trace plots for the current chain
+    
     plot(median_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Median"), xlab = "Iteration", ylab = "Median")
     plot(shift_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Shift"), xlab = "Iteration", ylab = "Shift")
     plot(first_quartile_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of First Quartile"), xlab = "Iteration", ylab = "First Quartile")
