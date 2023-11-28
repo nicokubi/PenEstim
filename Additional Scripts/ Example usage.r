@@ -62,17 +62,17 @@ par(mfrow = c(1, 1))
 
 # Output
 library(parallel)
-library(PPP)
+library(PPP)f
 library(PenEstim)
 
 
 load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated Families/simFamilies_C_1000_nocen_selected.RData")
+str(simFamilies_C_1000_nocen_selected)
 
 # Example call of PenEstim with proposal_fns and proposal_params.
-out10.1 <- PenEstim(
-data = simFamilies_C_1000_nocen_selected, cancer_type = "Breast",
-gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2, density_plots = FALSE,
-trace_plots = TRUE,
+out_test_coh <- PenEstim(
+data = carrierProbandFamilies_cohPedigree_selected, cancer_type = "Breast",
+gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 3, density_plots = TRUE,
 )
 
  dis <- create_distributions(
@@ -85,8 +85,3 @@ trace_plots = TRUE,
  )
 
 PenEstim()
-
-res
-res[1]
-par (mfrow(1,1))
-plot(out10$results[[1]]$median_samples)

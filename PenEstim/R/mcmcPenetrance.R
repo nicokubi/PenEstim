@@ -1,14 +1,30 @@
 #' Execution of a Single Chain in Metropolis-Hastings
 #'
+#' This function performs a single chain execution in the Metropolis-Hastings algorithm
+#' for Bayesian inference, specifically tailored for cancer risk estimation.
+#'
 #' @param seed Seed value for random number generation.
 #' @param n_iter Number of iterations for the chain.
 #' @param chain_id Identifier for the chain.
 #' @param data List of families data.
-#' @param proposal_params List of the parameters for the distributions of the proposal.
 #' @param max_age Maximum age to be considered.
-#' @return A list with samples and rejection rate.
-#' @importFrom parallel makeCluster stopCluster parLapply clusterExport clusterEvalQ
-#' @importFrom PPP PPP
+#' @param PanelPRODatabase Database containing PanelPRO information.
+#' @param proposal_distributions List of the parameters for the distributions of the proposal.
+#' @param cancer_type Type of cancer for which risk is being estimated.
+#' @param gene_input Gene information for risk estimation.
+#' @param median_max Boolean indicating whether to use median_max or max_age for calculations. Defaults to TRUE.
+#' @return A list containing samples, log likelihoods, acceptance ratio, and rejection rate for each iteration.
+#' @importFrom stats set.seed
+#' @importFrom parallel makeCluster stopCluster parLapply
+#' @examples
+#' # Example usage:
+#' result <- mhChain(
+#'   seed = 123, n_iter = 1000, chain_id = 1, data = familyData,
+#'   max_age = 90, PanelPRODatabase = database,
+#'   proposal_distributions = propDist, cancer_type = "breast",
+#'   gene_input = "BRCA1", median_max = TRUE
+#' )
+#' @export
 
 # Main mhChain function
 mhChain <- function(
@@ -137,30 +153,41 @@ mhChain <- function(
   return(out)
 }
 
-
 #' Bayesian Inference using Independent Metropolis-Hastings for Penetrance Estimation
 #'
-#' This function employs a Bayesian approach for penetrance estimation, utilizing the
-#' Independent Metropolis-Hastings algorithm. It leverages parallel computing and requires
-#' the `stats`, `parallel`, and `PPP` packages.
+#' This function implements the Independent Metropolis-Hastings algorithm for Bayesian
+#' penetrance estimation of cancer risk. It utilizes parallel computing to run multiple
+#' chains and provides various options for analyzing and visualizing the results.
 #'
-#' @param data List of families data.
+#' @param data List of families data for penetrance estimation.
 #' @param cancer_type The type of cancer to estimate penetrance for.
+#' @param gene_input Gene information for risk estimation.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
-#' @param proposal_params List of the parameters for the distributions of the proposal.
-#' @param burn_in The fraction proportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0.
-#' @param thinning_factor The factor by which to thin the results (positive integer). The default thinning factor is 1, which implies no thinning.
-#' @param max_age Maximum age to be considered. Default is 94, based on PanelPRO settings.
-#' @param summary_stats Includes summary statistics in the function output.
-#' @param rejection_rates Includes the rejection rates for each chain in the function output.
-#' @param density_plots Includes simple density plots for the posterior samples in the function output.
-#' @return A list containing results for each chain.
-#' @importFrom stats rbeta runif dweibull
+#' @param max_age Maximum age to be considered, default is 94.
+#' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
+#' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
+#' @param distribution_data Data for generating proposal distributions.
+#' @param sample_size Optional sample size for distribution generation.
+#' @param ratio Optional ratio parameter for distribution generation.
+#' @param proposal_params Parameters for proposal distributions.
+#' @param risk_proportion Proportion of risk for distribution generation.
+#' @param summary_stats Boolean to include summary statistics in the output.
+#' @param rejection_rates Boolean to include rejection rates in the output.
+#' @param density_plots Boolean to include density plots in the output.
+#' @return A list containing combined results from all chains, along with optional statistics and plots.
+#' @importFrom stats rbeta runif
 #' @importFrom parallel makeCluster stopCluster parLapply
-#' @importFrom PPP PPP
-#'
+#' @examples
+#' # Example usage:
+#' result <- PenEstim(
+#'   data = familyData, cancer_type = "breast", gene_input = "BRCA1",
+#'   n_chains = 4, n_iter_per_chain = 1000, max_age = 90,
+#'   burn_in = 0.1, thinning_factor = 2, summary_stats = TRUE,
+#'   rejection_rates = TRUE, density_plots = TRUE
+#' )
 #' @export
+
 
 PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      n_iter_per_chain = 200,

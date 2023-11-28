@@ -1,7 +1,7 @@
 #' Log-Likelihood Calculation for Metropolis-Hastings
 #'
 #' @param paras Vector of parameters for which likelihood is to be computed.
-#' @param data List of families data.
+#' @param families List of families data.
 #' @param max_age Maximum age to be considered.
 #' @param cancer_type The type of cancer for which to estimate penetrance.
 #' @param gene_input The gene for which to estimate penetrance.

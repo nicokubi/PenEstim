@@ -1,3 +1,30 @@
+#' Create Proposal Distributions for Statistical Analysis
+#'
+#' This function generates proposal distributions based on user input or default parameters. It is designed to aid in the statistical analysis of risk proportions in populations, particularly in the context of cancer research. The distributions are calculated for various statistical metrics such as asymptote, shift, median, and first quartile.
+#'
+#' @param data A data frame containing age and risk data. If NULL or contains NA values, default parameters are used.
+#' @param sample_size The total sample size used for risk proportion calculations.
+#' @param cancer A character string specifying the type of cancer, used in OR/RR ratio calculations.
+#' @param ratio The odds ratio (OR) or relative risk (RR) used in asymptote parameter calculations.
+#' @param proposal_params A list of proposal parameters for the beta distributions. If NULL, default parameters are used.
+#' @param risk_proportion A data frame with default proportions of people at risk.
+#'
+#' @details
+#' The function includes internal helper functions for normalizing median and first quartile values, and for computing beta distribution parameters. The function handles various settings: using default parameters, applying user inputs, and calculating parameters based on sample size and risk proportions.
+#'
+#' If the OR/RR ratio is provided, the asymptote parameters are computed based on this ratio, overriding other inputs for the asymptote.
+#'
+#' The function returns a list of distribution functions for the asymptote, shift, median, and first quartile, which can be used for further statistical analysis.
+#'
+#' @return A list of functions representing the proposal distributions for asymptote, shift, median, and first quartile.
+#'
+#' @examples
+#' # Example usage with default parameters
+#' distributions <- create_distributions(NULL, 100, "breast_cancer", 1.2, NULL, risk_proportion_default)
+#'
+#' @seealso \code{\link{qbeta}}, \code{\link{runif}}
+#' @export
+
 # Default parameter settings
 proposal_params_default <- list(
   asymptote = list(g1 = 1, g2 = 1),
