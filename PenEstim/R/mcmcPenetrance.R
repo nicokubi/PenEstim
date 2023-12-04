@@ -269,7 +269,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
       n_iter = n_iter_per_chain, chain_id = i,
       data = data,
       PanelPRODatabase = PanelPRODatabase,
-      proposal_distributions = prop,
+      prior_distributions = prop,
       max_age = max_age,
       cancer_type = cancer_type,
       gene_input = gene_input

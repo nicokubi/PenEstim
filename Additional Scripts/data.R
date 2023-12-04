@@ -82,5 +82,17 @@ selectfam <- function(input_families, n) {
 }
 selectfam(carrierProbandFamilies_cohPedigree, 100)
 str(carrierProbandFamilies_cohPedigree_selected)
+carrierProbandFamilies_cohPedigree_selected
 
+age_vectors <- lapply(carrierProbandFamilies_cohPedigree_selected, function(sublist) {
+    # Extracting the 'CurAge' vector from each sublist
+    sublist[["CurAge"]]
+})
 
+# Step 2: Combine these vectors into one
+all_ages <- unlist(age_vectors)
+
+# Step 3: Analyze the distribution of ages
+
+# Basic summary statistics
+summary(all_ages)
