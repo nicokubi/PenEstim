@@ -29,10 +29,14 @@
 # Main mhChain function
 mhChain <- function(
     seed, n_iter, chain_id, data,
-    max_age, PanelPRODatabase, proposal_distributions, cancer_type, gene_input,
+    max_age, PanelPRODatabase, 
+    prior_distributions, cancer_type, gene_input,
     median_max = TRUE) {
-  # Set the right seed
+  # Set seed
   set.seed(seed)
+
+  # Prior is the proposal in the independent MH
+  proposal_distributions <- prior_distributions
 
   # Calculate SEER baseline and midpoint
   SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER")
@@ -42,18 +46,22 @@ mhChain <- function(
 
   # Initialize parameters using random draws from the proposal distributions
   asymptote_start <- SEER_baseline$total_prob +
-    do.call(proposal_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
+    do.call(proposal_distributions$asymptote_distribution, list(1)) *
+    (1 - SEER_baseline$total_prob)
   shift_start <- do.call(proposal_distributions$shift_distribution, list(1))
   # Initialize median_start with an if-statement to choose between baseline_mid and max_age
   if (median_max == TRUE) {
-    median_start <- do.call(proposal_distributions$median_distribution, list(1)) *
+    median_start <-
+      do.call(proposal_distributions$median_distribution, list(1)) *
       (baseline_mid - shift_start) + shift_start
   } else {
-    median_start <- do.call(proposal_distributions$median_distribution, list(1)) *
+    median_start <-
+      do.call(proposal_distributions$median_distribution, list(1)) *
       (max_age - shift_start) + shift_start
   }
-  first_quartile_start <- do.call(proposal_distributions$first_quartile_distribution, list(1)) *
-    (median_start - shift_start) + shift_start
+  first_quartile_start <-
+    do.call(proposal_distributions$first_quartile_distribution,
+    list(1)) * (median_start - shift_start) + shift_start
 
   # Initialize parameters using the provided starting values
   median_current <- median_start
@@ -81,17 +89,20 @@ mhChain <- function(
     # Propose new values using the prior distributions
     # generate asymptote parameter (gamma)
     asymptote_proposal <- SEER_baseline$total_prob +
-      do.call(proposal_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
+      do.call(proposal_distributions$asymptote_distribution, list(1)) *
+      (1 - SEER_baseline$total_prob)
 
     # generate shift parameter (delta)
     shift_proposal <- do.call(proposal_distributions$shift_distribution, list(1))
 
     # generate median
     if (median_max == TRUE) {
-      median_proposal <- do.call(proposal_distributions$median_distribution, list(1)) *
-        (baseline_mid - shift_proposal) + shift_proposal
+      median_proposal <-
+      do.call(proposal_distributions$median_distribution, list(1)) *
+      (baseline_mid - shift_proposal) + shift_proposal
     } else {
-      median_proposal <- do.call(proposal_distributions$median_distribution, list(1)) *
+      median_proposal <-
+        do.call(proposal_distributions$median_distribution, list(1)) *
         (max_age - shift_proposal) + shift_proposal
     }
 
@@ -167,10 +178,10 @@ mhChain <- function(
 #' @param max_age Maximum age to be considered, default is 94.
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
 #' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
-#' @param distribution_data Data for generating proposal distributions.
+#' @param distribution_data Data for generating prior distributions.
 #' @param sample_size Optional sample size for distribution generation.
 #' @param ratio Optional ratio parameter for distribution generation.
-#' @param proposal_params Parameters for proposal distributions.
+#' @param prior_params Parameters for prior distributions.
 #' @param risk_proportion Proportion of risk for distribution generation.
 #' @param summary_stats Boolean to include summary statistics in the output.
 #' @param rejection_rates Boolean to include rejection rates in the output.
@@ -197,7 +208,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      distribution_data = distribution_data_default,
                      sample_size = NULL,
                      ratio = NULL,
-                     proposal_params = proposal_params_default,
+                     prior_params = prior_params_default,
                      risk_proportion = risk_proportion_default,
                      summary_stats = TRUE,
                      rejection_rates = TRUE,
@@ -225,23 +236,27 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   # create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
 
- # Create the proposal distributions
- prop <- create_distributions(
+ # Create the prior distributions
+ prop <- makePriors(
    data = distribution_data,
    sample_size = sample_size,
    cancer = cancer_type,
    ratio = ratio,
-   proposal_params = proposal_params,
+   prior_params = prior_params,
    risk_proportion = risk_proportion
  )
+  cores <- parallel::detectCores()
 
+  if (n_chains > cores) {
+  stop("Error: 'n_chains exceeds the number of available CPU cores.")
+}
   cl <- parallel::makeCluster(n_chains)
 
-  clusterEvalQ(cl, {
+  parallel::clusterEvalQ(cl, {
     library(PPP) # Load the "PPP" library
   })
 
-  clusterExport(cl, c(
+  parallel::clusterExport(cl, c(
     "mhChain", "mhLogLikelihood", "calculate_lifetime_risk",
     "generate_proposal",
     "seeds", "n_iter_per_chain",
@@ -262,8 +277,6 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   })
 
   parallel::stopCluster(cl)
-  saveRDS(results, file = "intermediate_results.RDS")
-
 
   # Check rejection rates and issue a warning if they are all above 90%
   all_high_rejections <- all(sapply(results, function(x) x$rejection_rate > 0.9))

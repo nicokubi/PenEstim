@@ -52,7 +52,6 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
   cancer_index <- which(dim_names$Cancer == cancer)
   race_index <- which(dim_names$Race == race)
   sex_index <- which(dim_names$Sex == female)
-  type_index <- which(dim_names$PenetType == type)
 
   # overwrite the penetrance in the PanelPro Database
   PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, , ] <- penetrance.mod.f
@@ -72,7 +71,7 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
     data <- families[[i]] # Get the data for the current family
 
     # Access the posterior probabilities (not normalized) and estimates for the specified gene and cancer type
-    postprobs <- PPP(pedigree = data, genes = c(gene_input), cancers = cancer_type, database = PanelPRODatabase)$posterior.prob[[1]]
+    postprobs <- PPP(pedigree = data, genes = c(gene_input), cancers = cancer_type, database = PanelPRODatabase, impute.missing.ages = FALSE)$posterior.prob[[1]]
     estimate <- postprobs[postprobs$genes == gene_adj, "estimate"]
 
     # Check for NA or NaN before proceeding to if condition

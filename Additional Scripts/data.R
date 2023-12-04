@@ -2,8 +2,8 @@
 library(dplyr)
 
 # Read the original dataset
-data <- read.csv("/path/to/your/first/dataset.csv")
-data <- families
+#data <- read.csv("/path/to/your/first/dataset.csv")
+data <- bm.clean
 
 transformed_data <- data %>%
     select(
@@ -15,8 +15,13 @@ transformed_data <- data %>%
         CurAge = AgeDeath,
         isDead = Death,
         AgeBC = AgeBreast,
+        AgeOC = AgeOvary,
+        AgePANC = AgePancreas,
         isAffBC = AffectedBreast,
+        isAffOC = AffectedOvary,
+        isAffPANC = AffectedPancreas,
         BRCA1 = BRCA1,
+        MLH1 = MLH1,
         Twins = Twins,
         Ancestry = ethnic,
         race = race
@@ -45,8 +50,13 @@ cohPedigree <- list_of_families_with_pedigree
 # check structure of Pedigree file
 str(cohPedigree)
 
+# Step 4: Select the MLH 1 families 
+MLH1Pedigree <- list_of_families_with_pedigree
+# Add code to take only the families given that the proband has the mutation
+
+
 # save fiel
-save(cohPedigree, file = "cohPedigree.RData")
+#save(cohPedigree, file = "cohPedigree.RData")
 
 # Filter families with affected probands for BRCA1
 carrierProbandFamilies_cohPedigree <- Filter(function(fam) {
@@ -70,7 +80,7 @@ selectfam <- function(input_families, n) {
 
     save(list = new_name, file = paste0(new_name, ".RData"))
 }
-selectfam(carrierProbandFamilies_cohPedigree, 200)
+selectfam(carrierProbandFamilies_cohPedigree, 100)
 str(carrierProbandFamilies_cohPedigree_selected)
 
 

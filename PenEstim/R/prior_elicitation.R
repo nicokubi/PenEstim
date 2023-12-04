@@ -1,12 +1,12 @@
-#' Create Proposal Distributions for Statistical Analysis
+#' Create Prior Distributions for Statistical Analysis
 #'
-#' This function generates proposal distributions based on user input or default parameters. It is designed to aid in the statistical analysis of risk proportions in populations, particularly in the context of cancer research. The distributions are calculated for various statistical metrics such as asymptote, shift, median, and first quartile.
+#' This function generates prior distributions based on user input or default parameters. It is designed to aid in the statistical analysis of risk proportions in populations, particularly in the context of cancer research. The distributions are calculated for various statistical metrics such as asymptote, shift, median, and first quartile.
 #'
 #' @param data A data frame containing age and risk data. If NULL or contains NA values, default parameters are used.
 #' @param sample_size The total sample size used for risk proportion calculations.
 #' @param cancer A character string specifying the type of cancer, used in OR/RR ratio calculations.
 #' @param ratio The odds ratio (OR) or relative risk (RR) used in asymptote parameter calculations.
-#' @param proposal_params A list of proposal parameters for the beta distributions. If NULL, default parameters are used.
+#' @param prior_params A list of prior parameters for the beta distributions. If NULL, default parameters are used.
 #' @param risk_proportion A data frame with default proportions of people at risk.
 #'
 #' @details
@@ -16,7 +16,7 @@
 #'
 #' The function returns a list of distribution functions for the asymptote, shift, median, and first quartile, which can be used for further statistical analysis.
 #'
-#' @return A list of functions representing the proposal distributions for asymptote, shift, median, and first quartile.
+#' @return A list of functions representing the prior distributions for asymptote, shift, median, and first quartile.
 #'
 #' @examples
 #' # Example usage with default parameters
@@ -26,7 +26,7 @@
 #' @export
 
 # Default parameter settings
-proposal_params_default <- list(
+prior_params_default <- list(
   asymptote = list(g1 = 1, g2 = 1),
   shift = list(min = 0, max = 25),
   median = list(m1 = 2, m2 = 2),
@@ -47,13 +47,13 @@ distribution_data_default <- data.frame(
   at_risk = c(NA, NA, NA, NA)
 )
 
-#  Function to create the proposal distributions
-create_distributions <- function(
+#  Function to create the prior distributions
+makePriors <- function(
     data,
     sample_size,
     cancer,
     ratio,
-    proposal_params,
+    prior_params,
     risk_proportion) {
   # Helper function definitions
   # Define the scaling transformation
@@ -94,11 +94,11 @@ create_distributions <- function(
     return(list(g1 = alpha, g2 = beta))
   }
 
-  # Main logic for setting the parameters of the proposal distribution
+  # Main logic for setting the parameters of the prior distribution
   # Setting 1: When there is no user input in the data_distribution, then the default parameter settings are applied.
-  # Setting 2: If the user has modified the proposal_params_default object, the customized parameter settings will be applied. 
+  # Setting 2: If the user has modified the prior_params_default object, the customized parameter settings will be applied. 
   if (is.null(data) || all(is.na(data))) {
-    proposal_params <- proposal_params_default
+    prior_params <- prior_params_default
   } else {
     # Setting 3: Extracting the user inputs from the data_distribution_default dataframe for the prior elicitation. 
     # Check if all age entries are present
@@ -131,8 +131,8 @@ create_distributions <- function(
     res_first_quartile <- compute_parameters_quartile(first_quartile_age, risk_first_quartile)
     res_asymptote <- compute_parameters_asymptote(max_age, risk_max_age)
 
-    # Update the proposal_params object with the newly calculated parameters
-    proposal_params <- list(
+    # Update the prior_params object with the newly calculated parameters
+    prior_params <- list(
       asymptote = list(g1 = res_asymptote$alpha, g2 = res_asymptote$beta),
       shift = list(min = 0, max = min_age),
       median = list(m1 = res_median$alpha, m2 = res_median$beta),
@@ -143,38 +143,38 @@ create_distributions <- function(
   # This will overwrite any other inputs for the asymptote
   if (!is.null(ratio) && !is.null(cancer)) {
     SERR_baseline <- calculate_lifetime_risk(cancer = cancer, gene = "SEER")
-    proposal_params$asymptote <- list(g1 = SERR_baseline * ratio, g2 = SERR_baseline * ratio)
+    prior_params$asymptote <- list(g1 = SERR_baseline * ratio, g2 = SERR_baseline * ratio)
   }
 
   # Asymptote distribution using either custom or default g1 and g2
   asymptote_distribution <- function(n) {
-    qbeta(runif(n), proposal_params$asymptote$g1, proposal_params$asymptote$g2)
+    qbeta(runif(n), prior_params$asymptote$g1, prior_params$asymptote$g2)
   }
 
   # Shift parameter distribution using either custom or default min and max
   shift_distribution <- function(n) {
-    runif(n, proposal_params$shift$min, proposal_params$shift$max)
+    runif(n, prior_params$shift$min, prior_params$shift$max)
   }
 
   # Median distribution using parameters from compute_parameters_median
   median_distribution <- function(n) {
-    qbeta(runif(n), proposal_params$median$m1, proposal_params$median$m2)
+    qbeta(runif(n), prior_params$median$m1, prior_params$median$m2)
   }
 
   # First quartile distribution using parameters from compute_parameters_quartile
   first_quartile_distribution <- function(n) {
-    qbeta(runif(n), proposal_params$first_quartile$q1, proposal_params$first_quartile$q2)
+    qbeta(runif(n), prior_params$first_quartile$q1, prior_params$first_quartile$q2)
   }
 
   # Create a list with the distributions
-  proposal_distributions <- list(
+  prior_distributions <- list(
     asymptote_distribution = asymptote_distribution,
     shift_distribution = shift_distribution,
     median_distribution = median_distribution,
     first_quartile_distribution = first_quartile_distribution
   )
 
-  # Return the proposal_distributions list
-  return(proposal_distributions)
+  # Return the prior_distributions list
+  return(prior_distributions)
 }
 
