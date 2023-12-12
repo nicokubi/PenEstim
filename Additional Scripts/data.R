@@ -53,18 +53,19 @@ str(cohPedigree)
 # Step 4: Select the MLH 1 families 
 MLH1Pedigree <- list_of_families_with_pedigree
 # Add code to take only the families given that the proband has the mutation
-
+MLH1Pedigree
 
 # save fiel
 #save(cohPedigree, file = "cohPedigree.RData")
 
 # Filter families with affected probands for BRCA1
-carrierProbandFamilies_cohPedigree <- Filter(function(fam) {
-    any(fam$isProband == 1 & fam$BRCA1 == 1 & fam$Sex == 0)
+carrierProbandFamilies_cohPedigree_MLH1 <- Filter(function(fam) {
+    any(fam$isProband == 1 & fam$MLH1 == 1)
 }, cohPedigree)
-str(carrierProbandFamilies_cohPedigree)
+str(carrierProbandFamilies_cohPedigree_MLH1)
 
-print(carrierProbandFamilies_cohPedigree[[2]])
+print(carrierProbandFamilies_cohPedigree_MLH1[[2]])
+length(carrierProbandFamilies_cohPedigree_MLH1)
 
 # Select a subset of the families 
 selectfam <- function(input_families, n) {
@@ -96,3 +97,34 @@ all_ages <- unlist(age_vectors)
 
 # Basic summary statistics
 summary(all_ages)
+str(carrierProbandFamilies_cohPedigree)
+
+
+# Function to prepare ages
+prepAges <- function(data) {
+    for (i in seq_along(data)) {
+        # For 'AgeBC', 'AgeOC', and 'AgePANC', set NA ages to 1 and corresponding 'isAff' to 0
+        columns_to_check <- c("BC", "OC", "PANC")
+        for (col_suffix in columns_to_check) {
+            age_col <- paste0("Age", col_suffix)
+            aff_col <- paste0("isAff", col_suffix)
+
+            # Set age_col to 1 and corresponding 'isAff' to 0 where NA
+            na_rows <- is.na(data[[i]][[age_col]])
+            data[[i]][[age_col]][na_rows] <- 1
+            data[[i]][[aff_col]][na_rows] <- 0
+        }
+
+        # Set 'CurAge' to the maximum cancer affection age where applicable
+        cancer_ages <- data[[i]][c("AgeBC", "AgeOC", "AgePANC")]
+        max_cancer_age <- apply(cancer_ages, 1, max, na.rm = TRUE)
+
+        # If CurAge is NA, set it to max cancer age, else set it to the maximum of CurAge and max cancer age
+        data[[i]]$CurAge <- ifelse(is.na(data[[i]]$CurAge), max_cancer_age, pmax(data[[i]]$CurAge, max_cancer_age))
+    }
+    return(data)
+}
+
+test_fam_1
+test = prepAges(carrierProbandFamilies_cohPedigree_MLH1)
+test

@@ -19,17 +19,7 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
   gamma <- paras[3]
   delta <- paras[4]
 
-  calculate_weibull_parameters <- function(given_median, given_first_quartile, delta, gamma) {
-    # Calculate alpha
-    alpha <- log(-log((gamma - 0.25) / gamma) / -log((gamma - 0.5) / gamma)) /
-      log((given_first_quartile - delta) / (given_median - delta))
-
-    # Calculate beta using the median (M)
-    beta <- (given_median - delta) / (log(2)^(1 / alpha))
-
-    return(list(alpha = alpha, beta = beta))
-  }
-
+  # Recalculate the parameters 
   params <- calculate_weibull_parameters(given_median, given_first_quartile, delta, gamma)
   alpha <- params$alpha
   beta <- params$beta
@@ -91,3 +81,4 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
   # return the log-likelihood
   return(log_likelihood)
 }
+

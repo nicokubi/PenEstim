@@ -195,3 +195,49 @@ apply_thinning <- function(results, thinning_factor) {
     thin_chain(chain, thinning_factor)
   })
 }
+
+#' Plot Weibull Distribution with Credible Intervals
+#'
+#' @param results A list with combined results from MCMC.
+#' @param prob The probability for the credible interval (between 0 and 1).
+#'
+#' @examples
+#' plot_weibull_distribution(combine_results, prob = 0.95)
+#'
+plot_weibull_distribution <- function(results, prob = 0.95) {
+
+  # Recover the parameters for plotting the weibull
+  params <- calculate_weibull_parameters(results$combined_chains$median_results,
+  results$combined_chains$first_quartile_results, results$combined_chains$shift_results, results$combined_chains$asymptote_results)
+ 
+  alphas <- params$alpha
+  betas <- params$beta
+  asymptotes <- results$combined_chains$asymptote_results
+  shifts <- results$combined_chains$shift_results
+
+  # Define the range for the distribution
+  x_values <- seq(0, 100, length.out = 100)
+
+  # Calculate Weibull distributions for each sample
+  distributions <- mapply(function(shape, scale, asymptote, shift) {
+    pweibull(x_values - shift, shape = shape, scale = scale) * asymptote
+  }, alphas, betas, asymptotes, shifts)
+
+prob= 0.95
+  # Calculate credible intervals
+  lower_bound <- apply(distributions, 1, quantile, probs = (1 - prob) / 2)
+  upper_bound <- apply(distributions, 1, quantile, probs = 1 - (1 - prob) / 2)
+  mean_distribution <- rowMeans(distributions)
+
+  # Plot the average distribution
+  plot(x_values, mean_distribution, type = 'l', col = 'blue', lwd = 2,
+       xlab = 'Age', ylab = 'Cumulative Penetrance',
+       main = 'Penetrane Curve with Credible Intervals')
+
+  # Add credible intervals
+  polygon(c(x_values, rev(x_values)), c(lower_bound, rev(upper_bound)), col = rgb(1, 0, 0, 0.2), border = NA)
+  lines(x_values, mean_distribution, col = 'blue', lwd = 2)
+
+  legend('topleft', legend = c('Mean Distribution', 'Credible Interval'),
+         col = c('blue', 'red'), lty = 1, cex = 0.8, fill = c(NA, rgb(1, 0, 0, 0.2)))
+}

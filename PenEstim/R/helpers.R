@@ -40,3 +40,33 @@ generate_proposal <- function(distribution_func, args_list) {
     proposal <- do.call(distribution_func, args_list)
     return(proposal)
 }
+
+#' Calculate Weibull Parameters
+#'
+#' This function calculates the shape (\code{alpha}) and scale (\code{beta}) parameters
+#' of a Weibull distribution given the median, first quartile, delta, and gamma values.
+#'
+#' @param given_median The median of the data.
+#' @param given_first_quartile The first quartile of the data.
+#' @param delta A constant offset value.
+#' @param gamma A constant shape parameter.
+#'
+#' @return A list containing the calculated Weibull parameters, \code{alpha} and \code{beta}.
+#'
+#' @examples
+#' # Example usage:
+#' result <- calculate_weibull_parameters(50, 25, 0.1, 2)
+#' cat("Alpha:", result$alpha, "\n")
+#' cat("Beta:", result$beta, "\n")
+#'
+#' @export
+calculate_weibull_parameters <- function(given_median, given_first_quartile, delta, gamma) {
+    # Calculate alpha
+    alpha <- log(-log((gamma - 0.25) / gamma) / -log((gamma - 0.5) / gamma)) /
+        log((given_first_quartile - delta) / (given_median - delta))
+
+    # Calculate beta using the median (M)
+    beta <- (given_median - delta) / (log(2)^(1 / alpha))
+
+    return(list(alpha = alpha, beta = beta))
+}
