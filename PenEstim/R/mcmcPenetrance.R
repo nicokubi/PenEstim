@@ -212,7 +212,9 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      risk_proportion = risk_proportion_default,
                      summary_stats = TRUE,
                      rejection_rates = TRUE,
-                     density_plots = TRUE
+                     density_plots = TRUE,
+                     penetrance_plot = TRUE,
+                     probCI = 0.95
                      )  {
   # Validate inputs
   if (missing(data)) {
@@ -258,8 +260,8 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
   parallel::clusterExport(cl, c(
     "mhChain", "mhLogLikelihood", "calculate_lifetime_risk",
-    "calculate_weibull_paremeters",
-    "generate_proposal",
+    "calculate_weibull_parameters",
+    "makePriors",
     "seeds", "n_iter_per_chain",
     "data", "prop", "max_age",
     "PanelPRODatabase", "cancer_type", "gene_input"
@@ -312,6 +314,11 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   if (density_plots) {
     # Generate density plots
     output$density_plots <- generate_density_plots(combined_chains)
+  }
+
+  if (penetrance_plot) {
+    # Generate density plots
+    output$penetrance_plot <- plot_penetrance(combined_chains, probCI)
   }
 
   output$combined_chains <- combined_chains

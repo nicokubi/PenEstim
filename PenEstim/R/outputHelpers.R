@@ -204,16 +204,17 @@ apply_thinning <- function(results, thinning_factor) {
 #' @examples
 #' plot_weibull_distribution(combine_results, prob = 0.95)
 #'
-plot_weibull_distribution <- function(results, prob = 0.95) {
+plot_penetrance <- function(data, prob = probCI) {
 
   # Recover the parameters for plotting the weibull
-  params <- calculate_weibull_parameters(results$combined_chains$median_results,
-  results$combined_chains$first_quartile_results, results$combined_chains$shift_results, results$combined_chains$asymptote_results)
+  params <- calculate_weibull_parameters(data$median_results,
+  data$first_quartile_results,
+  data$shift_results, data$asymptote_results)
  
   alphas <- params$alpha
   betas <- params$beta
-  asymptotes <- results$combined_chains$asymptote_results
-  shifts <- results$combined_chains$shift_results
+  asymptotes <- data$asymptote_results
+  shifts <- data$shift_results
 
   # Define the range for the distribution
   x_values <- seq(0, 100, length.out = 100)
@@ -223,10 +224,10 @@ plot_weibull_distribution <- function(results, prob = 0.95) {
     pweibull(x_values - shift, shape = shape, scale = scale) * asymptote
   }, alphas, betas, asymptotes, shifts)
 
-prob= 0.95
-  # Calculate credible intervals
-  lower_bound <- apply(distributions, 1, quantile, probs = (1 - prob) / 2)
-  upper_bound <- apply(distributions, 1, quantile, probs = 1 - (1 - prob) / 2)
+  
+  # Calculate credible intervals with na.rm = TRUE
+  lower_bound <- apply(distributions, 1, quantile, probs = (1 - prob) / 2, na.rm = TRUE)
+  upper_bound <- apply(distributions, 1, quantile, probs = 1 - (1 - prob) / 2, na.rm = TRUE)
   mean_distribution <- rowMeans(distributions)
 
   # Plot the average distribution

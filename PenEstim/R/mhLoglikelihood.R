@@ -9,6 +9,7 @@
 #' @return Log-likelihood value.
 #' @importFrom PPP PPP
 
+
 mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_type, gene_input) {
   # set age, same as in DB
   age <- seq(1, max_age, 1)
