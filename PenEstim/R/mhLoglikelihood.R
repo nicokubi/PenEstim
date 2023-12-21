@@ -10,6 +10,17 @@
 #' @importFrom PPP PPP
 
 
+
+suppressPPPLogs <- function(expr) {
+  # Save current output connection
+  originalConn <- stdout()
+  # Redirect output to null device
+  sink(file = NULL)
+  on.exit(sink(originalConn), add = TRUE)
+  expr
+}
+
+
 mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_type, gene_input) {
   # set age, same as in DB
   age <- seq(1, max_age, 1)
@@ -62,7 +73,8 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
     data <- families[[i]] # Get the data for the current family
 
     # Access the posterior probabilities (not normalized) and estimates for the specified gene and cancer type
-    postprobs <- PPP(pedigree = data, genes = c(gene_input), cancers = cancer_type, database = PanelPRODatabase, impute.missing.ages = FALSE)$posterior.prob[[1]]
+    postprobs <- suppressPPPLogs({PPP(pedigree = data, genes = c(gene_input), cancers = cancer_type,
+     database = PanelPRODatabase, impute.missing.ages = FALSE)$posterior.prob[[1]]})
     estimate <- postprobs[postprobs$genes == gene_adj, "estimate"]
 
     # Check for NA or NaN before proceeding to if condition

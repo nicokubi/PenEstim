@@ -27,9 +27,10 @@
 #' @export
 
 # Main mhChain function
+
 mhChain <- function(
     seed, n_iter, chain_id, data,
-    max_age, PanelPRODatabase, 
+    max_age, PanelPRODatabase,
     prior_distributions, cancer_type, gene_input,
     median_max = TRUE) {
   # Set seed
@@ -44,30 +45,31 @@ mhChain <- function(
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
 
-  # Initialize parameters using random draws from the proposal distributions
-  asymptote_start <- SEER_baseline$total_prob +
-    do.call(proposal_distributions$asymptote_distribution, list(1)) *
-    (1 - SEER_baseline$total_prob)
-  shift_start <- do.call(proposal_distributions$shift_distribution, list(1))
-  # Initialize median_start with an if-statement to choose between baseline_mid and max_age
-  if (median_max == TRUE) {
-    median_start <-
-      do.call(proposal_distributions$median_distribution, list(1)) *
-      (baseline_mid - shift_start) + shift_start
-  } else {
-    median_start <-
-      do.call(proposal_distributions$median_distribution, list(1)) *
-      (max_age - shift_start) + shift_start
-  }
-  first_quartile_start <-
-    do.call(proposal_distributions$first_quartile_distribution,
-    list(1)) * (median_start - shift_start) + shift_start
+    draw_initial_params <- function() {
+      repeat {
+        asymptote <- SEER_baseline$total_prob +
+          do.call(prior_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
+        shift <- do.call(prior_distributions$shift_distribution, list(1))
+        median <- if (median_max) {
+          do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
+        } else {
+          do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
+        }
+        first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
 
-  # Initialize parameters using the provided starting values
-  median_current <- median_start
-  asymptote_current <- asymptote_start
-  shift_current <- shift_start
-  first_quartile_current <- first_quartile_start
+        if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
+          return(c(first_quartile, median, shift, asymptote))
+        }
+      }
+    }
+
+    # Draw initial valid parameters
+    initial_params <- draw_initial_params()
+    first_quartile_current <- initial_params[1]
+    median_current <- initial_params[2]
+    shift_current <- initial_params[3]
+    asymptote_current <- initial_params[4]
+
 
   num_rejections <- 0
 
@@ -88,23 +90,21 @@ mhChain <- function(
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
     # generate asymptote parameter (gamma)
-    asymptote_proposal <- SEER_baseline$total_prob +
-      do.call(proposal_distributions$asymptote_distribution, list(1)) *
-      (1 - SEER_baseline$total_prob)
+   repeat {
+     asymptote_proposal <- SEER_baseline$total_prob +
+       do.call(prior_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
+     shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
+     median_proposal <- if (median_max) {
+       do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
+     } else {
+       do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift_proposal) + shift_proposal
+     }
+     first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median_proposal - shift_proposal) + shift_proposal
 
-    # generate shift parameter (delta)
-    shift_proposal <- do.call(proposal_distributions$shift_distribution, list(1))
-
-    # generate median
-    if (median_max == TRUE) {
-      median_proposal <-
-      do.call(proposal_distributions$median_distribution, list(1)) *
-      (baseline_mid - shift_proposal) + shift_proposal
-    } else {
-      median_proposal <-
-        do.call(proposal_distributions$median_distribution, list(1)) *
-        (max_age - shift_proposal) + shift_proposal
-    }
+     if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
+       break
+     }
+   }
 
     # generate first quartile
     first_quartile_proposal <-
@@ -203,6 +203,7 @@ mhChain <- function(
 PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      n_iter_per_chain = 200,
                      max_age = 94,
+                     removeProband = FALSE,
                      burn_in = 0,
                      thinning_factor = 1,
                      distribution_data = distribution_data_default,
@@ -214,8 +215,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      rejection_rates = TRUE,
                      density_plots = TRUE,
                      penetrance_plot = TRUE,
-                     probCI = 0.95
-                     )  {
+                     probCI = 0.95) {
   # Validate inputs
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
@@ -238,20 +238,23 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   # create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
 
- # Create the prior distributions
- prop <- makePriors(
-   data = distribution_data,
-   sample_size = sample_size,
-   cancer = cancer_type,
-   ratio = ratio,
-   prior_params = prior_params,
-   risk_proportion = risk_proportion
- )
+  # Apply the prepAges function to treat missing data
+  data <- prepAges(data, removeProband)
+
+  #  Create the prior distributions
+  prop <- makePriors(
+    data = distribution_data,
+    sample_size = sample_size,
+    cancer = cancer_type,
+    ratio = ratio,
+    prior_params = prior_params,
+    risk_proportion = risk_proportion
+  )
   cores <- parallel::detectCores()
 
   if (n_chains > cores) {
-  stop("Error: 'n_chains exceeds the number of available CPU cores.")
-}
+    stop("Error: 'n_chains exceeds the number of available CPU cores.")
+  }
   cl <- parallel::makeCluster(n_chains)
 
   parallel::clusterEvalQ(cl, {
@@ -287,7 +290,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
     warning("Low acceptance rate. Please consider running the chain longer.")
   }
 
-  # Apply burn-in and thinning 
+  # Apply burn-in and thinning
   if (burn_in > 0) {
     results <- apply_burn_in(results, burn_in)
   }
@@ -301,28 +304,37 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   # Initialize variables
   output <- list()
 
-  if (rejection_rates) {
-    # Generate rejection rates
-    output$rejection_rates <- printRejectionRates(results)
-  }
+  tryCatch(
+    {
+      if (rejection_rates) {
+        # Generate rejection rates
+        output$rejection_rates <- printRejectionRates(results)
+      }
 
-  if (summary_stats) {
-    # Generate summary statistics
-    output$summary_stats <- generate_summary(combined_chains)
-  }
+      if (summary_stats) {
+        # Generate summary statistics
+        output$summary_stats <- generate_summary(combined_chains)
+      }
 
-  if (density_plots) {
-    # Generate density plots
-    output$density_plots <- generate_density_plots(combined_chains)
-  }
+      if (density_plots) {
+        # Generate density plots
+        output$density_plots <- generate_density_plots(combined_chains)
+      }
 
-  if (penetrance_plot) {
-    # Generate density plots
-    output$penetrance_plot <- plot_penetrance(combined_chains, probCI)
-  }
+      if (penetrance_plot) {
+        # Generate penetrance plot
+        output$penetrance_plot <- plot_penetrance(combined_chains, probCI)
+      }
+    },
+    error = function(e) {
+      # Handle errors here
+      cat("An error occurred in the output display: ", e$message, "\n")
+    }
+  )
 
   output$combined_chains <- combined_chains
   output$results <- results
+  output$data <- data
 
   return(output)
 }

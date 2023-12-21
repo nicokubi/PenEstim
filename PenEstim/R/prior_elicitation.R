@@ -96,16 +96,16 @@ makePriors <- function(
 
   # Main logic for setting the parameters of the prior distribution
   # Setting 1: When there is no user input in the data_distribution, then the default parameter settings are applied.
-  # Setting 2: If the user has modified the prior_params_default object, the customized parameter settings will be applied. 
+  # Setting 2: If the user has modified the prior_params_default object, the customized parameter settings will be applied.
   if (is.null(data) || all(is.na(data))) {
     prior_params <- prior_params_default
   } else {
-    # Setting 3: Extracting the user inputs from the data_distribution_default dataframe for the prior elicitation. 
+    # Setting 3: Extracting the user inputs from the data_distribution_default dataframe for the prior elicitation.
     # Check if all age entries are present
     if (any(is.na(data$age)) || any(!sapply(data$age, is.numeric))) {
       stop("Missing or non-numeric age entries in the data. Add numeric ages.")
     }
-    # Extract the ages from the user input. 
+    # Extract the ages from the user input.
     max_age <- data["max", "age"]
     min_age <- data["min", "age"]
     first_quartile_age <- data["first_quartile", "age"]
@@ -177,4 +177,3 @@ makePriors <- function(
   # Return the prior_distributions list
   return(prior_distributions)
 }
-

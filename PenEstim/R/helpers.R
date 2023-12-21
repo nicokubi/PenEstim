@@ -70,3 +70,104 @@ calculate_weibull_parameters <- function(given_median, given_first_quartile, del
 
     return(list(alpha = alpha, beta = beta))
 }
+
+
+
+validate_weibull_parameters <- function(given_first_quartile, given_median, shift, asymptote) {
+    # Check for negative or zero values
+    if (given_median <= 0 || given_first_quartile <= 0 || shift < 0) {
+        return(FALSE)
+    }
+
+    # Check if asymptote (gamma) is within the valid range (0,1)
+    if (asymptote <= 0 || asymptote >= 1) {
+        return(FALSE)
+    }
+
+    # Check if the logarithmic calculations will be valid
+    if (given_first_quartile <= shift || given_median <= shift) {
+        return(FALSE)
+    }
+
+    # Check if the denominator in the alpha calculation would be zero
+    if ((given_first_quartile - shift) == (given_median - shift)) {
+        return(FALSE)
+    }
+
+    # If all checks pass, return TRUE
+    return(TRUE)
+}
+
+
+
+#' Prepare Ages from Pedigree Data
+#'
+#' This function processes a list of data frames containing information about various cancer types.
+#' For each cancer type, it adjusts the age column and the corresponding affected-status column.
+#' It also computes the maximum cancer age for each row and updates the 'CurAge' field accordingly.
+#' This function is designed to handle multiple cancer types and modify age-related fields in the data.
+#'
+#' @param data A list of data frames, where each data frame contains columns for age and affected-status
+#'             for different cancer types. The function expects specific column naming conventions like 'AgeBRA',
+#'             'isAffBRA' for each cancer type.
+#' @return The modified list of data frames, with updated age and affected-status columns for each cancer type,
+#'         and updated 'CurAge' values.
+#' @examples
+#' # Example usage:
+#' data <- list(df1, df2) # df1, df2 are data frames with appropriate columns
+#' result <- prepAges(data)
+#'
+prepAges <- function(data, removeProband = FALSE) {
+    # Define the list of genes
+    genes <- c(
+        "APC", "ATM", "BARD1", "BMPR1A", "BRCA1", "BRCA2", "BRIP1", "CDH1", "CDK4",
+        "CDKN2A", "CHEK2", "EPCAM", "MLH1", "MSH2", "MSH6", "MUTYH", "NBN", "PALB2",
+        "PMS2", "PTEN", "RAD51C", "RAD51D", "STK11", "TP53"
+    )
+
+    # Add all cancer types
+    cancer_types <- c(
+        "BRA", "BC", "CER", "COL", "ENDO", "GAS", "KID", "LEUK", "MELA",
+        "OC", "OST", "PANC", "PROS", "SMA", "STS", "THY", "UB", "HEP", "CBC", "BC2"
+    )
+
+    for (i in seq_along(data)) {
+        # If removeProband is TRUE, set genes, ages, and affections to NA for probands
+        if (removeProband) {
+            proband_rows <- data[[i]]$Proband == 1
+
+            # Set genes to NA
+            for (gene in genes) {
+                data[[i]][proband_rows, gene] <- NA
+            }
+
+            # Set ages and affections to NA
+            for (cancer in cancer_types) {
+                age_col <- paste0("Age", cancer)
+                aff_col <- paste0("isAff", cancer)
+                data[[i]][proband_rows, age_col] <- NA
+                data[[i]][proband_rows, aff_col] <- NA
+            }
+        }
+
+        for (cancer in cancer_types) {
+            age_col <- paste0("Age", cancer)
+            aff_col <- paste0("isAff", cancer)
+
+            # Set age_col to 1 and corresponding 'isAff' to 0 where NA
+            na_rows <- is.na(data[[i]][[age_col]])
+            data[[i]][[age_col]][na_rows] <- 1
+            data[[i]][[aff_col]][na_rows] <- 0
+        }
+
+        # Create a matrix of all cancer ages
+        cancer_ages_cols <- paste0("Age", cancer_types)
+        cancer_ages <- data[[i]][cancer_ages_cols]
+        max_cancer_age <- apply(cancer_ages, 1, max, na.rm = TRUE)
+
+        # If CurAge is NA, set it to max cancer age, else set it to the maximum of CurAge and max cancer age
+        data[[i]]$CurAge <- ifelse(is.na(data[[i]]$CurAge), max_cancer_age, pmax(data[[i]]$CurAge, max_cancer_age))
+    }
+    return(data)
+
+}
