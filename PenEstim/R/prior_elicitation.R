@@ -1,4 +1,4 @@
-#' Create Prior Distributions for Statistical Analysis
+#' Make Priors 
 #'
 #' This function generates prior distributions based on user input or default parameters. It is designed to aid in the statistical analysis of risk proportions in populations, particularly in the context of cancer research. The distributions are calculated for various statistical metrics such as asymptote, shift, median, and first quartile.
 #'
@@ -133,10 +133,10 @@ makePriors <- function(
 
     # Update the prior_params object with the newly calculated parameters
     prior_params <- list(
-      asymptote = list(g1 = res_asymptote$alpha, g2 = res_asymptote$beta),
+      asymptote = list(g1 = res_asymptote$g1, g2 = res_asymptote$g2),
       shift = list(min = 0, max = min_age),
-      median = list(m1 = res_median$alpha, m2 = res_median$beta),
-      first_quartile = list(q1 = res_first_quartile$alpha, q2 = res_first_quartile$beta)
+      median = list(m1 = res_median$m1, m2 = res_median$m2),
+      first_quartile = list(q1 = res_first_quartile$q1, q2 = res_first_quartile$q2)
     )
   }
   # Setting 3c: If OR/RR ratio is provided, compute the asymptote parameters based on the ratio

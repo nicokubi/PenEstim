@@ -71,8 +71,6 @@ calculate_weibull_parameters <- function(given_median, given_first_quartile, del
     return(list(alpha = alpha, beta = beta))
 }
 
-
-
 validate_weibull_parameters <- function(given_first_quartile, given_median, shift, asymptote) {
     # Check for negative or zero values
     if (given_median <= 0 || given_first_quartile <= 0 || shift < 0) {

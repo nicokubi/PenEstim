@@ -84,6 +84,8 @@ generate_density_plots <- function(data) {
   }
 }
 
+output_coh_mlh300$results
+
 #' Plot Trace
 #' @param results A list of MCMC chain results.
 #' @param n_chains The number of chains.
@@ -120,6 +122,7 @@ printRejectionRates <- function(results) {
   cat("Rejection rates: ", rejection_rates, "\n")
 }
 
+printRejectionRates(output_coh_mlh300$results)
 #' Apply Burn-In
 #'
 #' @param results A list of MCMC chain results.
