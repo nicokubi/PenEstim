@@ -84,8 +84,6 @@ generate_density_plots <- function(data) {
   }
 }
 
-output_coh_mlh300$results
-
 #' Plot Trace
 #' @param results A list of MCMC chain results.
 #' @param n_chains The number of chains.
@@ -122,7 +120,6 @@ printRejectionRates <- function(results) {
   cat("Rejection rates: ", rejection_rates, "\n")
 }
 
-printRejectionRates(output_coh_mlh300$results)
 #' Apply Burn-In
 #'
 #' @param results A list of MCMC chain results.
@@ -201,7 +198,7 @@ apply_thinning <- function(results, thinning_factor) {
 
 #' Plot Weibull Distribution with Credible Intervals
 #'
-#' @param results A list with combined results from MCMC.
+#' @param data A list with combined results from MCMC.
 #' @param prob The probability for the credible interval (between 0 and 1).
 #'
 #' @examples
@@ -210,15 +207,15 @@ apply_thinning <- function(results, thinning_factor) {
 plot_penetrance <- function(data, prob = probCI) {
   # Recover the parameters for plotting the Weibull
   params <- calculate_weibull_parameters(
-    output_coh_mlh300$combined_chains$median_results,
-    output_coh_mlh300$combined_chains$first_quartile_results,
-    output_coh_mlh300$combined_chains$shift_results, output_coh_mlh300$combined_chains$asymptote_results
+    data$combined_chains$median_results,
+    data$combined_chains$first_quartile_results,
+    data$combined_chains$shift_results, data$combined_chains$asymptote_results
   )
 
   alphas <- params$alpha
   betas <- params$beta
-  asymptotes <- output_coh_mlh300$combined_chains$asymptote_results
-  shifts <- output_coh_mlh300$combined_chains$shift_results
+  asymptotes <- data$combined_chains$asymptote_results
+  shifts <- data$combined_chains$shift_results
 
   # Define the range for the distribution
   x_values <- seq(0, 100, length.out = 100)
@@ -228,8 +225,14 @@ plot_penetrance <- function(data, prob = probCI) {
   distributions
 
   for (i in seq_along(alphas)) {
-    if (validate_weibull_parameters(output_coh_mlh300$combined_chains$first_quartile_results[i], output_coh_mlh300$combined_chains$median_results[i], output_coh_mlh300$combined_chains$shift_results[i], output_coh_mlh300$combined_chains$asymptote_results[i])) {
-      distributions[[i]] <- pweibull(x_values - shifts[i], shape = alphas[i], scale = betas[i]) * asymptotes[i]
+    if (validate_weibull_parameters(
+      data$combined_chains$first_quartile_results[i],
+      data$combined_chains$median_results[i], data$combined_chains$shift_results[i],
+      data$combined_chains$asymptote_results[i]
+    )) {
+      distributions[[i]] <- pweibull(x_values - shifts[i],
+        shape = alphas[i], scale = betas[i]
+      ) * asymptotes[i]
     } else {
       distributions[[i]] <- rep(NA, length(x_values))
     }

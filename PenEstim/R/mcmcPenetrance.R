@@ -170,12 +170,13 @@ mhChain <- function(
 #' penetrance estimation of cancer risk. It utilizes parallel computing to run multiple
 #' chains and provides various options for analyzing and visualizing the results.
 #'
-#' @param data List of families data for penetrance estimation.
-#' @param cancer_type The type of cancer to estimate penetrance for.
-#' @param gene_input Gene information for risk estimation.
+#' @param data A list of family data for penetrance estimation.
+#' @param cancer_type The type of cancer for which to estimate penetrance.
+#' @param gene_input Gene information used for risk estimation.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
-#' @param max_age Maximum age to be considered, default is 94.
+#' @param max_age Maximum age considered for analysis, default is 94.
+#' @param removeProband Logical, indicating whether to remove probands from the analysis (default is FALSE).
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
 #' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
 #' @param distribution_data Data for generating prior distributions.
@@ -186,6 +187,8 @@ mhChain <- function(
 #' @param summary_stats Boolean to include summary statistics in the output.
 #' @param rejection_rates Boolean to include rejection rates in the output.
 #' @param density_plots Boolean to include density plots in the output.
+#' @param penetrance_plot Boolean to include penetrance plots in the output.
+#' @param probCI Probability level for confidence intervals in penetrance plots (default is 0.95).
 #' @return A list containing combined results from all chains, along with optional statistics and plots.
 #' @importFrom stats rbeta runif
 #' @importFrom parallel makeCluster stopCluster parLapply
@@ -195,7 +198,7 @@ mhChain <- function(
 #'   data = familyData, cancer_type = "breast", gene_input = "BRCA1",
 #'   n_chains = 4, n_iter_per_chain = 1000, max_age = 90,
 #'   burn_in = 0.1, thinning_factor = 2, summary_stats = TRUE,
-#'   rejection_rates = TRUE, density_plots = TRUE
+#'   rejection_rates = TRUE, density_plots = TRUE, penetrance_plot = TRUE
 #' )
 #' @export
 
