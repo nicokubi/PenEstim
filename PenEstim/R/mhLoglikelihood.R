@@ -9,8 +9,6 @@
 #' @return Log-likelihood value.
 #' @importFrom PPP PPP
 
-
-
 suppressPPPLogs <- function(expr) {
   # Save current output connection
   originalConn <- stdout()
@@ -19,7 +17,6 @@ suppressPPPLogs <- function(expr) {
   on.exit(sink(originalConn), add = TRUE)
   expr
 }
-
 
 mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_type, gene_input) {
   # set age, same as in DB

@@ -27,12 +27,11 @@
 #' @export
 
 # Main mhChain function
-
 mhChain <- function(
     seed, n_iter, chain_id, data,
     max_age, PanelPRODatabase,
     prior_distributions, cancer_type, gene_input,
-    median_max = TRUE) {
+    median_max = TRUE, max_penetrance) {
   # Set seed
   set.seed(seed)
 
@@ -48,7 +47,7 @@ mhChain <- function(
     draw_initial_params <- function() {
       repeat {
         asymptote <- SEER_baseline$total_prob +
-          do.call(prior_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
+          do.call(prior_distributions$asymptote_distribution, list(1)) * (max_penetrance - SEER_baseline$total_prob)
         shift <- do.call(prior_distributions$shift_distribution, list(1))
         median <- if (median_max) {
           do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
@@ -92,7 +91,7 @@ mhChain <- function(
     # generate asymptote parameter (gamma)
    repeat {
      asymptote_proposal <- SEER_baseline$total_prob +
-       do.call(prior_distributions$asymptote_distribution, list(1)) * (1 - SEER_baseline$total_prob)
+       do.call(prior_distributions$asymptote_distribution, list(1)) * (max_penetrance - SEER_baseline$total_prob)
      shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
      median_proposal <- if (median_max) {
        do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
@@ -210,6 +209,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      burn_in = 0,
                      thinning_factor = 1,
                      distribution_data = distribution_data_default,
+                     max_penetrance = 1,
                      sample_size = NULL,
                      ratio = NULL,
                      prior_params = prior_params_default,
@@ -281,7 +281,8 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
       prior_distributions = prop,
       max_age = max_age,
       cancer_type = cancer_type,
-      gene_input = gene_input
+      gene_input = gene_input,
+      max_penetrance = max_penetrance
     )
   })
 
