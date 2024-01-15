@@ -60,43 +60,43 @@ generate_proposal <- function(distribution_func, args_list) {
 #' cat("Beta:", result$beta, "\n")
 #'
 #' @export
-calculate_weibull_parameters <- function(given_median, given_first_quartile, delta, gamma) {
-    # Calculate alpha
-    alpha <- log(-log((gamma - 0.25) / gamma) / -log((gamma - 0.5) / gamma)) /
-        log((given_first_quartile - delta) / (given_median - delta))
+calculate_weibull_parameters <-
+    function(given_median, given_first_quartile, delta, gamma) {
+        # Calculate alpha
+        alpha <- log(log(4 / 3) / log(2)) /
+            log((given_first_quartile - delta) / (given_median - delta))
 
-    # Calculate beta using the median (M)
-    beta <- (given_median - delta) / (log(2)^(1 / alpha))
+        # Calculate beta using the median (M)
+        beta <- (given_median - delta) / (log(2)^(1 / alpha))
 
-    return(list(alpha = alpha, beta = beta))
-}
-
-validate_weibull_parameters <- function(given_first_quartile, given_median, shift, asymptote) {
-    # Check for negative or zero values
-    if (given_median <= 0 || given_first_quartile <= 0 || shift < 0) {
-        return(FALSE)
+        return(list(alpha = alpha, beta = beta))
     }
 
-    # Check if asymptote (gamma) is within the valid range (0,1)
-    if (asymptote <= 0 || asymptote >= 1) {
-        return(FALSE)
+validate_weibull_parameters <-
+    function(given_first_quartile, given_median, shift, asymptote) {
+        # Check for negative or zero values
+        if (given_median <= 0 || given_first_quartile <= 0 || shift < 0) {
+            return(FALSE)
+        }
+
+        # Check if asymptote (gamma) is within the valid range (0,1)
+        if (asymptote <= 0 || asymptote >= 1) {
+            return(FALSE)
+        }
+
+        # Check if the logarithmic calculations will be valid
+        if (given_first_quartile <= shift || given_median <= shift) {
+            return(FALSE)
+        }
+
+        # Check if the denominator in the alpha calculation would be zero
+        if ((given_first_quartile - shift) == (given_median - shift)) {
+            return(FALSE)
+        }
+
+        # If all checks pass, return TRUE
+        return(TRUE)
     }
-
-    # Check if the logarithmic calculations will be valid
-    if (given_first_quartile <= shift || given_median <= shift) {
-        return(FALSE)
-    }
-
-    # Check if the denominator in the alpha calculation would be zero
-    if ((given_first_quartile - shift) == (given_median - shift)) {
-        return(FALSE)
-    }
-
-    # If all checks pass, return TRUE
-    return(TRUE)
-}
-
-
 
 #' Prepare Ages from Pedigree Data
 #'
@@ -167,5 +167,4 @@ prepAges <- function(data, removeProband = FALSE) {
         data[[i]]$CurAge <- ifelse(is.na(data[[i]]$CurAge), max_cancer_age, pmax(data[[i]]$CurAge, max_cancer_age))
     }
     return(data)
-
 }

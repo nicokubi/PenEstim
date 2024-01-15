@@ -71,7 +71,7 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
 
     # Access the posterior probabilities (not normalized) and estimates for the specified gene and cancer type
     postprobs <- suppressPPPLogs({PPP(pedigree = data, genes = c(gene_input), cancers = cancer_type,
-     database = PanelPRODatabase, impute.missing.ages = FALSE)$posterior.prob[[1]]})
+      database = PanelPRODatabase, impute.missing.ages = FALSE)$posterior.prob[[1]]})
     estimate <- postprobs[postprobs$genes == gene_adj, "estimate"]
 
     # Check for NA or NaN before proceeding to if condition

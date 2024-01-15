@@ -57,9 +57,6 @@ makePriors <- function(
     risk_proportion) {
   # Helper function definitions
   # Define the scaling transformation
-
-  max_age=58
-  min_age=42
   normalize_median <- function(x) {
     return((x - min_age) / (max_age - min_age))
   }
@@ -87,10 +84,17 @@ makePriors <- function(
 
   # Function: Compute beta distribution parameters for asymptote parameter
   compute_parameters_asymptote <- function(stat, at_risk) {
-    max_age_norm <- normalize_median(58)
+    max_age_norm <- normalize_median(stat)
     alpha <- max_age_norm * at_risk
     beta <- at_risk - alpha
     return(list(g1 = alpha, g2 = beta))
+  }
+  
+  compute_parameters_asymptote <- function(stat, at_risk) {
+  max_age_norm <- normalize_median(stat)
+  alpha <- max_age_norm * at_risk
+  beta <- alpha
+  return(list(g1 = alpha, g2 = beta))
   }
 
   # Main logic for setting the parameters of the prior distribution

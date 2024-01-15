@@ -35,39 +35,38 @@ mhChain <- function(
   # Set seed
   set.seed(seed)
 
-  # Prior is the proposal in the independent MH
-  proposal_distributions <- prior_distributions
-
   # Calculate SEER baseline and midpoint
   SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER")
   midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
 
-    draw_initial_params <- function() {
-      repeat {
-        asymptote <- SEER_baseline$total_prob +
-          do.call(prior_distributions$asymptote_distribution, list(1)) * (max_penetrance - SEER_baseline$total_prob)
-        shift <- do.call(prior_distributions$shift_distribution, list(1))
-        median <- if (median_max) {
-          do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
-        } else {
-          do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
-        }
-        first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
+  draw_initial_params <- function() {
+    repeat {
+      asymptote <- SEER_baseline$total_prob +
+        do.call(prior_distributions$asymptote_distribution, list(1)) * (2 * max_penetrance - SEER_baseline$total_prob)
+      # Constrain the result between 0 and 1
+      asymptote <- max(0, min(1, asymptote))
+      shift <- do.call(prior_distributions$shift_distribution, list(1))
+      median <- if (median_max) {
+        do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
+      } else {
+        do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
+      }
+      first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
 
-        if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
-          return(c(first_quartile, median, shift, asymptote))
-        }
+      if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
+        return(c(first_quartile, median, shift, asymptote))
       }
     }
+  }
 
-    # Draw initial valid parameters
-    initial_params <- draw_initial_params()
-    first_quartile_current <- initial_params[1]
-    median_current <- initial_params[2]
-    shift_current <- initial_params[3]
-    asymptote_current <- initial_params[4]
+  # Draw initial valid parameters
+  initial_params <- draw_initial_params()
+  first_quartile_current <- initial_params[1]
+  median_current <- initial_params[2]
+  shift_current <- initial_params[3]
+  asymptote_current <- initial_params[4]
 
 
   num_rejections <- 0
@@ -89,26 +88,24 @@ mhChain <- function(
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
     # generate asymptote parameter (gamma)
-   repeat {
-     asymptote_proposal <- SEER_baseline$total_prob +
-       do.call(prior_distributions$asymptote_distribution, list(1)) * (max_penetrance - SEER_baseline$total_prob)
-     shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
-     median_proposal <- if (median_max) {
-       do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
-     } else {
-       do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift_proposal) + shift_proposal
-     }
-     first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median_proposal - shift_proposal) + shift_proposal
+    repeat {
+      asymptote_proposal <- SEER_baseline$total_prob +
+        do.call(prior_distributions$asymptote_distribution, list(1)) * (2 * max_penetrance - SEER_baseline$total_prob)
+      # Constrain the result between 0 and 1
+      asymptote_proposal <- max(0, min(1, aymptote_proposal))
+      shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
+      median_proposal <- if (median_max) {
+        do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
+      } else {
+        do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift_proposal) + shift_proposal
+      }
+      first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
+        (median_proposal - shift_proposal) + shift_proposal
 
-     if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
-       break
-     }
-   }
-
-    # generate first quartile
-    first_quartile_proposal <-
-      do.call(proposal_distributions$first_quartile_distribution, list(1)) *
-      (median_proposal - shift_proposal) + shift_proposal
+      if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
+        break
+      }
+    }
 
     # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood(
