@@ -92,7 +92,7 @@ mhChain <- function(
       asymptote_proposal <- SEER_baseline$total_prob +
         do.call(prior_distributions$asymptote_distribution, list(1)) * (2 * max_penetrance - SEER_baseline$total_prob)
       # Constrain the result between 0 and 1
-      asymptote_proposal <- max(0, min(1, aymptote_proposal))
+      asymptote_proposal <- max(0, min(1, asymptote_proposal))
       shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
       median_proposal <- if (median_max) {
         do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
