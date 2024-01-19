@@ -238,8 +238,6 @@ plot_penetrance <- function(data, prob = probCI) {
     }
   }
 
-  getwd()
-
   # Convert list to matrix
   distributions_matrix <- do.call(cbind, distributions)
   str(distributions_matrix)
@@ -248,8 +246,6 @@ plot_penetrance <- function(data, prob = probCI) {
   lower_bound <- apply(distributions_matrix, 1, quantile, probs = (1 - 0.95) / 2, na.rm = TRUE)
   upper_bound <- apply(distributions_matrix, 1, quantile, probs = 1 - (1 - 0.95) / 2, na.rm = TRUE)
   mean_distribution <- rowMeans(distributions_matrix, na.rm = TRUE)
-
-  lower_bound
 
   # Plot the average distribution
   plot(x_values, mean_distribution,

@@ -12,7 +12,7 @@
 #' @param proposal_distributions List of the parameters for the distributions of the proposal.
 #' @param cancer_type Type of cancer for which risk is being estimated.
 #' @param gene_input Gene information for risk estimation.
-#' @param median_max Boolean indicating whether to use median_max or max_age for calculations. Defaults to TRUE.
+#' @param median_max Boolean indicating whether to use SEER median or max_age as an upper bound for the median proposal. Defaults to TRUE, i.e. using the SEER median.
 #' @return A list containing samples, log likelihoods, acceptance ratio, and rejection rate for each iteration.
 #' @importFrom stats set.seed
 #' @importFrom parallel makeCluster stopCluster parLapply
@@ -173,6 +173,7 @@ mhChain <- function(
 #' @param n_iter_per_chain Number of iterations for each chain.
 #' @param max_age Maximum age considered for analysis, default is 94.
 #' @param removeProband Logical, indicating whether to remove probands from the analysis (default is FALSE).
+#' @param median_max Boolean indicating whether to use SEER median or max_age as an upper bound for the median proposal. Defaults to TRUE, i.e. using the SEER median.
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
 #' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
 #' @param distribution_data Data for generating prior distributions.
@@ -203,6 +204,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      n_iter_per_chain = 200,
                      max_age = 94,
                      removeProband = FALSE,
+                     median_max = TRUE,
                      burn_in = 0,
                      thinning_factor = 1,
                      distribution_data = distribution_data_default,
