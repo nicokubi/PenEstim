@@ -26,6 +26,7 @@
 #' )
 #' @export
 
+ 
 # Main mhChain function
 mhChain <- function(
     seed, n_iter, chain_id, data,
@@ -108,29 +109,30 @@ mhChain <- function(
     }
 
     # Compute the likelihood for the current and proposed
-    loglikelihood_current <- mhLogLikelihood(
+    loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
         median_current,
         first_quartile_current, asymptote_current,
         shift_current
       ), families = data,
       max_age = max_age,
-      gene_input = gene_input,
       cancer_type = cancer_type,
-      PanelPRODatabase = PanelPRODatabase
+      db = PanelPRODatabase,
+      af = 0.001
     )
 
-    loglikelihood_proposal <- mhLogLikelihood(
+    loglikelihood_proposal <- mhLogLikelihood_clipp(
       paras =
         c(
           median_proposal, first_quartile_proposal,
           asymptote_proposal, shift_proposal
         ), families = data,
       max_age = max_age,
-      gene_input = gene_input,
       cancer_type = cancer_type,
-      PanelPRODatabase = PanelPRODatabase
+      db = PanelPRODatabase,
+      af = 0.001
     )
+  
 
     # Compute the acceptance ratio (likelihood ratio)
     acceptance_ratio <- exp(loglikelihood_proposal - loglikelihood_current)
@@ -261,11 +263,15 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
   parallel::clusterEvalQ(cl, {
     library(PPP) # Load the "PPP" library
+    library(clipp)
+    library(stats4)
+    library(dplyr)
   })
 
   parallel::clusterExport(cl, c(
-    "mhChain", "mhLogLikelihood", "calculate_lifetime_risk",
-    "calculate_weibull_parameters", "validate_weibull_parameters", "suppressPPPLogs",
+    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", 
+    "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
+    "penet.fn", "transformDF",
     "makePriors",
     "seeds", "n_iter_per_chain",
     "data", "prop", "max_age",
@@ -341,3 +347,4 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
   return(output)
 }
+

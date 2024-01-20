@@ -204,41 +204,59 @@ apply_thinning <- function(results, thinning_factor) {
 #' @examples
 #' plot_weibull_distribution(combine_results, prob = 0.95)
 #'
+
 plot_penetrance <- function(data, prob = probCI) {
   # Recover the parameters for plotting the Weibull
   params <- calculate_weibull_parameters(
-    data$combined_chains$median_results,
-    data$combined_chains$first_quartile_results,
-    data$combined_chains$shift_results, data$combined_chains$asymptote_results
+    data$median_results,
+    data$first_quartile_results,
+    data$shift_results, 
+    data$asymptote_results
   )
 
   alphas <- params$alpha
   betas <- params$beta
-  asymptotes <- data$combined_chains$asymptote_results
-  shifts <- data$combined_chains$shift_results
+  asymptotes <- data$asymptote_results
+  shifts <- data$shift_results
+
+  # Check lengths and contents of parameters
+  cat("Length of alphas: ", length(alphas), "\n")
+  cat("Length of betas: ", length(betas), "\n")
+  cat("Length of asymptotes: ", length(asymptotes), "\n")
+  cat("Length of shifts: ", length(shifts), "\n")
+
+  summary(alphas)
+  summary(betas)
+  summary(asymptotes)
+  summary(shifts)
 
   # Define the range for the distribution
   x_values <- seq(0, 100, length.out = 100)
 
   # Initialize an empty list for distributions
   distributions <- vector("list", length(alphas))
-  distributions
 
   for (i in seq_along(alphas)) {
+    cat("Processing index: ", i, "\n")
     if (validate_weibull_parameters(
-      data$combined_chains$first_quartile_results[i],
-      data$combined_chains$median_results[i], data$combined_chains$shift_results[i],
-      data$combined_chains$asymptote_results[i]
+      data$first_quartile_results[i],
+      data$median_results[i], data$shift_results[i],
+      data$asymptote_results[i]
     )) {
       distributions[[i]] <- pweibull(x_values - shifts[i],
         shape = alphas[i], scale = betas[i]
       ) * asymptotes[i]
+      cat("Distribution at index ", i, " calculated.\n")
     } else {
       distributions[[i]] <- rep(NA, length(x_values))
+      cat("Invalid parameters at index ", i, ". Filled with NA.\n")
     }
   }
 
-  # Convert list to matrix
+  # Inspect distributions list
+  str(distributions)
+
+  # Convert list to matrix and check its structure
   distributions_matrix <- do.call(cbind, distributions)
   str(distributions_matrix)
 
@@ -246,6 +264,10 @@ plot_penetrance <- function(data, prob = probCI) {
   lower_bound <- apply(distributions_matrix, 1, quantile, probs = (1 - 0.95) / 2, na.rm = TRUE)
   upper_bound <- apply(distributions_matrix, 1, quantile, probs = 1 - (1 - 0.95) / 2, na.rm = TRUE)
   mean_distribution <- rowMeans(distributions_matrix, na.rm = TRUE)
+
+  # Check the structure of credible intervals
+  str(lower_bound)
+  str(upper_bound)
 
   # Plot the average distribution
   plot(x_values, mean_distribution,
