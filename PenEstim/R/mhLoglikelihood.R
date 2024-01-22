@@ -25,11 +25,11 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
   # Parameters, drawn from prior/proposal
   given_median <- paras[1]
   given_first_quartile <- paras[2]
-  gamma <- paras[3]
-  delta <- paras[4]
+  delta <- paras[3]
+  gamma <- paras[4]
 
   # Recalculate the parameters 
-  params <- calculate_weibull_parameters(given_median, given_first_quartile, delta, gamma)
+  params <- calculate_weibull_parameters(given_median, given_first_quartile, shift, asymptote)
   alpha <- params$alpha
   beta <- params$beta
 

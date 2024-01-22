@@ -26,27 +26,29 @@
 #' )
 #' @export
 
- 
 # Main mhChain function
 mhChain <- function(
     seed, n_iter, chain_id, data,
-    max_age, PanelPRODatabase,
+    max_age, db,
     prior_distributions, cancer_type, gene_input,
     median_max = TRUE, max_penetrance) {
   # Set seed
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER")
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", data = db)
   midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
 
   draw_initial_params <- function() {
     repeat {
+      asymptote_factor <- 2 * max_penetrance
+      if (asymptote_factor > 1) {
+        asymptote_factor <- 1 - SEER_baseline$total_prob
+      }
       asymptote <- SEER_baseline$total_prob +
-        do.call(prior_distributions$asymptote_distribution, list(1)) * (2 * max_penetrance - SEER_baseline$total_prob)
-      # Constrain the result between 0 and 1
+        do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
       asymptote <- max(0, min(1, asymptote))
       shift <- do.call(prior_distributions$shift_distribution, list(1))
       median <- if (median_max) {
@@ -90,9 +92,12 @@ mhChain <- function(
     # Propose new values using the prior distributions
     # generate asymptote parameter (gamma)
     repeat {
+      asymptote_factor <- 2 * max_penetrance 
+      if (asymptote_factor > 1) {
+        asymptote_factor <- 1 - SEER_baseline$total_prob
+      }
       asymptote_proposal <- SEER_baseline$total_prob +
-        do.call(prior_distributions$asymptote_distribution, list(1)) * (2 * max_penetrance - SEER_baseline$total_prob)
-      # Constrain the result between 0 and 1
+        do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
       asymptote_proposal <- max(0, min(1, asymptote_proposal))
       shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
       median_proposal <- if (median_max) {
@@ -112,12 +117,12 @@ mhChain <- function(
     loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
         median_current,
-        first_quartile_current, asymptote_current,
-        shift_current
+        first_quartile_current, shift_current, 
+        asymptote_current
       ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
-      db = PanelPRODatabase,
+      db,
       af = 0.001
     )
 
@@ -125,11 +130,11 @@ mhChain <- function(
       paras =
         c(
           median_proposal, first_quartile_proposal,
-          asymptote_proposal, shift_proposal
+           shift_proposal, asymptote_proposal
         ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
-      db = PanelPRODatabase,
+      db,
       af = 0.001
     )
   
@@ -285,7 +290,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
     mhChain(seeds[i],
       n_iter = n_iter_per_chain, chain_id = i,
       data = data,
-      PanelPRODatabase = PanelPRODatabase,
+      db = PanelPRODatabase,
       prior_distributions = prop,
       max_age = max_age,
       cancer_type = cancer_type,
@@ -350,4 +355,3 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
   return(output)
 }
-

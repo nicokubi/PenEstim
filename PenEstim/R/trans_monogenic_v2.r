@@ -52,7 +52,7 @@
 #' trans_monogenic(2, annotate = TRUE)
 #'
 
-trans_monogenic <- function(n_alleles, annotate = FALSE, nonviable) {
+trans_monogenic2 <- function(n_alleles, annotate = FALSE, nonviable) {
     # List of possible genotypes
     eg <- cbind(rep(1:n_alleles, each = n_alleles), rep(1:n_alleles, times = n_alleles))
     f <- function(x) {

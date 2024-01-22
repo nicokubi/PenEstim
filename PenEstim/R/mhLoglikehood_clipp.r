@@ -1,9 +1,3 @@
-# Load Libraries
-library(clipp)
-library(PPP)
-library(stats4)
-library(dplyr)
-
  calculateBaseline <- function(cancer_type, gene = "SEER", race = "All_Races", sex = "Male", type = "Crude", data) {
      # Check if dimnames are available and correct
      if (is.null(data$Penetrance) || is.null(attr(data$Penetrance, "dimnames"))) {
@@ -38,8 +32,7 @@ library(dplyr)
  }
 
  # Penetrance Functions
- penet.fn <- function(i, data, alpha, beta, gamma, delta, max_age,baselineRisk) {
-     max_age <- max_age 
+ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk) {
      if (data$age[i] == 0) {
          penet.i <- c(1, 1) # Assuming people aged 0 years are all unaffected
      } else {
@@ -88,8 +81,8 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
     # Extract parameters
     given_median <- paras[1]
     given_first_quartile <- paras[2]
-    gamma <- paras[3]
-    delta <- paras[4]
+    delta <- paras[3]
+    gamma <- paras[4]
 
     # Calculate Weibull parameters
     params <- calculate_weibull_parameters(given_median, given_first_quartile, delta, gamma)
@@ -98,12 +91,12 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
 
     # Initialize values
     geno_freq <- c((1 - af)^2, 2*(1-af)*af)
-    trans <- trans_monogenic(n_alleles = 2, nonviable = TRUE)
+    trans <- trans_monogenic2(n_alleles = 2, nonviable = TRUE)
     baselineRisk <- calculateBaseline(cancer_type, data = db)
 
     # Calculate penetrance
     penet <- t(sapply(1:nrow(families), function(i) {
-        penet.fn(i, families, alpha, beta, gamma, delta, max_age, baselineRisk)
+        penet.fn(i, families, alpha, beta, delta, gamma, max_age, baselineRisk)
     }))
 
     # Compute log-likelihooda
@@ -115,7 +108,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
         loglik <- NEGATIVE_INFINITY_PENALTY
         cat("Negative infinity encountered, penalized log likelihood:", loglik, "\n")
     } else {
-        cat("Parameters:", given_median, given_first_quartile, alpha, beta, gamma, delta, "\n")
+        cat("Parameters:", given_median, given_first_quartile, alpha, beta, delta, gamma, "\n")
         cat("Log Likelihood:", loglik, "\n")
     }
 

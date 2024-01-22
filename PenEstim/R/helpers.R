@@ -17,7 +17,7 @@
 #' calculate_lifetime_risk("Breast_Cancer", "BRCA1")
 #'
 #' @export
-calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex = "Female", type = "Crude", data = PanelPRODatabase) {
+calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex = "Female", type = "Crude", data) {
     # Find the indices for the respective attributes
     dim_names <- attr(data$Penetrance, "dimnames")
     gene_index <- which(dim_names$Gene == gene)
@@ -61,13 +61,13 @@ generate_proposal <- function(distribution_func, args_list) {
 #'
 #' @export
 calculate_weibull_parameters <-
-    function(given_median, given_first_quartile, delta, gamma) {
+    function(given_median, given_first_quartile, shift, asymptote) {
         # Calculate alpha
         alpha <- log(log(4 / 3) / log(2)) /
-            log((given_first_quartile - delta) / (given_median - delta))
+            log((given_first_quartile - shift) / (given_median - shift))
 
         # Calculate beta using the median (M)
-        beta <- (given_median - delta) / (log(2)^(1 / alpha))
+        beta <- (given_median - shift) / (log(2)^(1 / alpha))
 
         return(list(alpha = alpha, beta = beta))
     }
