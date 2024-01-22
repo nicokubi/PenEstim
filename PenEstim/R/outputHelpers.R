@@ -219,17 +219,6 @@ plot_penetrance <- function(data, prob = probCI) {
   asymptotes <- data$asymptote_results
   shifts <- data$shift_results
 
-  # Check lengths and contents of parameters
-  cat("Length of alphas: ", length(alphas), "\n")
-  cat("Length of betas: ", length(betas), "\n")
-  cat("Length of asymptotes: ", length(asymptotes), "\n")
-  cat("Length of shifts: ", length(shifts), "\n")
-
-  summary(alphas)
-  summary(betas)
-  summary(asymptotes)
-  summary(shifts)
-
   # Define the range for the distribution
   x_values <- seq(0, 100, length.out = 100)
 
@@ -237,7 +226,6 @@ plot_penetrance <- function(data, prob = probCI) {
   distributions <- vector("list", length(alphas))
 
   for (i in seq_along(alphas)) {
-    cat("Processing index: ", i, "\n")
     if (validate_weibull_parameters(
       data$first_quartile_results[i],
       data$median_results[i], data$shift_results[i],
@@ -246,10 +234,8 @@ plot_penetrance <- function(data, prob = probCI) {
       distributions[[i]] <- pweibull(x_values - shifts[i],
         shape = alphas[i], scale = betas[i]
       ) * asymptotes[i]
-      cat("Distribution at index ", i, " calculated.\n")
     } else {
       distributions[[i]] <- rep(NA, length(x_values))
-      cat("Invalid parameters at index ", i, ". Filled with NA.\n")
     }
   }
 

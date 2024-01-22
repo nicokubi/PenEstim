@@ -245,6 +245,9 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   # Apply the prepAges function to treat missing data
   data <- prepAges(data, removeProband)
 
+   # Apply the transformation to adjust the format for the clipp package 
+  data <- do.call(rbind, lapply(data, transformDF))
+
   #  Create the prior distributions
   prop <- makePriors(
     data = distribution_data,
@@ -271,7 +274,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   parallel::clusterExport(cl, c(
     "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", 
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
-    "penet.fn", "transformDF",
+    "penet.fn", "transformDF", "trans_monogenic",
     "makePriors",
     "seeds", "n_iter_per_chain",
     "data", "prop", "max_age",

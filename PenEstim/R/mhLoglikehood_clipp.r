@@ -39,12 +39,12 @@ library(dplyr)
 
  # Penetrance Functions
  penet.fn <- function(i, data, alpha, beta, gamma, delta, max_age,baselineRisk) {
-     max_age <- max_age # Assuming "inc" is defined elsewhere
+     max_age <- max_age 
      if (data$age[i] == 0) {
          penet.i <- c(1, 1) # Assuming people aged 0 years are all unaffected
      } else {
          # Find the index corresponding to the age of individual i
-         age_index <- match(data$age[i], 1:94)
+         age_index <- match(data$age[i], 1:max_age)
          # Check if the age is within the valid range of ages in your vector
          if (!is.na(age_index)) {
              # Extract the corresponding estimate
@@ -64,7 +64,7 @@ library(dplyr)
      return(penet.i)
  }
 
- # Function to transform each data frame
+ # Function to transform each data frame into the format for clipp
  transformDF <- function(df) {
      df %>%
          select(
@@ -78,16 +78,12 @@ library(dplyr)
              geno = MSH6
          ) %>%
          mutate(
-             mother = ifelse(is.na(mother), NA, paste0("ora", sprintf("%03d", mother))),
-             father = ifelse(is.na(father), NA, paste0("ora", sprintf("%03d", father))),
-             geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", geno))
+             geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0,"1/1",geno)))
          )
  }
 
-# Improved version of mhLogLikelihood_clipp function
+# Likelihood calculation using the clipp package 
 mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af) {
-    # Combine family data
-    combined_df <- do.call(rbind, lapply(families, transformDF))
 
     # Extract parameters
     given_median <- paras[1]
@@ -101,17 +97,17 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
     beta <- params$beta
 
     # Initialize values
-    geno_freq <- c(1 - af, af)
-    trans <- trans_monogenic(n_alleles = 2)
+    geno_freq <- c((1 - af)^2, 2*(1-af)*af)
+    trans <- trans_monogenic(n_alleles = 2, nonviable = TRUE)
     baselineRisk <- calculateBaseline(cancer_type, data = db)
 
     # Calculate penetrance
-    penet <- t(sapply(1:nrow(combined_df), function(i) {
-        penet.fn(i, combined_df, alpha, beta, gamma, delta, max_age, baselineRisk)
+    penet <- t(sapply(1:nrow(families), function(i) {
+        penet.fn(i, families, alpha, beta, gamma, delta, max_age, baselineRisk)
     }))
 
-    # Compute log-likelihood
-    loglik <- pedigree_loglikelihood(combined_df, geno_freq, trans, penet, ncores = 1)
+    # Compute log-likelihooda
+    loglik <- pedigree_loglikelihood(families, geno_freq, trans, penet, ncores = 1)
 
     # Handle -Inf values
     if (is.infinite(loglik) && loglik == -Inf) {
