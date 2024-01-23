@@ -271,3 +271,7 @@ plot_penetrance <- function(data, prob = probCI) {
     col = c("blue", "red"), lty = 1, cex = 0.8, fill = c(NA, rgb(1, 0, 0, 0.2))
   )
 }
+
+# Define the range for the distribution
+x_values <- seq(0, 100, length.out = 100)
+plot(pweibull(x_values-10,0.9,10)*0.2)

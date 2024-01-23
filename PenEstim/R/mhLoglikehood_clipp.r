@@ -1,11 +1,32 @@
- calculateBaseline <- function(cancer_type, gene = "SEER", race = "All_Races", sex = "Male", type = "Crude", data) {
+#' Calculate Baseline Penetrance
+#'
+#' This function calculates the baseline penetrance for a specific cancer type, gene, race, sex, and type.
+#' It extracts the necessary information from the provided data object.
+#'
+#' @param cancer_type The type of cancer.
+#' @param gene The gene (default is "SEER").
+#' @param race The race (default is "All_Races").
+#' @param sex The sex (default is "Male").
+#' @param type The type of penetrance (default is "Crude").
+#' @param data The data object containing penetrance information.
+#'
+#' @return A matrix containing the baseline penetrance values.
+#'
+#' @seealso \code{\link{penet.fn}}
+#'
+#' @examples
+#' # Calculate baseline penetrance
+#' baseline <- calculateBaseline("Lung Cancer", data = my_data)
+#'
+
+ calculateBaseline <- function(cancer_type, gene, race, type, data) {
      # Check if dimnames are available and correct
      if (is.null(data$Penetrance) || is.null(attr(data$Penetrance, "dimnames"))) {
          stop("Penetrance data or its dimension names are not properly defined.")
      }
 
      dim_names <- attr(data$Penetrance, "dimnames")
-     required_dims <- c("Cancer", "Gene", "Race", "Sex", "Age", "PenetType")
+     required_dims <- c("Cancer", "Gene", "Race", "Age", "PenetType")
      if (!all(required_dims %in% names(dim_names))) {
          stop("One or more required dimensions are missing in Penetrance data.")
      }
@@ -23,28 +44,52 @@
      cancer_index <- get_index("Cancer", cancer_type)
      gene_index <- get_index("Gene", gene)
      race_index <- get_index("Race", race)
-     sex_index <- get_index("Sex", sex)
      type_index <- get_index("PenetType", type)
 
      # Subsetting Penetrance data for all ages using indices
-     lifetime_risk <- data$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
+     lifetime_risk <- data$Penetrance[cancer_index, gene_index, race_index, , , type_index]
      return(lifetime_risk)
  }
 
- # Penetrance Functions
+#' Penetrance Function
+#'
+#' This function calculates the penetrance for an individual based on their age, genotype, and other factors.
+#'
+#' @param i The index of the individual.
+#' @param data The data object containing individual information.
+#' @param alpha Weibull distribution parameter alpha.
+#' @param beta Weibull distribution parameter beta.
+#' @param delta The delta parameter.
+#' @param gamma The gamma parameter.
+#' @param max_age The maximum age considered.
+#' @param baselineRisk The baseline penetrance values.
+#'
+#' @return A vector containing penetrance values for unaffected and affected individuals.
+#'
+#' @examples
+#' # Calculate penetrance for an individual
+#' penetrance <- penet.fn(1, individual_data, 1.0, 2.0, 0.5, 0.8, 80, baseline_risk)
+#'
+ # Define the penetrance function  
  penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk) {
+     if (is.na(data$sex[i])) {
+         # Handle NA in sex - using average risk
+         sex_indices <- 1:nrow(baselineRisk)
+     } else {
+         # Map sex to row index: Assuming "Female" is 1st row and "Male" is 2nd row
+         sex_index <- ifelse(data$sex[i] == "Female", 1, 2)
+         sex_indices <- sex_index
+     }
+
      if (data$age[i] == 0) {
          penet.i <- c(1, 1) # Assuming people aged 0 years are all unaffected
      } else {
-         # Find the index corresponding to the age of individual i
-         age_index <- match(data$age[i], 1:max_age)
-         # Check if the age is within the valid range of ages in your vector
-         if (!is.na(age_index)) {
-             # Extract the corresponding estimate
-             nc.pen <- baselineRisk[age_index]
-         } else {
-             print("Age not found in the range of ages.")
-         }
+         # Ensure age is within the valid range
+         age_index <- min(max_age, data$age[i])
+
+         # Extract the corresponding baseline risk for sex and age
+         nc.pen <- mean(baselineRisk[sex_indices, age_index])
+
          # Weibull hazard and survival for carriers
          c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
 
@@ -52,12 +97,26 @@
          penet.i <- c(1 - nc.pen, 1 - c.pen) # if person is not affected
          if (data$aff[i] == 1) penet.i <- c(nc.pen, c.pen)
      }
+
      if (data$geno[i] == "1/1") penet.i[-1] <- 0
      if (data$geno[i] == "1/2") penet.i[-2] <- 0
+
      return(penet.i)
  }
 
- # Function to transform each data frame into the format for clipp
+#' Transform Data Frame
+#'
+#' This function transforms a data frame into the required format for further analysis.
+#'
+#' @param df The input data frame in the usual PanelPRO format.
+#'
+#' @return The transformed data frame in the format required for clipp.
+#'
+#' @examples
+#' # Transform a data frame
+#' transformed_df <- transformDF(input_df)
+#'
+ 
  transformDF <- function(df) {
      df %>%
          select(
@@ -75,7 +134,26 @@
          )
  }
 
-# Likelihood calculation using the clipp package 
+#' Calculate Log Likelihood using clipp Package
+#'
+#' This function calculates the log likelihood using the clipp package for a set of parameters and data.
+#'
+#' @param paras A vector of parameters (proposals)
+#' @param families The pedigree data for families.
+#' @param max_age The maximum age considered.
+#' @param cancer_type The type of cancer.
+#' @param db The data object.
+#' @param af Allele frequency.
+#'
+#' @return The log likelihood value.
+#'
+#' @references
+#' Details about the clipp package and methods can be found in the package documentation.
+#'
+#' @examples
+#' # Calculate log likelihood
+#' log_likelihood <- mhLogLikelihood_clipp(parameters, pedigree_data, 80, "Lung Cancer", data_object, 0.2)
+#'
 mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af) {
 
     # Extract parameters
@@ -92,7 +170,8 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
     # Initialize values
     geno_freq <- c((1 - af)^2, 2*(1-af)*af)
     trans <- trans_monogenic2(n_alleles = 2, nonviable = TRUE)
-    baselineRisk <- calculateBaseline(cancer_type, data = db)
+    baselineRisk <- calculateBaseline(cancer_type = cancer_type,
+     gene = "SEER", race = "All_Races", type = "Crude", data = db)
 
     # Calculate penetrance
     penet <- t(sapply(1:nrow(families), function(i) {

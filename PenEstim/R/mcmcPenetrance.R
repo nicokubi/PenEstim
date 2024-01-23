@@ -279,7 +279,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   parallel::clusterExport(cl, c(
     "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", 
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
-    "penet.fn", "transformDF", "trans_monogenic",
+    "penet.fn", "transformDF", "trans_monogenic2",
     "makePriors",
     "seeds", "n_iter_per_chain",
     "data", "prop", "max_age",
