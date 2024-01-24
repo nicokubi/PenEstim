@@ -239,23 +239,17 @@ plot_penetrance <- function(data, prob = probCI) {
     }
   }
 
-  # Inspect distributions list
-  str(distributions)
-
   # Convert list to matrix and check its structure
   distributions_matrix <- do.call(cbind, distributions)
-  str(distributions_matrix)
 
   # Calculate credible intervals with na.rm = TRUE
   lower_bound <- apply(distributions_matrix, 1, quantile, probs = (1 - 0.95) / 2, na.rm = TRUE)
   upper_bound <- apply(distributions_matrix, 1, quantile, probs = 1 - (1 - 0.95) / 2, na.rm = TRUE)
   mean_distribution <- rowMeans(distributions_matrix, na.rm = TRUE)
 
-  # Check the structure of credible intervals
-  str(lower_bound)
-  str(upper_bound)
 
   # Plot the average distribution
+  par(mfrow = c(1, 1))
   plot(x_values, mean_distribution,
     type = "l", col = "blue", lwd = 2,
     xlab = "Age", ylab = "Cumulative Penetrance",

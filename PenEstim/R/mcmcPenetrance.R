@@ -92,7 +92,7 @@ mhChain <- function(
     # Propose new values using the prior distributions
     # generate asymptote parameter (gamma)
     repeat {
-      asymptote_factor <- 2 * max_penetrance 
+      asymptote_factor <- 2 * max_penetrance
       if (asymptote_factor > 1) {
         asymptote_factor <- 1 - SEER_baseline$total_prob
       }
@@ -117,7 +117,7 @@ mhChain <- function(
     loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
         median_current,
-        first_quartile_current, shift_current, 
+        first_quartile_current, shift_current,
         asymptote_current
       ), families = data,
       max_age = max_age,
@@ -130,14 +130,13 @@ mhChain <- function(
       paras =
         c(
           median_proposal, first_quartile_proposal,
-           shift_proposal, asymptote_proposal
+          shift_proposal, asymptote_proposal
         ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
       db,
       af
     )
-  
 
     # Compute the acceptance ratio (likelihood ratio)
     acceptance_ratio <- exp(loglikelihood_proposal - loglikelihood_current)
@@ -251,7 +250,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   # Apply the prepAges function to treat missing data
   data <- prepAges(data, removeProband)
 
-   # Apply the transformation to adjust the format for the clipp package 
+  # Apply the transformation to adjust the format for the clipp package
   data <- do.call(rbind, lapply(data, transformDF))
 
   #  Create the prior distributions
@@ -278,7 +277,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   })
 
   parallel::clusterExport(cl, c(
-    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", 
+    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
     "penet.fn", "transformDF",
     "makePriors",
@@ -296,7 +295,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
       max_age = max_age,
       cancer_type = cancer_type,
       gene_input = gene_input,
-      af = af, 
+      af = af,
       max_penetrance = max_penetrance
     )
   })

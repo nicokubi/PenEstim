@@ -193,7 +193,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
     if (is.infinite(loglik) && loglik == -Inf) {
         NEGATIVE_INFINITY_PENALTY <- -10000
         loglik <- NEGATIVE_INFINITY_PENALTY
-        cat("Negative infinity encountered, penalized log likelihood:", loglik, "\n")
+
     } else {
         cat("Parameters:", given_median, given_first_quartile, alpha, beta, delta, gamma, "\n")
         cat("Log Likelihood:", loglik, "\n")
