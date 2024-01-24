@@ -30,7 +30,7 @@
 mhChain <- function(
     seed, n_iter, chain_id, data,
     max_age, db,
-    prior_distributions, cancer_type, gene_input,
+    prior_distributions, cancer_type, gene_input, af,
     median_max = TRUE, max_penetrance) {
   # Set seed
   set.seed(seed)
@@ -123,7 +123,7 @@ mhChain <- function(
       max_age = max_age,
       cancer_type = cancer_type,
       db,
-      af = 0.001
+      af
     )
 
     loglikelihood_proposal <- mhLogLikelihood_clipp(
@@ -135,7 +135,7 @@ mhChain <- function(
       max_age = max_age,
       cancer_type = cancer_type,
       db,
-      af = 0.001
+      af
     )
   
 
@@ -215,6 +215,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      burn_in = 0,
                      thinning_factor = 1,
                      distribution_data = distribution_data_default,
+                     af = 0.0001,
                      max_penetrance = 1,
                      sample_size = NULL,
                      ratio = NULL,
@@ -279,10 +280,10 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   parallel::clusterExport(cl, c(
     "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", 
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
-    "penet.fn", "transformDF", "trans_monogenic2",
+    "penet.fn", "transformDF",
     "makePriors",
     "seeds", "n_iter_per_chain",
-    "data", "prop", "max_age",
+    "data", "prop", "af", "max_age",
     "PanelPRODatabase", "cancer_type", "gene_input"
   ), envir = environment())
 
@@ -295,6 +296,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
       max_age = max_age,
       cancer_type = cancer_type,
       gene_input = gene_input,
+      af = af, 
       max_penetrance = max_penetrance
     )
   })

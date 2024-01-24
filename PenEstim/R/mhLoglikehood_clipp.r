@@ -71,7 +71,7 @@
 #' penetrance <- penet.fn(1, individual_data, 1.0, 2.0, 0.5, 0.8, 80, baseline_risk)
 #'
  # Define the penetrance function  
- penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk) {
+ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote = FALSE) {
      if (is.na(data$sex[i])) {
          # Handle NA in sex - using average risk
          sex_indices <- 1:nrow(baselineRisk)
@@ -82,7 +82,7 @@
      }
 
      if (data$age[i] == 0) {
-         penet.i <- c(1, 1) # Assuming people aged 0 years are all unaffected
+         penet.i <- c(1, 1, 1) # Assuming people aged 0 years are all unaffected
      } else {
          # Ensure age is within the valid range
          age_index <- min(max_age, data$age[i])
@@ -94,15 +94,22 @@
          c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
 
          # Penetrance calculations based on genotype
-         penet.i <- c(1 - nc.pen, 1 - c.pen) # if person is not affected
-         if (data$aff[i] == 1) penet.i <- c(nc.pen, c.pen)
+         penet.i <- c(1 - nc.pen, 1 - c.pen, 1 - c.pen) # if person is not affected
+         if (data$aff[i] == 1) penet.i <- c(nc.pen, c.pen, c.pen)
      }
 
      if (data$geno[i] == "1/1") penet.i[-1] <- 0
      if (data$geno[i] == "1/2") penet.i[-2] <- 0
+     if (data$geno[i] == "2/2") penet.i[-3] <- 0
+
+     # Setting the third element to 0 if homozygote is FALSE
+     if (!homozygote) {
+         penet.i[3] <- 0
+     }
 
      return(penet.i)
  }
+
 
 #' Transform Data Frame
 #'
@@ -168,8 +175,9 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
     beta <- params$beta
 
     # Initialize values
-    geno_freq <- c((1 - af)^2, 2*(1-af)*af)
-    trans <- trans_monogenic2(n_alleles = 2, nonviable = TRUE)
+    af <- 0.001 
+    geno_freq <- geno_freq_monogenic(p_alleles = c(1 - af, af))
+    trans <- trans_monogenic(n_alleles = 2)
     baselineRisk <- calculateBaseline(cancer_type = cancer_type,
      gene = "SEER", race = "All_Races", type = "Crude", data = db)
 
