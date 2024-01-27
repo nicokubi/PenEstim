@@ -102,14 +102,13 @@
      if (data$geno[i] == "1/2") penet.i[-2] <- 0
      if (data$geno[i] == "2/2") penet.i[-3] <- 0
 
-     # Setting the third element to 0 if homozygote is FALSE
+      #Setting the third element to 0 if homozygote is FALSE
      if (!homozygote) {
          penet.i[3] <- 0
      }
 
      return(penet.i)
  }
-
 
 #' Transform Data Frame
 #'
@@ -131,10 +130,10 @@
              family = PedigreeID,
              mother = MotherID,
              father = FatherID,
-             aff = isAffCOL,
+             aff = isAffBC,
              sex = Sex,
              age = CurAge,
-             geno = MSH6
+             geno = BRCA1
          ) %>%
          mutate(
              geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0,"1/1",geno)))
@@ -175,11 +174,10 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
     beta <- params$beta
 
     # Initialize values
-    af <- 0.001 
     geno_freq <- geno_freq_monogenic(p_alleles = c(1 - af, af))
     trans <- trans_monogenic(n_alleles = 2)
     baselineRisk <- calculateBaseline(cancer_type = cancer_type,
-     gene = "SEER", race = "All_Races", type = "Crude", data = db)
+    gene = "SEER", race = "All_Races", type = "Crude", data = db)
 
     # Calculate penetrance
     penet <- t(sapply(1:nrow(families), function(i) {
@@ -191,8 +189,8 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
 
     # Handle -Inf values
     if (is.infinite(loglik) && loglik == -Inf) {
-        NEGATIVE_INFINITY_PENALTY <- -10000
-        loglik <- NEGATIVE_INFINITY_PENALTY
+        penalty <- 1e-28
+        loglik <- log(penalty)
 
     } else {
         cat("Parameters:", given_median, given_first_quartile, alpha, beta, delta, gamma, "\n")

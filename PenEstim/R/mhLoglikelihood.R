@@ -25,8 +25,8 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
   # Parameters, drawn from prior/proposal
   given_median <- paras[1]
   given_first_quartile <- paras[2]
-  delta <- paras[3]
-  gamma <- paras[4]
+  shift <- paras[3]
+  asymptote <- paras[4]
 
   # Recalculate the parameters 
   params <- calculate_weibull_parameters(given_median, given_first_quartile, shift, asymptote)
@@ -34,7 +34,7 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
   beta <- params$beta
 
   # Now use alpha and beta in your simulation
-  penetrance.mod.f <- dweibull(age - delta, alpha, beta) * gamma
+  penetrance.mod.f <- dweibull(age - shift, alpha, beta) * asymptote
 
   # For now focus on just one vector of penetrance estimates
   gene_adj <- paste(gene_input, "_hetero_anyPV", sep = "")
@@ -71,7 +71,7 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
 
     # Access the posterior probabilities (not normalized) and estimates for the specified gene and cancer type
     postprobs <- suppressPPPLogs({PPP(pedigree = data, genes = c(gene_input), cancers = cancer_type,
-      database = PanelPRODatabase, impute.missing.ages = FALSE)$posterior.prob[[1]]})
+    database = PanelPRODatabase, impute.missing.ages = FALSE)$posterior.prob[[1]]})
     estimate <- postprobs[postprobs$genes == gene_adj, "estimate"]
 
     # Check for NA or NaN before proceeding to if condition
@@ -80,11 +80,11 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
       estimate <- 1e-28
       ll <- log(estimate)
       log_likelihood <- log_likelihood + ll
-      cat("NaN or zero encountered:", alpha, beta, gamma, delta, ll, log_likelihood, estimate, "\n")
+      cat("NaN or zero encountered:", alpha, beta, asymptote, shift, ll, log_likelihood, estimate, "\n")
     } else {
       ll <- log(estimate)
       log_likelihood <- log_likelihood + ll
-      cat(given_median, given_first_quartile, alpha, beta, gamma, delta, ll, log_likelihood, estimate, "\n")
+      cat(given_median, given_first_quartile, alpha, beta, asymptote, shift, ll, log_likelihood, estimate, "\n")
     }
   }
 

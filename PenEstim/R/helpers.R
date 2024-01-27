@@ -115,7 +115,7 @@ validate_weibull_parameters <-
 #' data <- list(df1, df2) # df1, df2 are data frames with appropriate columns
 #' result <- prepAges(data)
 #'
-prepAges <- function(data, removeProband = FALSE) {
+prepAges <- function(data, removeProband) {
     # Define the list of genes
     genes <- c(
         "APC", "ATM", "BARD1", "BMPR1A", "BRCA1", "BRCA2", "BRIP1", "CDH1", "CDK4",
@@ -128,23 +128,25 @@ prepAges <- function(data, removeProband = FALSE) {
         "BRA", "BC", "CER", "COL", "ENDO", "GAS", "KID", "LEUK", "MELA",
         "OC", "OST", "PANC", "PROS", "SMA", "STS", "THY", "UB", "HEP", "CBC", "BC2"
     )
-
+    
     for (i in seq_along(data)) {
         # If removeProband is TRUE, set genes, ages, and affections to NA for probands
         if (removeProband) {
             proband_rows <- data[[i]]$Proband == 1
-
-            # Set genes to NA
             for (gene in genes) {
-                data[[i]][proband_rows, gene] <- NA
+                if (gene %in% colnames(data[[i]])) {
+                    data[[i]][proband_rows, gene] <- NA
+                }
             }
-
-            # Set ages and affections to NA
             for (cancer in cancer_types) {
                 age_col <- paste0("Age", cancer)
                 aff_col <- paste0("isAff", cancer)
-                data[[i]][proband_rows, age_col] <- NA
-                data[[i]][proband_rows, aff_col] <- NA
+                if (age_col %in% colnames(data[[i]])) {
+                    data[[i]][proband_rows, age_col] <- NA
+                }
+                if (aff_col %in% colnames(data[[i]])) {
+                    data[[i]][proband_rows, aff_col] <- NA
+                }
             }
         }
 
@@ -152,19 +154,27 @@ prepAges <- function(data, removeProband = FALSE) {
             age_col <- paste0("Age", cancer)
             aff_col <- paste0("isAff", cancer)
 
-            # Set age_col to 1 and corresponding 'isAff' to 0 where NA
-            na_rows <- is.na(data[[i]][[age_col]])
-            data[[i]][[age_col]][na_rows] <- 1
-            data[[i]][[aff_col]][na_rows] <- 0
+            if (age_col %in% colnames(data[[i]])) {
+                na_rows <- is.na(data[[i]][[age_col]])
+                data[[i]][[age_col]][na_rows] <- 1
+                data[[i]][[aff_col]][na_rows] <- 0
+            }
         }
 
-        # Create a matrix of all cancer ages
+        # Calculate max cancer age only for columns that exist in the data
         cancer_ages_cols <- paste0("Age", cancer_types)
+        cancer_ages_cols <- intersect(cancer_ages_cols, colnames(data[[i]]))
         cancer_ages <- data[[i]][cancer_ages_cols]
-        max_cancer_age <- apply(cancer_ages, 1, max, na.rm = TRUE)
-
-        # If CurAge is NA, set it to max cancer age, else set it to the maximum of CurAge and max cancer age
-        data[[i]]$CurAge <- ifelse(is.na(data[[i]]$CurAge), max_cancer_age, pmax(data[[i]]$CurAge, max_cancer_age))
+        
+        if (length(cancer_ages_cols) > 0) {
+            max_cancer_age <- apply(cancer_ages, 1, max, na.rm = TRUE)
+            data[[i]]$CurAge <- ifelse(is.na(data[[i]]$CurAge), max_cancer_age, pmax(data[[i]]$CurAge, max_cancer_age))
+        }
     }
     return(data)
 }
+
+
+na_rows <- is.na(simFamilies_C_1000_nocen_selected[[1]][["AgeBC"]])
+simFamilies_C_1000_nocen_selected[[2]][["AgeBC"]][na_rows]
+na_rows
