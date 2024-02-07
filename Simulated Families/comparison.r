@@ -57,7 +57,7 @@ PanelPRODatabase$AlleleFrequency
 str(datPP)
 
 # Calculation using clipp
-ll_out <- mhLogLikelihood(paras, datPP[1], max_age, db, cancer_type, gene_input)
+ll_out <- mhLogLikelihood(paras, datPP[10], max_age, db, cancer_type, gene_input)
 print(ll_out)
 head(datPP)
 
@@ -92,16 +92,16 @@ dat <- prepAges(simFamilies_C_1000_nocen_selected, removeProband = FALSE)
 
 # Apply the transformation to adjust the format for the clipp package
 dat <- do.call(rbind, lapply(dat, transformDF))
-dat1 <- dat[dat$family == 1, ]
+dat10 <- dat[dat$family == 10, ]
 dat1
 
 # use same af
 af <- PanelPRODatabase$AlleleFrequency[3,2]
 af
-llClipp <- mhLogLikelihood_clipp(paras, dat1, max_age, cancer_type, db, af)
+llClipp <- mhLogLikelihood_clipp(paras, dat10, max_age, cancer_type, db, af)
+ll_out
 
-
-PPP(pedigree = datPP[[1]], genes = c("BRCA1"), cancers = "BC",
+PPP(pedigree = datPP[[1]], genes = c("BRCA1"), cancers = "Breast",
     database = PanelPRODatabase, impute.missing.ages = FALSE)$posterior.prob[[1]]
 
 datPP

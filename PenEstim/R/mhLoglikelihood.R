@@ -53,15 +53,16 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
   sex_index <- which(dim_names$Sex == female)
 
   # overwrite the penetrance in the PanelPro Database
-  PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, , ] <- penetrance.mod.f
-
+  for(i in 1:length(penetrance.mod.f)) {
+    PanelPRODatabase$Penetrance[cancer_index, gene_index,,sex_index,i , ]  <- penetrance.mod.f[i]
+  }
+  
   #  Male Penetrance
   sex_index <- which(dim_names$Sex == male)
-
-  # Male penetrance function
-  penetrance.mod.m <- 0
-  # overwrite the penetrance in the PanelPro Database
-  PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, , ] <- penetrance.mod.m
+  
+  for(i in 1:length(penetrance.mod.f)) {
+    PanelPRODatabase$Penetrance[cancer_index, gene_index,,sex_index,i , ]  <- penetrance.mod.f[i]
+  }
 
   # Storing the estimates
   log_likelihood <- 0

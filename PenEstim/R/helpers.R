@@ -173,8 +173,3 @@ prepAges <- function(data, removeProband) {
     }
     return(data)
 }
-
-
-na_rows <- is.na(simFamilies_C_1000_nocen_selected[[1]][["AgeBC"]])
-simFamilies_C_1000_nocen_selected[[2]][["AgeBC"]][na_rows]
-na_rows

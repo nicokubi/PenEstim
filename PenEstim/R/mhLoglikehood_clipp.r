@@ -71,14 +71,13 @@
 #' penetrance <- penet.fn(1, individual_data, 1.0, 2.0, 0.5, 0.8, 80, baseline_risk)
 #'
  # Define the penetrance function  
- penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote = FALSE) {
+ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote = TRUE) {
      if (is.na(data$sex[i])) {
          # Handle NA in sex - using average risk
          sex_indices <- 1:nrow(baselineRisk)
      } else {
          # Map sex to row index: Assuming "Female" is 1st row and "Male" is 2nd row
          sex_index <- ifelse(data$sex[i] == "Female", 1, 2)
-         sex_indices <- sex_index
      }
 
      if (data$age[i] == 0) {
@@ -88,13 +87,13 @@
          age_index <- min(max_age, data$age[i])
 
          # Extract the corresponding baseline risk for sex and age
-         nc.pen <- mean(baselineRisk[sex_indices, age_index])
+         nc.pen <- baselineRisk[sex_index, age_index]
 
          # Weibull hazard and survival for carriers
          c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
 
          # Penetrance calculations based on genotype
-         penet.i <- c(1 - nc.pen, 1 - c.pen, 1 - c.pen) # if person is not affected
+         penet.i <- c(1-nc.pen, 1 - c.pen, 1 - c.pen) # if person is not affected
          if (data$aff[i] == 1) penet.i <- c(nc.pen, c.pen, c.pen)
      }
 
@@ -102,14 +101,15 @@
      if (data$geno[i] == "1/2") penet.i[-2] <- 0
      if (data$geno[i] == "2/2") penet.i[-3] <- 0
 
-      #Setting the third element to 0 if homozygote is FALSE
+    #Setting the third element to 0 if homozygote is FALSE
      if (!homozygote) {
          penet.i[3] <- 0
-     }
+    }
 
      return(penet.i)
  }
-
+ 
+ 
 #' Transform Data Frame
 #'
 #' This function transforms a data frame into the required format for further analysis.
@@ -132,13 +132,31 @@
              father = FatherID,
              aff = isAffBC,
              sex = Sex,
-             age = CurAge,
+             age = AgeBC,
              geno = BRCA1
          ) %>%
          mutate(
              geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0,"1/1",geno)))
          )
  }
+ 
+ transformDF <- function(df) {
+   df %>%
+     rename(
+       individual = SubjectID,
+       family = PedigreeID,
+       mother = MotherID,
+       father = FatherID,
+       aff = isAffBC,
+       sex = Sex,
+       age = AgeBC,
+       geno = BRCA1
+     ) %>%
+     mutate(
+       geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0, "1/1", geno)))
+     )
+ }
+ 
 
 #' Calculate Log Likelihood using clipp Package
 #'
@@ -160,7 +178,7 @@
 #' # Calculate log likelihood
 #' log_likelihood <- mhLogLikelihood_clipp(parameters, pedigree_data, 80, "Lung Cancer", data_object, 0.2)
 #'
-mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af) {
+mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, data, af) {
 
     # Extract parameters
     given_median <- paras[1]
@@ -177,7 +195,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
     geno_freq <- geno_freq_monogenic(p_alleles = c(1 - af, af))
     trans <- trans_monogenic(n_alleles = 2)
     baselineRisk <- calculateBaseline(cancer_type = cancer_type,
-    gene = "SEER", race = "All_Races", type = "Crude", data = db)
+    gene = "SEER", race = "All_Races", type = "Crude", data)
 
     # Calculate penetrance
     penet <- t(sapply(1:nrow(families), function(i) {
