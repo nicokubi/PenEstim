@@ -19,13 +19,13 @@
 #' baseline <- calculateBaseline("Lung Cancer", data = my_data)
 #'
 
- calculateBaseline <- function(cancer_type, gene, race, type, data) {
+ calculateBaseline <- function(cancer_type, gene, race, type, db) {
      # Check if dimnames are available and correct
-     if (is.null(data$Penetrance) || is.null(attr(data$Penetrance, "dimnames"))) {
+     if (is.null(db$Penetrance) || is.null(attr(db$Penetrance, "dimnames"))) {
          stop("Penetrance data or its dimension names are not properly defined.")
      }
 
-     dim_names <- attr(data$Penetrance, "dimnames")
+     dim_names <- attr(db$Penetrance, "dimnames")
      required_dims <- c("Cancer", "Gene", "Race", "Age", "PenetType")
      if (!all(required_dims %in% names(dim_names))) {
          stop("One or more required dimensions are missing in Penetrance data.")
@@ -47,7 +47,7 @@
      type_index <- get_index("PenetType", type)
 
      # Subsetting Penetrance data for all ages using indices
-     lifetime_risk <- data$Penetrance[cancer_index, gene_index, race_index, , , type_index]
+     lifetime_risk <- db$Penetrance[cancer_index, gene_index, race_index, , , type_index]
      return(lifetime_risk)
  }
 
@@ -77,7 +77,7 @@
          sex_indices <- 1:nrow(baselineRisk)
      } else {
          # Map sex to row index: Assuming "Female" is 1st row and "Male" is 2nd row
-         sex_index <- ifelse(data$sex[i] == "Female", 1, 2)
+         sex_index <- ifelse(data$sex[i] == 2, 1, 2)
      }
 
      if (data$age[i] == 0) {
@@ -87,6 +87,7 @@
          age_index <- min(max_age, data$age[i])
 
          # Extract the corresponding baseline risk for sex and age
+         # Assuming the non-carrier risk is equal to the SEER baeline risk 
          nc.pen <- baselineRisk[sex_index, age_index]
 
          # Weibull hazard and survival for carriers
@@ -124,23 +125,6 @@
 #'
  
  transformDF <- function(df) {
-     df %>%
-         select(
-             individual = SubjectID,
-             family = PedigreeID,
-             mother = MotherID,
-             father = FatherID,
-             aff = isAffBC,
-             sex = Sex,
-             age = AgeBC,
-             geno = BRCA1
-         ) %>%
-         mutate(
-             geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0,"1/1",geno)))
-         )
- }
- 
- transformDF <- function(df) {
    df %>%
      rename(
        individual = SubjectID,
@@ -153,9 +137,11 @@
        geno = BRCA1
      ) %>%
      mutate(
-       geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0, "1/1", geno)))
+       geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0, "1/1", geno))),
+       sex = ifelse(sex == 0, 2, sex) # Convert 0s to 2s in sex, keep 1s as is
      )
  }
+ 
  
 
 #' Calculate Log Likelihood using clipp Package
@@ -178,7 +164,7 @@
 #' # Calculate log likelihood
 #' log_likelihood <- mhLogLikelihood_clipp(parameters, pedigree_data, 80, "Lung Cancer", data_object, 0.2)
 #'
-mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, data, af) {
+mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af) {
 
     # Extract parameters
     given_median <- paras[1]
@@ -195,7 +181,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, data, a
     geno_freq <- geno_freq_monogenic(p_alleles = c(1 - af, af))
     trans <- trans_monogenic(n_alleles = 2)
     baselineRisk <- calculateBaseline(cancer_type = cancer_type,
-    gene = "SEER", race = "All_Races", type = "Crude", data)
+    gene = "SEER", race = "All_Races", type = "Net", db)
 
     # Calculate penetrance
     penet <- t(sapply(1:nrow(families), function(i) {

@@ -36,7 +36,7 @@ mhChain <- function(
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", data = db)
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", db=db)
   midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
@@ -47,7 +47,7 @@ mhChain <- function(
       if (asymptote_factor > 1) {
         asymptote_factor <- 1 - SEER_baseline$total_prob
       }
-      asymptote <- SEER_baseline$total_prob +
+      asymptote <- 0.5 +
         do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
       asymptote <- max(0, min(1, asymptote))
       shift <- do.call(prior_distributions$shift_distribution, list(1))
@@ -96,7 +96,7 @@ mhChain <- function(
       if (asymptote_factor > 1) {
         asymptote_factor <- 1 - SEER_baseline$total_prob
       }
-      asymptote_proposal <- SEER_baseline$total_prob +
+      asymptote_proposal <- 0.5 +
         do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
       asymptote_proposal <- max(0, min(1, asymptote_proposal))
       shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
@@ -122,8 +122,8 @@ mhChain <- function(
       ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
-      db,
-      af
+      db = db,
+      af = af
     )
 
     loglikelihood_proposal <- mhLogLikelihood_clipp(
@@ -134,8 +134,8 @@ mhChain <- function(
         ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
-      db,
-      af
+      db = db,
+      af = af
     )
 
     # Compute the acceptance ratio (likelihood ratio)

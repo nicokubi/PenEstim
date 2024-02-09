@@ -17,7 +17,7 @@
 #' calculate_lifetime_risk("Breast_Cancer", "BRCA1")
 #'
 #' @export
-calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex = "Female", type = "Crude", data) {
+calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex = "Female", type = "Crude", db) {
     # Find the indices for the respective attributes
     dim_names <- attr(data$Penetrance, "dimnames")
     gene_index <- which(dim_names$Gene == gene)
@@ -60,40 +60,49 @@ generate_proposal <- function(distribution_func, args_list) {
 #' cat("Beta:", result$beta, "\n")
 #'
 #' @export
-calculate_weibull_parameters <-
-    function(given_median, given_first_quartile, shift, asymptote) {
-        # Calculate alpha
-        alpha <- log(log(4 / 3) / log(2)) /
-            log((given_first_quartile - shift) / (given_median - shift))
 
-        # Calculate beta using the median (M)
-        beta <- (given_median - shift) / (log(2)^(1 / alpha))
+# Ensure the Q function is defined somewhere in your script
+Q <- function(p, beta, alpha, delta,gamma) {
+    beta * (-log(1 - p / gamma))^(1 / alpha) + delta
+}
 
-        return(list(alpha = alpha, beta = beta))
+calculate_weibull_parameters <- function(given_median, given_first_quartile, shift, asymptote) {
+    # Objective function to minimize
+    objective_function <- function(params, given_median, given_first_quartile, asymptote, shift) {
+        beta <- params[1] # Scale parameter
+        alpha <- params[2] # Shape parameter
+
+        # Calculate the predicted quantiles based on current beta and alpha
+        median_pred <- Q(0.5, beta, alpha, asymptote, shift)
+        first_quartile_pred <- Q(0.25, beta, alpha, asymptote, shift)
+
+        # Sum of squared differences
+        sum_of_squares <- (given_median - median_pred)^2 + (given_first_quartile - first_quartile_pred)^2
+
+        return(sum_of_squares)
     }
+
+    # Initial guesses for beta and alpha
+    initial_guesses <- c(beta = 1, alpha = 1)
+
+    # Use optim to minimize the objective function
+    result <- optim(initial_guesses, objective_function,
+        given_median = given_median,
+        given_first_quartile = given_first_quartile,
+        asymptote = asymptote,
+        shift = shift
+    ) # Adding method and lower bounds to ensure positive parameters
+
+    return(list(beta = result$par[1], alpha = result$par[2]))
+}
+
+# Example usage (you need to define given_median, given_first_quartile, shift, and asymptote)
+# calculate_weibull_parameters(given_median, given_first_quartile, shift, asymptote)
 
 validate_weibull_parameters <-
     function(given_first_quartile, given_median, shift, asymptote) {
         # Check for negative or zero values
-        if (given_median <= 0 || given_first_quartile <= 0 || shift < 0) {
-            return(FALSE)
-        }
-
-        # Check if asymptote (gamma) is within the valid range (0,1)
-        if (asymptote <= 0 || asymptote >= 1) {
-            return(FALSE)
-        }
-
-        # Check if the logarithmic calculations will be valid
-        if (given_first_quartile <= shift || given_median <= shift) {
-            return(FALSE)
-        }
-
-        # Check if the denominator in the alpha calculation would be zero
-        if ((given_first_quartile - shift) == (given_median - shift)) {
-            return(FALSE)
-        }
-
+      
         # If all checks pass, return TRUE
         return(TRUE)
     }
@@ -115,7 +124,7 @@ validate_weibull_parameters <-
 #' data <- list(df1, df2) # df1, df2 are data frames with appropriate columns
 #' result <- prepAges(data)
 #'
-prepAges <- function(data, removeProband) {
+prepAges <- function(data, removeProband = FALSE) {
     # Define the list of genes
     genes <- c(
         "APC", "ATM", "BARD1", "BMPR1A", "BRCA1", "BRCA2", "BRIP1", "CDH1", "CDK4",
