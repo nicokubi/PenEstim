@@ -204,66 +204,6 @@ apply_thinning <- function(results, thinning_factor) {
 #' @examples
 #' plot_weibull_distribution(combine_results, prob = 0.95)
 #'
-plot_penetrance <- function(data, prob = probCI) {
-  # Recover the parameters for plotting the Weibull
-  params <- calculate_weibull_parameters_vectorized(
-    data$median_results,
-    data$first_quartile_results,
-    data$shift_results,
-    data$asymptote_results
-  )
-
-  alphas <- params$alpha
-  betas <- params$beta
-  asymptotes <- data$asymptote_results
-  shifts <- data$shift_results
-
-  # Define the range for the distribution
-  x_values <- seq(0, 100, length.out = 100)
-
-  # Initialize an empty list for distributions
-  distributions <- vector("list", length(alphas))
-
-  for (i in seq_along(alphas)) {
-    if (validate_weibull_parameters(
-      data$first_quartile_results[i],
-      data$median_results[i], data$shift_results[i],
-      data$asymptote_results[i]
-    )) {
-      distributions[[i]] <- pweibull(x_values - shifts[i],
-        shape = alphas[i], scale = betas[i]
-      ) * asymptotes[i]
-    } else {
-      distributions[[i]] <- rep(NA, length(x_values))
-    }
-  }
-
-  # Convert list to matrix and check its structure
-  distributions_matrix <- do.call(cbind, distributions)
-
-  # Calculate credible intervals with na.rm = TRUE
-  lower_bound <- apply(distributions_matrix, 1, quantile, probs = (1 - 0.95) / 2, na.rm = TRUE)
-  upper_bound <- apply(distributions_matrix, 1, quantile, probs = 1 - (1 - 0.95) / 2, na.rm = TRUE)
-  mean_distribution <- rowMeans(distributions_matrix, na.rm = TRUE)
-
-
-  # Plot the average distribution
-  par(mfrow = c(1, 1))
-  plot(x_values, mean_distribution,
-    type = "l", col = "blue", lwd = 2,
-    xlab = "Age", ylab = "Cumulative Penetrance",
-    main = "Penetrance Curve with Credible Intervals"
-  )
-
-  # Add credible intervals
-  polygon(c(x_values, rev(x_values)), c(lower_bound, rev(upper_bound)), col = rgb(1, 0, 0, 0.2), border = NA)
-  lines(x_values, mean_distribution, col = "blue", lwd = 2)
-
-  legend("topleft",
-    legend = c("Mean Distribution", "Credible Interval"),
-    col = c("blue", "red"), lty = 1, cex = 0.8, fill = c(NA, rgb(1, 0, 0, 0.2))
-  )
-}
 
 plot_penetrance <- function(data, confidence_level = probCI) {
   # Recover the parameters for plotting the Weibull
@@ -328,6 +268,3 @@ plot_penetrance <- function(data, confidence_level = probCI) {
   polygon(c(age_range, rev(age_range)), c(lower_bound, rev(upper_bound)), col = rgb(1, 0, 0, 0.1), border = NA)
   legend("topleft", legend = c("Mean Density", "95% CI"), col = c("blue", "red"), lty = c(1, 2), cex = 0.8)
 }
-plot_penetrance(out_sim_2000$combined_chains,0.95)
-
-out_sim_2000$summary_stats
