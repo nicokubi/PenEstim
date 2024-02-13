@@ -92,4 +92,3 @@ mhLogLikelihood <- function(paras, families, max_age, PanelPRODatabase, cancer_t
   # return the log-likelihood
   return(log_likelihood)
 }
-

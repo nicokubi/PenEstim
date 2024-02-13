@@ -204,13 +204,12 @@ apply_thinning <- function(results, thinning_factor) {
 #' @examples
 #' plot_weibull_distribution(combine_results, prob = 0.95)
 #'
-
 plot_penetrance <- function(data, prob = probCI) {
   # Recover the parameters for plotting the Weibull
-  params <- calculate_weibull_parameters(
+  params <- calculate_weibull_parameters_vectorized(
     data$median_results,
     data$first_quartile_results,
-    data$shift_results, 
+    data$shift_results,
     data$asymptote_results
   )
 
@@ -265,3 +264,70 @@ plot_penetrance <- function(data, prob = probCI) {
     col = c("blue", "red"), lty = 1, cex = 0.8, fill = c(NA, rgb(1, 0, 0, 0.2))
   )
 }
+
+plot_penetrance <- function(data, confidence_level = probCI) {
+  # Recover the parameters for plotting the Weibull
+  params <- calculate_weibull_parameters_vectorized(
+    data$median_results,
+    data$first_quartile_results,
+    data$shift_results,
+    data$asymptote_results
+  )
+
+  alphas <- params$alpha
+  betas <- params$beta
+  asymptotes <- data$asymptote_results
+  shifts <- data$shift_results
+
+  # Define the range for the distribution
+  x_values <- seq(0, 100, length.out = 100)
+
+  # Initialize an empty list for distributions
+  distributions <- vector("list", length(alphas))
+
+  for (i in seq_along(alphas)) {
+    distributions[[i]] <- pweibull(x_values - shifts[i],
+      shape = alphas[i], scale = betas[i]
+    ) * asymptotes[i]
+  }
+
+  # Convert list to matrix and check its structure
+  distributions_matrix <- do.call(cbind, distributions)
+
+  # Calculate mean density for each age
+  mean_density <- rowMeans(distributions_matrix[, -1], na.rm = TRUE)
+
+  # Calculate the Standard Error of the Mean (SEM) for each age
+  sem_density <- apply(distributions_matrix[, -1], 1, function(x) {
+    sd(x, na.rm = TRUE) / sqrt(length(x))
+  })
+
+  # Degrees of freedom
+  df <- nrow(distributions_matrix) - 1
+
+  # T-critical value for 95% CI
+  t_critical <- qt((1 + confidence_level) / 2, df)
+
+  # Margin of error
+  margin_of_error <- t_critical * sem_density
+
+  # Lower and upper bounds of the 95% CI
+  lower_bound <- mean_density - margin_of_error
+  upper_bound <- mean_density + margin_of_error
+
+  # Age range (1 to 100)
+  age_range <- 1:100
+
+  # Plotting
+  plot(age_range, mean_density,
+    type = "l", col = "blue", ylim = c(min(lower_bound), max(upper_bound)),
+    xlab = "Age", ylab = "Density", main = "Density Curve with 95% Confidence Interval"
+  )
+  lines(age_range, lower_bound, col = "red", lty = 2) # Lower CI
+  lines(age_range, upper_bound, col = "red", lty = 2) # Upper CI
+  polygon(c(age_range, rev(age_range)), c(lower_bound, rev(upper_bound)), col = rgb(1, 0, 0, 0.1), border = NA)
+  legend("topleft", legend = c("Mean Density", "95% CI"), col = c("blue", "red"), lty = c(1, 2), cex = 0.8)
+}
+plot_penetrance(out_sim_2000$combined_chains,0.95)
+
+out_sim_2000$summary_stats

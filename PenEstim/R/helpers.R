@@ -19,7 +19,7 @@
 #' @export
 calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex = "Female", type = "Crude", db) {
     # Find the indices for the respective attributes
-    dim_names <- attr(data$Penetrance, "dimnames")
+    dim_names <- attr(db$Penetrance, "dimnames")
     gene_index <- which(dim_names$Gene == gene)
     cancer_index <- which(dim_names$Cancer == cancer_type)
     race_index <- which(dim_names$Race == race)
@@ -27,7 +27,7 @@ calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex =
     type_index <- which(dim_names$PenetType == type)
 
     # Calculate the cumulative risk
-    lifetime_risk <- data$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
+    lifetime_risk <- db$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
     cumulative_risk <- cumsum(lifetime_risk)
     total_prob <- sum(lifetime_risk)
 
@@ -62,19 +62,23 @@ generate_proposal <- function(distribution_func, args_list) {
 #' @export
 
 # Ensure the Q function is defined somewhere in your script
-Q <- function(p, beta, alpha, delta,gamma) {
-    beta * (-log(1 - p / gamma))^(1 / alpha) + delta
+quantile.fn <- function(p, beta, alpha, shift) {
+    beta * (-log(1 - p))^(1 / alpha) + shift
 }
 
 calculate_weibull_parameters <- function(given_median, given_first_quartile, shift, asymptote) {
     # Objective function to minimize
-    objective_function <- function(params, given_median, given_first_quartile, asymptote, shift) {
+    objective_function <- function(params, given_median, given_first_quartile, shift, asymptote) {
         beta <- params[1] # Scale parameter
         alpha <- params[2] # Shape parameter
 
         # Calculate the predicted quantiles based on current beta and alpha
-        median_pred <- Q(0.5, beta, alpha, asymptote, shift)
-        first_quartile_pred <- Q(0.25, beta, alpha, asymptote, shift)
+        median_pred <- quantile.fn(0.5, beta, alpha, shift)
+        first_quartile_pred <- quantile.fn(0.25, beta, alpha, shift)
+
+        # Scale the given parameters
+        given_median <- given_median / asymptote
+        given_first_quartile <- given_first_quartile / asymptote
 
         # Sum of squared differences
         sum_of_squares <- (given_median - median_pred)^2 + (given_first_quartile - first_quartile_pred)^2
@@ -83,7 +87,7 @@ calculate_weibull_parameters <- function(given_median, given_first_quartile, shi
     }
 
     # Initial guesses for beta and alpha
-    initial_guesses <- c(beta = 1, alpha = 1)
+    initial_guesses <- c(beta = 5, alpha = 1)
 
     # Use optim to minimize the objective function
     result <- optim(initial_guesses, objective_function,
@@ -96,13 +100,38 @@ calculate_weibull_parameters <- function(given_median, given_first_quartile, shi
     return(list(beta = result$par[1], alpha = result$par[2]))
 }
 
+calculate_weibull_parameters_vectorized <- function(given_median, given_first_quartile, shift, asymptote) {
+    # Initialize lists to store the results
+    betas <- numeric(length(given_median))
+    alphas <- numeric(length(given_median))
+
+    # Loop over each set of inputs
+    for (i in seq_along(given_median)) {
+        # Single set of inputs
+        single_given_median <- given_median[i]
+        single_given_first_quartile <- given_first_quartile[i]
+        single_shift <- shift[i]
+        single_asymptote <- asymptote[i]
+
+        # Optimization for a single set of inputs
+        result <- calculate_weibull_parameters(single_given_median, single_given_first_quartile, single_shift, single_asymptote)
+
+        # Store the results
+        betas[i] <- result$beta
+        alphas[i] <- result$alpha
+    }
+
+    # Return the results as a list of vectors
+    return(list(beta = betas, alpha = alphas))
+}
+
 # Example usage (you need to define given_median, given_first_quartile, shift, and asymptote)
 # calculate_weibull_parameters(given_median, given_first_quartile, shift, asymptote)
 
 validate_weibull_parameters <-
     function(given_first_quartile, given_median, shift, asymptote) {
         # Check for negative or zero values
-      
+
         # If all checks pass, return TRUE
         return(TRUE)
     }
@@ -137,7 +166,7 @@ prepAges <- function(data, removeProband = FALSE) {
         "BRA", "BC", "CER", "COL", "ENDO", "GAS", "KID", "LEUK", "MELA",
         "OC", "OST", "PANC", "PROS", "SMA", "STS", "THY", "UB", "HEP", "CBC", "BC2"
     )
-    
+
     for (i in seq_along(data)) {
         # If removeProband is TRUE, set genes, ages, and affections to NA for probands
         if (removeProband) {
@@ -174,7 +203,7 @@ prepAges <- function(data, removeProband = FALSE) {
         cancer_ages_cols <- paste0("Age", cancer_types)
         cancer_ages_cols <- intersect(cancer_ages_cols, colnames(data[[i]]))
         cancer_ages <- data[[i]][cancer_ages_cols]
-        
+
         if (length(cancer_ages_cols) > 0) {
             max_cancer_age <- apply(cancer_ages, 1, max, na.rm = TRUE)
             data[[i]]$CurAge <- ifelse(is.na(data[[i]]$CurAge), max_cancer_age, pmax(data[[i]]$CurAge, max_cancer_age))

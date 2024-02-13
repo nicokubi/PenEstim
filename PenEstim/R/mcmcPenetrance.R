@@ -32,6 +32,7 @@ mhChain <- function(
     max_age, db,
     prior_distributions, cancer_type, gene_input, af,
     median_max = TRUE, max_penetrance) {
+  
   # Set seed
   set.seed(seed)
 
@@ -42,27 +43,23 @@ mhChain <- function(
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
 
   draw_initial_params <- function() {
-    repeat {
-      asymptote_factor <- 2 * max_penetrance
-      if (asymptote_factor > 1) {
-        asymptote_factor <- 1 - SEER_baseline$total_prob
-      }
-      asymptote <- 0.5 +
-        do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
-      asymptote <- max(0, min(1, asymptote))
-      shift <- do.call(prior_distributions$shift_distribution, list(1))
-      median <- if (median_max) {
-        do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
-      } else {
-        do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
-      }
-      first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
-
-      if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
-        return(c(first_quartile, median, shift, asymptote))
-      }
+    asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
+    if (asymptote_factor > 1) {
+      asymptote_factor <- 1 - SEER_baseline$total_prob
     }
-  }
+    asymptote <- SEER_baseline$total_prob +
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+    asymptote <- max(0, min(1, asymptote))
+    shift <- do.call(prior_distributions$shift_distribution, list(1))
+    median <- if (median_max) {
+      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
+    } else {
+      do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
+    }
+    first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
+    # if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
+    return(c(first_quartile, median, shift, asymptote))
+    }
 
   # Draw initial valid parameters
   initial_params <- draw_initial_params()
@@ -91,12 +88,12 @@ mhChain <- function(
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
     # generate asymptote parameter (gamma)
-    repeat {
-      asymptote_factor <- 2 * max_penetrance
+    #repeat 
+      asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
       if (asymptote_factor > 1) {
         asymptote_factor <- 1 - SEER_baseline$total_prob
       }
-      asymptote_proposal <- 0.5 +
+      asymptote_proposal <- SEER_baseline$total_prob +
         do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
       asymptote_proposal <- max(0, min(1, asymptote_proposal))
       shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
@@ -108,10 +105,10 @@ mhChain <- function(
       first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
         (median_proposal - shift_proposal) + shift_proposal
 
-      if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
-        break
-      }
-    }
+      #if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
+       # break
+      #}
+    # }
 
     # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood_clipp(
@@ -225,6 +222,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      density_plots = TRUE,
                      penetrance_plot = TRUE,
                      probCI = 0.95) {
+
   # Validate inputs
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
@@ -280,7 +278,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
     "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
     "penet.fn", "transformDF",
-    "makePriors",
+    "makePriors", "quantile.fn",
     "seeds", "n_iter_per_chain",
     "data", "prop", "af", "max_age",
     "PanelPRODatabase", "cancer_type", "gene_input"
