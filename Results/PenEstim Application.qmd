@@ -1,0 +1,303 @@
+---
+title: "PenEstim Application"
+format:
+  html:
+    theme: default
+---
+
+```{r, echo=FALSE, include=FALSE}
+library(tidyverse)
+library(PPP)
+library(parallel)
+library(dplyr)
+library(stats4)
+library(clipp)
+library(survival)
+
+
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/prior_elicitation.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/helpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/outputHelpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mhLoglikelihood.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mhLoglikehood_clipp.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mcmcPenetrance.R")
+```
+
+**Data:**
+
+We use simulated data and plot the penetrance using Kaplan-Mayer estimator. The families were simulated using the PedUtils package. It contains 500 families with 19 carriers of the PV.
+
+```{r desc, echo=FALSE}
+
+# Simulation study
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated Families/families.RData")
+dat <- families
+
+describeFamilies <- function(fams){
+  
+  affectedFamilies = 0 
+  affectedProbands = 0
+  famSizes = c()
+  BRCA1Families = 0
+  BRCA1Probands = 0 
+  curAges = 0
+  BCAges = 0
+  pbBCAges=0
+  pbCurAges=0
+  pbBCAgesfemale = 0
+  affectedfemaleProbands = 0
+  BRCA1femaleProbands = 0 
+  BCAgesfemale = 0
+  total_individuals = 0
+  BRCA1_individuals = 0
+
+  #affectedFamiliesList = list()
+  #j = 1
+  for(i in 1:length(fams)){
+    f = fams[[i]]
+    sizeOfFamily = nrow(f)
+    total_individuals = total_individuals + sizeOfFamily
+    famSizes = c(famSizes, sizeOfFamily)
+    curAges = c(curAges, f$CurAge)  
+    f = f %>% filter(isAffBC==1) %>% filter(isProband==0) 
+    BCAges <- c(BCAges, f$AgeBC)  
+    ff = fams[[i]] %>% filter(BRCA1==1) %>% filter(isAffBC==1) 
+    BRCA1_individuals = BRCA1_individuals + nrow(ff)
+    BCAgesfemale <- c(BCAgesfemale, ff$AgeBC)  
+
+    if(nrow(f)>0){
+      affectedFamilies = affectedFamilies + 1
+    
+    }
+    BRCA1fams = fams[[i]] %>% filter(isProband==0) %>% filter(BRCA1==1)
+    if(nrow(BRCA1fams) > 0){
+     BRCA1Families = BRCA1Families + 1
+    }
+    
+    pb <- fams[[i]] %>% filter(isProband == 1)
+    pbfemale <- fams[[i]] %>% filter(isProband == 1) %>% filter(Sex == 0)
+    
+    
+    # Check if pbfemale has any rows before accessing its columns
+    if (nrow(pbfemale) > 0) {
+      pbBCAgesfemale <- c(pbBCAgesfemale, pbfemale$AgeBC)
+      if (any(pbfemale$isAffBC == 1)){
+        affectedfemaleProbands <- affectedfemaleProbands + 1
+      }
+      if (!is.na(pbfemale$BRCA1)){
+        if (any(pbfemale$BRCA1 == 1)){
+          BRCA1femaleProbands <- BRCA1femaleProbands + 1
+        }
+      }
+    }
+  
+    pbBCAges <- c(pbBCAges, pb$AgeBC)
+    pbCurAges <- c(pbCurAges, pb$CurAge)  
+    
+    if (any(pb$isAffBC == 1)){
+      affectedProbands <- affectedProbands + 1
+    }
+    
+        if (!is.na(pb$BRCA1)){
+      if (any(pb$BRCA1 == 1)){
+        BRCA1Probands <- BRCA1Probands + 1
+      }
+    }
+  }
+    
+ 
+  
+  # careful with the description 
+  # do the stratified descriptives 
+  # check the weibull to look like 
+  
+  print(paste0("Number of families: ", length(fams)))
+  print(paste0("Total Individuals: ", total_individuals))
+  print(paste0("Average family size: ", mean(famSizes)))
+  print("Summary of family sizes")
+  print(summary(famSizes))
+  print("Summary of Current Age for all family members")
+  print(summary(curAges))
+  print("Summary of Current Age for probands")
+  print(summary(pbCurAges))
+  
+  print(paste0("Number of families with affected (BC) individuals: ", 
+               affectedFamilies))
+  print(paste0("Number of families with affected (BC) probands: ", 
+               affectedProbands))
+  print(paste0("Number of families with affected (BC) female probands: ", 
+               affectedfemaleProbands))
+  print(paste0("Number of families with relatives with PV (and not the proband)
+               : ", BRCA1Families))
+  print(paste0("Number of families with proband with PV: ", BRCA1Probands))
+  print(paste0("Number of families with female proband with PV: ", 
+               BRCA1femaleProbands))
+  print(paste0("Number of individuals with PV: ", BRCA1_individuals))
+  
+  print("Summary of BC Age of (female) probands")
+  print(summary(pbBCAgesfemale))
+
+  print("Summary of BC Age in affected (non-proband) individuals")
+  print(summary(BCAges))
+  
+  print("Summary of BC Age in affected (non-proband) female individuals")
+  print(summary(BCAgesfemale))
+}
+
+print(describeFamilies(dat))
+
+
+```
+
+**Pentrance Curve using Kaplan-Meyer Estimator**
+
+```{r, echo=FALSE}
+
+
+allcarriers <- data.frame()
+allnoncarriers <- data.frame()
+
+# Plot the empirical penetrance curve
+plot_penetrance_curves <- function(fams) {
+  # Create an empty plot
+  plot(0, 0, type = "n", xlim = c(0, 100), ylim = c(0, 1), xlab = "Age", 
+       ylab = "Penetrance",
+       main = "Estimated Penetrance Curves (for females)")
+
+  # Initialize colors and line types
+  colors <- c("red", "blue")  
+  line_types <- c(1, 2)  
+
+  # Create empty data frames to aggregate the data
+  allcarriers <- data.frame()
+  allnoncarriers <- data.frame()
+
+  # Iterate through each family and aggregate the data
+  for (i in 1:length(fams)) {
+    f <- fams[[i]]
+    carriers <- f %>% filter(BRCA1 == 1) %>% filter(Sex == 0)
+    noncarriers <- f %>% filter(BRCA1 == 0) %>% filter(Sex == 0)
+    
+    # Append the data to the combined data frames
+    allcarriers<- rbind(allcarriers, carriers)
+    allnoncarriers <- rbind(allnoncarriers, noncarriers)
+  }
+  
+  # Convert the cancer status variable to survival objects for each genotype
+  surv_obj_1 <- Surv(time = allcarriers$AgeBC, event = allcarriers$isAffBC)
+  surv_obj_0 <- Surv(time = allnoncarriers$AgeBC, event = allnoncarriers$isAffBC)
+  
+  # Estimate the Kaplan-Meier survival curves for each genotype
+  km_fit_1 <- survfit(surv_obj_1 ~ 1, data = allcarriers)
+  km_fit_0 <- survfit(surv_obj_0 ~ 1, data = allnoncarriers)
+  
+  # Calculate the penetrance functions for carriers and non-carriers
+  penetrance_1 <- 1 - km_fit_1$surv
+  penetrance_0 <- 1 - km_fit_0$surv
+  
+  # Plot the aggregated penetrance curves
+  lines(km_fit_1$time, penetrance_1, type = "l", col = colors[1], 
+        lty = line_types[1])
+  lines(km_fit_0$time, penetrance_0, type = "l", col = colors[2], 
+        lty = line_types[2])
+  
+  # Add legend
+  legend("topright", legend = c("PV", "Non-PV"), col = colors[1:2], lty = 1,
+         cex = 0.8)
+}
+
+
+# Plot the empirical penetrance curves
+plot_penetrance_curves(dat)
+
+
+
+```
+
+**Estimation using PenEstim**
+
+Application of the PenEstim algorithm using the clipp package for the likelihood calculation and the default prior settings.
+
+-   First Quartile \$Q\_{25}\$ & Scaled Beta(6,3)
+
+-   Median \$Q\_{50}\$ & Scaled Beta(2,2)
+
+-   Asymptote \$\gamma\$ & Scaled Beta(1,1)
+
+-   Threshold \$\delta\$ & Uniform(0,25)
+
+```{r, echo=TRUE}
+
+# Data Prep for the clipp structure from the classic PP format 
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "PedigreeID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+
+# Run Estimation procedure with default prior setting 
+out_sim_100 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 100
+)
+
+# print summary stats
+out_sim_100$summary_stats
+```
+
+**Review: Weibull parameter estimation**
+
+The quantile function for the Weibull distribution, adjusted by a shift, is defined as:
+
+$Q(p; \beta, \alpha, \delta) = \delta + \beta \left(-\log(1 - p)\right)^{\frac{1}{\alpha}}]$
+
+where:
+
+\- $p$ is the quantile probability,
+
+\- $\beta$ is the scale parameter of the distribution,
+
+\- $\alpha$ is the shape parameter of the distribution,
+
+\- $\delta$ is a constant offset value.
+
+The conditional median $Q_{50} = Q(0.5)$ and the conditional first quartile $Q_{25} = Q(0.25)$ are then:
+
+$Q_{50} = \delta + \beta [ln (2)]^{1/\alpha}$
+
+$Q_{25} = \delta + \beta[ln(4 / 3)]^{1/\alpha}$
+
+The objective function, which is minimized to calculate the Weibull parameters given the median and first quartile drawn as from the prior distributions, is given by:
+
+$f(\beta, \alpha) = (\frac{\text{given\_median}}{\text{asymptote}} - Q_{50})^2 + (\frac{\text{given\_first\_quartile}}{\text{asymptote}} - Q_{25})^2$
+
+We then use an optimization process that seeks the values of $\alpha$ and $\beta$ that minimize this objective function.
+
+Analytically, a solution is more challenging:
+
+\*\*Step 1: Express $\beta$ in terms of $Q\_{50}$, $\delta$, and $\alpha$\*\*
+
+From the equation for $Q\_{50}$, we can express $\beta$ as:
+
+$\beta = \frac{Q\_{50} - \delta}{[\ln(2)]^{1/\alpha}}$
+
+\*\*Step 2: Substitute $\beta$ into the equation for $Q\_{25}$\*\*
+
+Substitute the expression for $\beta$ from $Q\_{50}$ into the equation for $Q\_{25}$:
+
+$Q\_{25} = \delta + (\frac{Q\_{50} - \delta}{[ln(2)]^{1/\alpha}})[ln(4 / 3)]^{1/\alpha}$
+
+Now solving for $\alpha$ is challenging...

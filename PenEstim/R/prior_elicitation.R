@@ -28,7 +28,7 @@
 # Default parameter settings
 prior_params_default <- list(
   asymptote = list(g1 = 1, g2 = 1),
-  shift = list(min = 0, max = 25),
+  shift = list(min = 15, max = 25),
   median = list(m1 = 2, m2 = 2),
   first_quartile = list(q1 = 6, q2 = 3)
 )

@@ -29,37 +29,37 @@
 # Main mhChain function
 mhChain <- function(
     seed, n_iter, chain_id, data,
-    max_age, PanelPRODatabase,
-    prior_distributions, cancer_type, gene_input,
+    max_age, db,
+    prior_distributions, cancer_type, gene_input, af,
     median_max = TRUE, max_penetrance) {
+  
   # Set seed
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER")
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", db=db)
   midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
 
   draw_initial_params <- function() {
-    repeat {
-      asymptote <- SEER_baseline$total_prob +
-        do.call(prior_distributions$asymptote_distribution, list(1)) * (2 * max_penetrance - SEER_baseline$total_prob)
-      # Constrain the result between 0 and 1
-      asymptote <- max(0, min(1, asymptote))
-      shift <- do.call(prior_distributions$shift_distribution, list(1))
-      median <- if (median_max) {
-        do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
-      } else {
-        do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
-      }
-      first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
-
-      if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
-        return(c(first_quartile, median, shift, asymptote))
-      }
+    asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
+    if (asymptote_factor > 1) {
+      asymptote_factor <- 1 - SEER_baseline$total_prob
     }
-  }
+    asymptote <- SEER_baseline$total_prob +
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+    asymptote <- max(0, min(1, asymptote))
+    shift <- do.call(prior_distributions$shift_distribution, list(1))
+    median <- if (median_max) {
+      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
+    } else {
+      do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
+    }
+    first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
+    # if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
+    return(c(first_quartile, median, shift, asymptote))
+    }
 
   # Draw initial valid parameters
   initial_params <- draw_initial_params()
@@ -88,10 +88,13 @@ mhChain <- function(
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
     # generate asymptote parameter (gamma)
-    repeat {
+    #repeat 
+      asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
+      if (asymptote_factor > 1) {
+        asymptote_factor <- 1 - SEER_baseline$total_prob
+      }
       asymptote_proposal <- SEER_baseline$total_prob +
-        do.call(prior_distributions$asymptote_distribution, list(1)) * (2 * max_penetrance - SEER_baseline$total_prob)
-      # Constrain the result between 0 and 1
+        do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
       asymptote_proposal <- max(0, min(1, asymptote_proposal))
       shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
       median_proposal <- if (median_max) {
@@ -102,34 +105,34 @@ mhChain <- function(
       first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
         (median_proposal - shift_proposal) + shift_proposal
 
-      if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
-        break
-      }
-    }
+      #if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
+       # break
+      #}
+    # }
 
     # Compute the likelihood for the current and proposed
-    loglikelihood_current <- mhLogLikelihood(
+    loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
         median_current,
-        first_quartile_current, asymptote_current,
-        shift_current
+        first_quartile_current, shift_current,
+        asymptote_current
       ), families = data,
       max_age = max_age,
-      gene_input = gene_input,
       cancer_type = cancer_type,
-      PanelPRODatabase = PanelPRODatabase
+      db = db,
+      af = af
     )
 
-    loglikelihood_proposal <- mhLogLikelihood(
+    loglikelihood_proposal <- mhLogLikelihood_clipp(
       paras =
         c(
           median_proposal, first_quartile_proposal,
-          asymptote_proposal, shift_proposal
+          shift_proposal, asymptote_proposal
         ), families = data,
       max_age = max_age,
-      gene_input = gene_input,
       cancer_type = cancer_type,
-      PanelPRODatabase = PanelPRODatabase
+      db = db,
+      af = af
     )
 
     # Compute the acceptance ratio (likelihood ratio)
@@ -208,6 +211,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      burn_in = 0,
                      thinning_factor = 1,
                      distribution_data = distribution_data_default,
+                     af = 0.0001,
                      max_penetrance = 1,
                      sample_size = NULL,
                      ratio = NULL,
@@ -218,6 +222,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      density_plots = TRUE,
                      penetrance_plot = TRUE,
                      probCI = 0.95) {
+
   # Validate inputs
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
@@ -243,6 +248,9 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   # Apply the prepAges function to treat missing data
   data <- prepAges(data, removeProband)
 
+  # Apply the transformation to adjust the format for the clipp package
+  data <- do.call(rbind, lapply(data, transformDF))
+
   #  Create the prior distributions
   prop <- makePriors(
     data = distribution_data,
@@ -261,14 +269,18 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
   parallel::clusterEvalQ(cl, {
     library(PPP) # Load the "PPP" library
+    library(clipp)
+    library(stats4)
+    library(dplyr)
   })
 
   parallel::clusterExport(cl, c(
-    "mhChain", "mhLogLikelihood", "calculate_lifetime_risk",
-    "calculate_weibull_parameters", "validate_weibull_parameters", "suppressPPPLogs",
-    "makePriors",
+    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk",
+    "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
+    "penet.fn", "transformDF",
+    "makePriors", "quantile.fn",
     "seeds", "n_iter_per_chain",
-    "data", "prop", "max_age",
+    "data", "prop", "af", "max_age",
     "PanelPRODatabase", "cancer_type", "gene_input"
   ), envir = environment())
 
@@ -276,11 +288,12 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
     mhChain(seeds[i],
       n_iter = n_iter_per_chain, chain_id = i,
       data = data,
-      PanelPRODatabase = PanelPRODatabase,
+      db = PanelPRODatabase,
       prior_distributions = prop,
       max_age = max_age,
       cancer_type = cancer_type,
       gene_input = gene_input,
+      af = af,
       max_penetrance = max_penetrance
     )
   })

@@ -17,9 +17,9 @@
 #' calculate_lifetime_risk("Breast_Cancer", "BRCA1")
 #'
 #' @export
-calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex = "Female", type = "Crude", data = PanelPRODatabase) {
+calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex = "Female", type = "Crude", db) {
     # Find the indices for the respective attributes
-    dim_names <- attr(data$Penetrance, "dimnames")
+    dim_names <- attr(db$Penetrance, "dimnames")
     gene_index <- which(dim_names$Gene == gene)
     cancer_index <- which(dim_names$Cancer == cancer_type)
     race_index <- which(dim_names$Race == race)
@@ -27,7 +27,7 @@ calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex =
     type_index <- which(dim_names$PenetType == type)
 
     # Calculate the cumulative risk
-    lifetime_risk <- data$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
+    lifetime_risk <- db$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
     cumulative_risk <- cumsum(lifetime_risk)
     total_prob <- sum(lifetime_risk)
 
@@ -60,6 +60,7 @@ generate_proposal <- function(distribution_func, args_list) {
 #' cat("Beta:", result$beta, "\n")
 #'
 #' @export
+
 calculate_weibull_parameters <-
     function(given_median, given_first_quartile, delta, gamma) {
         # Calculate alpha
@@ -133,18 +134,20 @@ prepAges <- function(data, removeProband = FALSE) {
         # If removeProband is TRUE, set genes, ages, and affections to NA for probands
         if (removeProband) {
             proband_rows <- data[[i]]$Proband == 1
-
-            # Set genes to NA
             for (gene in genes) {
-                data[[i]][proband_rows, gene] <- NA
+                if (gene %in% colnames(data[[i]])) {
+                    data[[i]][proband_rows, gene] <- NA
+                }
             }
-
-            # Set ages and affections to NA
             for (cancer in cancer_types) {
                 age_col <- paste0("Age", cancer)
                 aff_col <- paste0("isAff", cancer)
-                data[[i]][proband_rows, age_col] <- NA
-                data[[i]][proband_rows, aff_col] <- NA
+                if (age_col %in% colnames(data[[i]])) {
+                    data[[i]][proband_rows, age_col] <- NA
+                }
+                if (aff_col %in% colnames(data[[i]])) {
+                    data[[i]][proband_rows, aff_col] <- NA
+                }
             }
         }
 
@@ -152,19 +155,22 @@ prepAges <- function(data, removeProband = FALSE) {
             age_col <- paste0("Age", cancer)
             aff_col <- paste0("isAff", cancer)
 
-            # Set age_col to 1 and corresponding 'isAff' to 0 where NA
-            na_rows <- is.na(data[[i]][[age_col]])
-            data[[i]][[age_col]][na_rows] <- 1
-            data[[i]][[aff_col]][na_rows] <- 0
+            if (age_col %in% colnames(data[[i]])) {
+                na_rows <- is.na(data[[i]][[age_col]])
+                data[[i]][[age_col]][na_rows] <- 1
+                data[[i]][[aff_col]][na_rows] <- 0
+            }
         }
 
-        # Create a matrix of all cancer ages
+        # Calculate max cancer age only for columns that exist in the data
         cancer_ages_cols <- paste0("Age", cancer_types)
+        cancer_ages_cols <- intersect(cancer_ages_cols, colnames(data[[i]]))
         cancer_ages <- data[[i]][cancer_ages_cols]
-        max_cancer_age <- apply(cancer_ages, 1, max, na.rm = TRUE)
 
-        # If CurAge is NA, set it to max cancer age, else set it to the maximum of CurAge and max cancer age
-        data[[i]]$CurAge <- ifelse(is.na(data[[i]]$CurAge), max_cancer_age, pmax(data[[i]]$CurAge, max_cancer_age))
+        if (length(cancer_ages_cols) > 0) {
+            max_cancer_age <- apply(cancer_ages, 1, max, na.rm = TRUE)
+            data[[i]]$CurAge <- ifelse(is.na(data[[i]]$CurAge), max_cancer_age, pmax(data[[i]]$CurAge, max_cancer_age))
+        }
     }
     return(data)
 }

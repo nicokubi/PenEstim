@@ -204,31 +204,35 @@ apply_thinning <- function(results, thinning_factor) {
 #' @examples
 #' plot_weibull_distribution(combine_results, prob = 0.95)
 #'
-plot_penetrance <- function(data, prob = probCI) {
+plot_penetrance <- function(data, prob = 0.95) {
+  # Ensure 'prob' is between 0 and 1
+  if (prob <= 0 || prob >= 1) {
+    stop("prob must be between 0 and 1")
+  }
+
   # Recover the parameters for plotting the Weibull
   params <- calculate_weibull_parameters(
-    data$combined_chains$median_results,
-    data$combined_chains$first_quartile_results,
-    data$combined_chains$shift_results, data$combined_chains$asymptote_results
+    data$median_results,
+    data$first_quartile_results,
+    data$shift_results, data$asymptote_results
   )
 
   alphas <- params$alpha
   betas <- params$beta
-  asymptotes <- data$combined_chains$asymptote_results
-  shifts <- data$combined_chains$shift_results
+  asymptotes <- data$asymptote_results
+  shifts <- data$shift_results
 
   # Define the range for the distribution
-  x_values <- seq(0, 100, length.out = 100)
+  x_values <- seq(0, 100, length.out = 101)
 
   # Initialize an empty list for distributions
   distributions <- vector("list", length(alphas))
-  distributions
 
   for (i in seq_along(alphas)) {
     if (validate_weibull_parameters(
-      data$combined_chains$first_quartile_results[i],
-      data$combined_chains$median_results[i], data$combined_chains$shift_results[i],
-      data$combined_chains$asymptote_results[i]
+      data$first_quartile_results[i],
+      data$median_results[i], data$shift_results[i],
+      data$asymptote_results[i]
     )) {
       distributions[[i]] <- pweibull(x_values - shifts[i],
         shape = alphas[i], scale = betas[i]
@@ -240,26 +244,27 @@ plot_penetrance <- function(data, prob = probCI) {
 
   # Convert list to matrix
   distributions_matrix <- do.call(cbind, distributions)
-  str(distributions_matrix)
 
-  # Calculate credible intervals with na.rm = TRUE
-  lower_bound <- apply(distributions_matrix, 1, quantile, probs = (1 - 0.95) / 2, na.rm = TRUE)
-  upper_bound <- apply(distributions_matrix, 1, quantile, probs = 1 - (1 - 0.95) / 2, na.rm = TRUE)
-  mean_distribution <- rowMeans(distributions_matrix, na.rm = TRUE)
+  # Calculate the credible interval bounds directly from the MCMC samples
+  ci_lower <- apply(distributions_matrix, 1, function(x) quantile(x, probs = (1 - prob) / 2, na.rm = TRUE))
+  ci_upper <- apply(distributions_matrix, 1, function(x) quantile(x, probs = 1 - (1 - prob) / 2, na.rm = TRUE))
 
-  # Plot the average distribution
-  plot(x_values, mean_distribution,
-    type = "l", col = "blue", lwd = 2,
-    xlab = "Age", ylab = "Cumulative Penetrance",
-    main = "Penetrance Curve with Credible Intervals"
+  # Calculate the mean density if you want to plot it as well
+  mean_density <- rowMeans(distributions_matrix, na.rm = TRUE)
+
+  # Define the age_range for plotting (corresponds to x_values)
+  age_range <- x_values
+
+   # Reset the plotting window to a single plot layout
+   par(mfrow = c(1, 1))
+
+  # Plotting
+  plot(age_range, mean_density,
+    type = "l", col = "blue", ylim = c(min(ci_lower), max(ci_upper)),
+    xlab = "Age", ylab = "Density", main = "Density Curve with Credible Interval"
   )
-
-  # Add credible intervals
-  polygon(c(x_values, rev(x_values)), c(lower_bound, rev(upper_bound)), col = rgb(1, 0, 0, 0.2), border = NA)
-  lines(x_values, mean_distribution, col = "blue", lwd = 2)
-
-  legend("topleft",
-    legend = c("Mean Distribution", "Credible Interval"),
-    col = c("blue", "red"), lty = 1, cex = 0.8, fill = c(NA, rgb(1, 0, 0, 0.2))
-  )
+  lines(age_range, ci_lower, col = "red", lty = 2) # Lower CI
+  lines(age_range, ci_upper, col = "red", lty = 2) # Upper CI
+  polygon(c(age_range, rev(age_range)), c(ci_lower, rev(ci_upper)), col = rgb(1, 0, 0, 0.1), border = NA)
+  legend("topleft", legend = c("Mean Density", "Credible Interval"), col = c("blue", "red"), lty = c(1, 2), cex = 0.8)
 }
