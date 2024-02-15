@@ -61,76 +61,39 @@ generate_proposal <- function(distribution_func, args_list) {
 #'
 #' @export
 
-# Ensure the Q function is defined somewhere in your script
-quantile.fn <- function(p, beta, alpha, shift) {
-    beta * (-log(1 - p))^(1 / alpha) + shift
-}
+calculate_weibull_parameters <-
+    function(given_median, given_first_quartile, delta, gamma) {
+        # Calculate alpha
+        alpha <- log(log(4 / 3) / log(2)) /
+            log((given_first_quartile - delta) / (given_median - delta))
 
-calculate_weibull_parameters <- function(given_median, given_first_quartile, shift, asymptote) {
-    # Objective function to minimize
-    objective_function <- function(params, given_median, given_first_quartile, shift, asymptote) {
-        beta <- params[1] # Scale parameter
-        alpha <- params[2] # Shape parameter
+        # Calculate beta using the median (M)
+        beta <- (given_median - delta) / (log(2)^(1 / alpha))
 
-        # Calculate the predicted quantiles based on current beta and alpha
-        median_pred <- quantile.fn(0.5, beta, alpha, shift)
-        first_quartile_pred <- quantile.fn(0.25, beta, alpha, shift)
-
-        # Scale the given parameters
-        given_median <- given_median / asymptote
-        given_first_quartile <- given_first_quartile / asymptote
-
-        # Sum of squared differences
-        sum_of_squares <- (given_median - median_pred)^2 + (given_first_quartile - first_quartile_pred)^2
-
-        return(sum_of_squares)
+        return(list(alpha = alpha, beta = beta))
     }
-
-    # Initial guesses for beta and alpha
-    initial_guesses <- c(beta = 5, alpha = 1)
-
-    # Use optim to minimize the objective function
-    result <- optim(initial_guesses, objective_function,
-        given_median = given_median,
-        given_first_quartile = given_first_quartile,
-        asymptote = asymptote,
-        shift = shift
-    ) # Adding method and lower bounds to ensure positive parameters
-
-    return(list(beta = result$par[1], alpha = result$par[2]))
-}
-
-calculate_weibull_parameters_vectorized <- function(given_median, given_first_quartile, shift, asymptote) {
-    # Initialize lists to store the results
-    betas <- numeric(length(given_median))
-    alphas <- numeric(length(given_median))
-
-    # Loop over each set of inputs
-    for (i in seq_along(given_median)) {
-        # Single set of inputs
-        single_given_median <- given_median[i]
-        single_given_first_quartile <- given_first_quartile[i]
-        single_shift <- shift[i]
-        single_asymptote <- asymptote[i]
-
-        # Optimization for a single set of inputs
-        result <- calculate_weibull_parameters(single_given_median, single_given_first_quartile, single_shift, single_asymptote)
-
-        # Store the results
-        betas[i] <- result$beta
-        alphas[i] <- result$alpha
-    }
-
-    # Return the results as a list of vectors
-    return(list(beta = betas, alpha = alphas))
-}
-
-# Example usage (you need to define given_median, given_first_quartile, shift, and asymptote)
-# calculate_weibull_parameters(given_median, given_first_quartile, shift, asymptote)
 
 validate_weibull_parameters <-
     function(given_first_quartile, given_median, shift, asymptote) {
         # Check for negative or zero values
+        if (given_median <= 0 || given_first_quartile <= 0 || shift < 0) {
+            return(FALSE)
+        }
+
+        # Check if asymptote (gamma) is within the valid range (0,1)
+        if (asymptote <= 0 || asymptote >= 1) {
+            return(FALSE)
+        }
+
+        # Check if the logarithmic calculations will be valid
+        if (given_first_quartile <= shift || given_median <= shift) {
+            return(FALSE)
+        }
+
+        # Check if the denominator in the alpha calculation would be zero
+        if ((given_first_quartile - shift) == (given_median - shift)) {
+            return(FALSE)
+        }
 
         # If all checks pass, return TRUE
         return(TRUE)
