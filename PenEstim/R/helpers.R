@@ -189,7 +189,7 @@ prepAges <- function(data, removeProband = FALSE) {
 #' # Transform a data frame
 #' transformed_df <- transformDF(input_df)
 
-transformDF <- function(df, cancer_type = cancer_type, gene = gene_input) {
+transformDF <- function(df, cancer_type, gene_input) {
     # Validate cancer type
     cancer_index <- match(cancer_type, CANCER_NAME_MAP$long)
     # Validate cancer type
@@ -202,7 +202,7 @@ transformDF <- function(df, cancer_type = cancer_type, gene = gene_input) {
     # Dynamically construct column names based on inputs
     aff_col_name <- paste0("isAff", cancer_type_short)
     age_col_name <- paste0("Age", cancer_type_short)
-    geno_col_name <- gene
+    geno_col_name <- gene_input
 
     df %>%
         rename(

@@ -32,6 +32,7 @@ mhChain <- function(
     max_age, db,
     prior_distributions, cancer_type, gene_input, af,
     median_max = TRUE, max_penetrance) {
+
   # Set seed
   set.seed(seed)
 
@@ -56,7 +57,6 @@ mhChain <- function(
       do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
     }
     first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
-    # if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
     return(c(first_quartile, median, shift, asymptote))
   }
 
@@ -66,7 +66,6 @@ mhChain <- function(
   median_current <- initial_params[2]
   shift_current <- initial_params[3]
   asymptote_current <- initial_params[4]
-
 
   num_rejections <- 0
 
@@ -103,11 +102,6 @@ mhChain <- function(
     }
     first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_proposal - shift_proposal) + shift_proposal
-
-    # if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
-    # break
-    # }
-    # }
 
     # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood_clipp(
@@ -168,14 +162,65 @@ mhChain <- function(
 #' penetrance estimation of cancer risk. It utilizes parallel computing to run multiple
 #' chains and provides various options for analyzing and visualizing the results.
 #'
-#' @param data A list of family data for penetrance estimation.
+#' @param data The pedigree data in the required format. A data frame of
+#' family history information with the following columns.
+#' Unknown or missing values should be explicitly coded as `NA`.
+#' * `ID`: A numeric value; ID for each individual. There should not be any
+#' duplicated entries.
+#' * `Sex`: A numeric value; `0` for female and `1` for male. Missing entries
+#' are not currently supported.
+#' * `MotherID`: A numeric value; unique ID for someone's mother.
+#' * `FatherID`: A numeric value; unique ID for someone's father.
+#' * `isProband`: A numeric value; `1` if someone is a proband, `0` otherwise.
+#' This will be overridden by the `proband` argument in `PanelPRO`, if it is
+#' specified. At least one proband should be specified by either the
+#' `isProband` column or `proband`. Multiple probands are supported.
+#' * `CurAge`: A numeric value; the age of censoring (current age if the person
+#' is alive or age of death if the person is dead). Ages ranging from `1` to
+#' `94` are allowed.
+#' * `isAffX`: A numeric value; the affection status of cancer `X`, where `X`
+#' is a `short` cancer code (see Details). Affection status should be encoded
+#' as `1` if the individual was diagnosed, `0 `otherwise. Missing entries are
+#' not currently supported.
+#' * `AgeX`: A numeric value; the age of diagnosis for cancer `X`, where `X` is
+#' a `short` cancer code (see Details). Ages ranging from `1` to `94` are
+#' allowed. If the individual was not diagnosed for a given cancer, their
+#' affection age should be encoded as `NA` and will be ignored otherwise.
+#' * `isDead`: A numeric value; `1` if someone is dead, `0` otherwise. Missing
+#' entries are assumed to be `0`.
+#' * Columns for germline testing results (e.g. `BRCA1`,
+#' `MLH1`) or tumor marker testing results. `ER`, `PR`, `CK14`, `CK5.6` and
+#' `HER2` are tumor markers associated with breast cancer that will modify the
+#' likelihood of phenotypes associated with `BRCA1` and `BRCA2`. `MSI` is a
+#' tumor marker for colorectal cancer that will modify the likelihoods
+#' associated with `MLH1`, `MSH2` `MSH6` and `PMS2`. For each of these optional
+#' columns, positive results should be coded as `1`, negative results should be
+#' coded as `0`, and unknown results should be coded as `NA`.
+#' * Optional: `race`: A character string; expected values are `"All_Races"`, `"AIAN"`
+#' (American Indian and Alaska Native), `"Asian"`, `"Black"`, `"White"`,
+#' `"Hispanic"`, `"WH"` (white Hispanic), and `"WNH"` (non-white Hispanic)
+#' (see `PanelPRO:::RACE_TYPES`). Asian-Pacific Islanders should be encoded as
+#' `"Asian"`. Race information will be used to select the cancer and death by
+#' other causes penetrances used in the model. Missing entries are recoded as
+#' the `unknown.race` argument, which defaults to
+#' `PanelPRO:::UNKNOWN_RACE`.
+#' * Optional: `Ancestry`: A character string; expected values are `"AJ"`(Ashkenazi Jewish),
+#' `"nonAJ"`, and `"Italian"` (see `PanelPRO:::ANCESTRY_TYPES`). The ancestry
+#' information is used to determine the allele frequencies of BRCA1 and BRCA2,
+#' if they are included in the model. Missing entries are recoded as the
+#' `unknown.ancestry` argument, which defaults to `PanelPRO:::UNKNOWN_ANCESTRY`.
+#' * `Twins`: A numeric value; `0` for non-identical/single births, `1` for
+#' the first set of identical twins/multiple births in the family, `2` for the
+#' second set, etc. Missing entries are assumed to be `0`.
 #' @param cancer_type The type of cancer for which to estimate penetrance.
 #' @param gene_input Gene information used for risk estimation.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
 #' @param max_age Maximum age considered for analysis, default is 94.
-#' @param removeProband Logical, indicating whether to remove probands from the analysis (default is FALSE).
-#' @param median_max Boolean indicating whether to use SEER median or max_age as an upper bound for the median proposal. Defaults to TRUE, i.e. using the SEER median.
+#' @param removeProband Logical, indicating whether to remove probands from the
+#' analysis (default is FALSE).
+#' @param median_max Boolean indicating whether to use SEER median or max_age as an
+#' upper bound for the median proposal. Defaults to TRUE, i.e. using the SEER median.
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
 #' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
 #' @param distribution_data Data for generating prior distributions.
@@ -189,8 +234,10 @@ mhChain <- function(
 #' @param rejection_rates Boolean to include rejection rates in the output.
 #' @param density_plots Boolean to include density plots in the output.
 #' @param penetrance_plot Boolean to include penetrance plots in the output.
-#' @param probCI Probability level for confidence intervals in penetrance plots (default is 0.95).
-#' @return A list containing combined results from all chains, along with optional statistics and plots.
+#' @param probCI Probability level for confidence intervals in penetrance plots
+#' (default is 0.95).
+#' @return A list containing combined results from all chains, along with optional
+#' statistics and plots.
 #' @importFrom stats rbeta runif
 #' @importFrom parallel makeCluster stopCluster parLapply
 #' @examples
@@ -205,6 +252,7 @@ mhChain <- function(
 
 PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      n_iter_per_chain = 200,
+                     db = PPP::PanelPRODatabase,
                      max_age = 94,
                      removeProband = FALSE,
                      median_max = TRUE,
@@ -222,7 +270,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      density_plots = TRUE,
                      penetrance_plot = TRUE,
                      probCI = 0.95) {
-
+  
   # Validate inputs
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
@@ -245,7 +293,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
   # create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
-  
+
   # Apply the prepAges function to treat missing data
   data <- prepAges(data, removeProband)
 
@@ -271,8 +319,9 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   }
   cl <- parallel::makeCluster(n_chains)
 
+  # Load required packages to the clusters
   parallel::clusterEvalQ(cl, {
-    library(PPP) # Load the "PPP" library
+    library(PPP)
     library(clipp)
     library(stats4)
     library(dplyr)
@@ -281,18 +330,18 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   parallel::clusterExport(cl, c(
     "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
-    "penet.fn", "transformDF",
-    "makePriors", "quantile.fn",
+    "transformDF", "makePriors", "penet.fn",
     "seeds", "n_iter_per_chain",
     "data", "prop", "af", "max_age",
-    "PanelPRODatabase", "cancer_type", "gene_input"
+    "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
+    "GENE_TYPES", "CANCER_NAME_MAP"
   ), envir = environment())
 
   results <- parallel::parLapply(cl, 1:n_chains, function(i) {
     mhChain(seeds[i],
       n_iter = n_iter_per_chain, chain_id = i,
       data = data,
-      db = PanelPRODatabase,
+      db = db,
       prior_distributions = prop,
       max_age = max_age,
       cancer_type = cancer_type,
