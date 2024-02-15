@@ -109,36 +109,6 @@ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, 
     return(penet.i)
 }
 
-#' Transform Data Frame
-#'
-#' This function transforms a data frame into the required format for further analysis.
-#'
-#' @param df The input data frame in the usual PanelPRO format.
-#'
-#' @return The transformed data frame in the format required for clipp.
-#'
-#' @examples
-#' # Transform a data frame
-#' transformed_df <- transformDF(input_df)
-#'
-transformDF <- function(df) {
-    df %>%
-        rename(
-            individual = SubjectID,
-            family = PedigreeID,
-            mother = MotherID,
-            father = FatherID,
-            aff = isAffBC,
-            sex = Sex,
-            age = AgeBC,
-            geno = BRCA1
-        ) %>%
-        mutate(
-            geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0, "1/1", geno))),
-            sex = ifelse(sex == 0, 2, sex) # Convert 0s to 2s in sex, keep 1s as is
-        )
-}
-
 #' Calculate Log Likelihood using clipp Package
 #'
 #' This function calculates the log likelihood using the clipp package for a set of parameters and data.
