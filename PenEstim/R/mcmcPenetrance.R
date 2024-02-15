@@ -32,12 +32,11 @@ mhChain <- function(
     max_age, db,
     prior_distributions, cancer_type, gene_input, af,
     median_max = TRUE, max_penetrance) {
-  
   # Set seed
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", db=db)
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", db = db)
   midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
@@ -59,7 +58,7 @@ mhChain <- function(
     first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
     # if (validate_weibull_parameters(first_quartile, median, shift, asymptote)) {
     return(c(first_quartile, median, shift, asymptote))
-    }
+  }
 
   # Draw initial valid parameters
   initial_params <- draw_initial_params()
@@ -88,26 +87,26 @@ mhChain <- function(
   for (i in 1:n_iter) {
     # Propose new values using the prior distributions
     # generate asymptote parameter (gamma)
-    #repeat 
-      asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
-      if (asymptote_factor > 1) {
-        asymptote_factor <- 1 - SEER_baseline$total_prob
-      }
-      asymptote_proposal <- SEER_baseline$total_prob +
-        do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
-      asymptote_proposal <- max(0, min(1, asymptote_proposal))
-      shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
-      median_proposal <- if (median_max) {
-        do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
-      } else {
-        do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift_proposal) + shift_proposal
-      }
-      first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
-        (median_proposal - shift_proposal) + shift_proposal
+    # repeat
+    asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
+    if (asymptote_factor > 1) {
+      asymptote_factor <- 1 - SEER_baseline$total_prob
+    }
+    asymptote_proposal <- SEER_baseline$total_prob +
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+    asymptote_proposal <- max(0, min(1, asymptote_proposal))
+    shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
+    median_proposal <- if (median_max) {
+      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
+    } else {
+      do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift_proposal) + shift_proposal
+    }
+    first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
+      (median_proposal - shift_proposal) + shift_proposal
 
-      #if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
-       # break
-      #}
+    # if (validate_weibull_parameters(first_quartile_proposal, median_proposal, shift_proposal, asymptote_proposal)) {
+    # break
+    # }
     # }
 
     # Compute the likelihood for the current and proposed
@@ -180,6 +179,8 @@ mhChain <- function(
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
 #' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
 #' @param distribution_data Data for generating prior distributions.
+#' @param af Allele frequency for risk allele, default is 0.0001.
+#' @param max_penetrance Maximum penetrance considered for analysis, default is 1.
 #' @param sample_size Optional sample size for distribution generation.
 #' @param ratio Optional ratio parameter for distribution generation.
 #' @param prior_params Parameters for prior distributions.
@@ -195,13 +196,12 @@ mhChain <- function(
 #' @examples
 #' # Example usage:
 #' result <- PenEstim(
-#'   data = familyData, cancer_type = "breast", gene_input = "BRCA1",
+#'   data = familyData, cancer_type = "Breast", gene_input = "BRCA1",
 #'   n_chains = 4, n_iter_per_chain = 1000, max_age = 90,
 #'   burn_in = 0.1, thinning_factor = 2, summary_stats = TRUE,
 #'   rejection_rates = TRUE, density_plots = TRUE, penetrance_plot = TRUE
 #' )
 #' @export
-
 
 PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      n_iter_per_chain = 200,
@@ -227,29 +227,33 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
   }
-  if (missing(cancer_type)) {
-    stop("Error: 'cancer_type' parameter is missing. Please specify the type of cancer for penetrance estimation.")
+  if (!(cancer_type %in% CANCER_TYPES)) {
+    stop(paste("Error: Cancer type", shQuote(cancer_type), "is not supported. Please choose from the supported list."))
   }
-  if (missing(gene_input)) {
-    stop("Error: 'gene_input' parameter is missing. Please provide the gene.")
+  if (!(gene_input %in% GENE_TYPES)) {
+    stop(paste("Error: Gene type", shQuote(gene_input), "is not supported. Please choose from the supported list."))
   }
   if (missing(n_chains) || !is.numeric(n_chains) || n_chains <= 0) {
-    stop("Error: 'n_chains' parameter is missing or invalid.
-    Please specify the number of chains to be run (on seperate cores).
-    It must be a positive integer.")
+    stop("Error: 'n_chains' parameter is missing or invalid. Please specify a positive integer.")
   }
   if (missing(n_iter_per_chain) || !is.numeric(n_iter_per_chain) || n_iter_per_chain <= 0) {
     stop("Error: 'n_iter_per_chain' parameter is missing or invalid. It must be a positive integer.")
   }
+  if (n_chains > parallel::detectCores()) {
+    stop("Error: 'n_chains' exceeds the number of available CPU cores.")
+  }
 
   # create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
-
+  
   # Apply the prepAges function to treat missing data
   data <- prepAges(data, removeProband)
 
   # Apply the transformation to adjust the format for the clipp package
-  data <- do.call(rbind, lapply(data, transformDF))
+  data <- do.call(rbind, lapply(data, transformDF,
+    cancer_type = cancer_type,
+    gene = gene_input
+  ))
 
   #  Create the prior distributions
   prop <- makePriors(

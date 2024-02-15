@@ -17,6 +17,7 @@
 #' calculate_lifetime_risk("Breast_Cancer", "BRCA1")
 #'
 #' @export
+
 calculate_lifetime_risk <- function(cancer_type, gene, race = "All_Races", sex = "Female", type = "Crude", db) {
     # Find the indices for the respective attributes
     dim_names <- attr(db$Penetrance, "dimnames")
@@ -173,4 +174,49 @@ prepAges <- function(data, removeProband = FALSE) {
         }
     }
     return(data)
+}
+
+#' Transform Data Frame
+#'
+#' This function transforms a data frame from the standard format we have in Panelpro
+#' into the required format which conforms to the requirements of PenEstim (and clipp)
+#'
+#' @param df The input data frame in the usual PanelPRO format.
+#'
+#' @return The transformed data frame in the format required for clipp.
+#'
+#' @examples
+#' # Transform a data frame
+#' transformed_df <- transformDF(input_df)
+
+transformDF <- function(df, cancer_type = cancer_type, gene = gene_input) {
+    # Validate cancer type
+    cancer_index <- match(cancer_type, CANCER_NAME_MAP$long)
+    # Validate cancer type
+    cancer_index <- match(cancer_type, CANCER_NAME_MAP$long)
+    if (is.na(cancer_index)) {
+        stop(paste("Cancer type", shQuote(cancer_type), "is not supported. Please choose from the supported list."))
+    }
+    cancer_type_short <- CANCER_NAME_MAP$short[cancer_index]
+    
+    # Dynamically construct column names based on inputs
+    aff_col_name <- paste0("isAff", cancer_type_short)
+    age_col_name <- paste0("Age", cancer_type_short)
+    geno_col_name <- gene
+
+    df %>%
+        rename(
+            individual = SubjectID,
+            family = PedigreeID,
+            mother = MotherID,
+            father = FatherID,
+            aff = !!sym(aff_col_name),
+            sex = Sex,
+            age = !!sym(age_col_name),
+            geno = !!sym(geno_col_name)
+        ) %>%
+        mutate(
+            geno = ifelse(is.na(geno), "", ifelse(geno == 1, "1/2", ifelse(geno == 0, "1/1", geno))),
+            sex = ifelse(sex == 0, 2, sex) # Convert 0s to 2s in sex, keep 1s as is
+        )
 }
