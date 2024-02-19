@@ -216,6 +216,8 @@ mhChain <- function(
 #' @param gene_input Gene information used for risk estimation.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
+#' @param db Database for the the baseline risk estimates. The default uses the the 
+#' PanelPRODatabase. 
 #' @param max_age Maximum age considered for analysis, default is 94.
 #' @param removeProband Logical, indicating whether to remove probands from the
 #' analysis (default is FALSE).

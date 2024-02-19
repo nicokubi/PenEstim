@@ -101,7 +101,7 @@ makePriors <- function(
   # Setting 1: When there is no user input in the data_distribution, then the default parameter settings are applied.
   # Setting 2: If the user has modified the prior_params_default object, the customized parameter settings will be applied.
   if (is.null(data) || all(is.na(data))) {
-    prior_params <- prior_params_default
+    prior_params <- prior_params
   } else {
     # Setting 3: Extracting the user inputs from the data_distribution_default dataframe for the prior elicitation.
     # Check if all age entries are present
