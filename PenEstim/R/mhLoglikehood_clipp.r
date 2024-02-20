@@ -50,9 +50,35 @@ calculateBaseline <- function(cancer_type, gene, race, type, db) {
     return(lifetime_risk)
 }
 
+calculateNCPen <- function(SEER_baseline, carrierPenetrances, af, homozygous = FALSE) {
+    # Calculate probability weights for carriers based on allele frequencies
+    weights1 <- 2 * af * (1 - af) # Heterozygous carriers
+    weights2 <- af^2 # Homozygous carriers
+
+    # Conditionally include weights for homozygous carriers
+    weights <- if (homozygous) {
+        weights1 + weights2
+    } else {
+        weights1
+    }
+    # Assuming carrierPenetrances is structured to align with the age and possibly sex
+    # This might require adjustment based on your data
+    weightedCarrierPenetrances <- carrierPenetrances * weights
+    weightedSumCarrierPenetrances <- sum(weightedCarrierPenetrances)
+
+    # Calculate age-specific non-carrier penetrance
+    nonCarrierPenetrance <- (SEER_baseline - weightedSumCarrierPenetrances) / (1 - sum(weights))
+
+    # Ensure non-negative value
+    nonCarrierPenetrance <- max(0, nonCarrierPenetrance)
+
+    return(nonCarrierPenetrance)
+}
+
 #' Penetrance Function
 #'
-#' This function calculates the penetrance for an individual based on their age, genotype, and other factors.
+#' This function calculates the penetrance for an individual based on a Weibull distribution. 
+#' Given this simple penetrance function we assume a single age-specific penetrance function.
 #'
 #' @param i The index of the individual.
 #' @param data The data object containing individual information.
@@ -70,7 +96,7 @@ calculateBaseline <- function(cancer_type, gene, race, type, db) {
 #' penetrance <- penet.fn(1, individual_data, 1.0, 2.0, 0.5, 0.8, 80, baseline_risk)
 #'
 # Define the penetrance function
-penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote = TRUE) {
+penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote, SeerNC) {
     if (is.na(data$sex[i])) {
         # Handle NA in sex - using average risk
         sex_indices <- 1:nrow(baselineRisk)
@@ -85,14 +111,25 @@ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, 
         # Ensure age is within the valid range
         age_index <- min(max_age, data$age[i])
 
-        # Extract the corresponding baseline risk for sex and age
-        # Assuming the non-carrier risk is equal to the SEER baeline risk
-        nc.pen <- baselineRisk[sex_index, age_index]
+        # Weibull hazard and survival calculation differs for males and females
+        if (data$sex[i] == 2) { # Assuming "Male" is coded as 2
+            c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
+        } else { # Female 
+            c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
+        }
 
-        # Weibull hazard and survival for carriers
-        c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
+        # Extract the corresponding baseline risk for sex and age
+        SEER_baseline_i <- baselineRisk[sex_index, age_index]
+
+        # If Assuming the non-carrier risk is equal to the SEER baseline risk
+        if (SeerNC == TRUE) {
+            nc.pen <- SEER_baseline_i
+        } else {
+            nc.pen <- calculateNCPen(SEER_baseline = SEER_baseline_i, carrierPenetrances = c.pen, af = af)
+        }
 
         # Penetrance calculations based on genotype
+        # Assuming same penetrance for homozygous and heterozygous carriers 
         penet.i <- c(1 - nc.pen, 1 - c.pen, 1 - c.pen) # if person is not affected
         if (data$aff[i] == 1) penet.i <- c(nc.pen, c.pen, c.pen)
     }
@@ -129,7 +166,7 @@ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, 
 #' # Calculate log likelihood
 #' log_likelihood <- mhLogLikelihood_clipp(parameters, pedigree_data, 80, "Lung Cancer", data_object, 0.2)
 #'
-mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af) {
+mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,homozygote,SeerNC) {
     # Extract parameters
     given_median <- paras[1]
     given_first_quartile <- paras[2]
@@ -151,7 +188,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af)
 
     # Calculate penetrance
     penet <- t(sapply(1:nrow(families), function(i) {
-        penet.fn(i, families, alpha, beta, delta, gamma, max_age, baselineRisk)
+        penet.fn(i, families, alpha, beta, delta, gamma, max_age, baselineRisk,homozygote = homozygote, SeerNC = SeerNC )
     }))
 
     # Compute log-likelihooda

@@ -30,10 +30,14 @@ We use simulated data and plot the penetrance using Kaplan-Mayer estimator. The 
 ```{r desc, echo=FALSE}
 
 # Simulation study
-load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated Families/families.RData")
-dat <- families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated Families/simFamilies_C_1000_nocen_selected.RData")
+dat <- simFamilies_C_1000_nocen_selected
 
 describeFamilies <- function(fams){
+  
+  
+  
+  
   
   affectedFamilies = 0 
   affectedProbands = 0
@@ -50,6 +54,8 @@ describeFamilies <- function(fams){
   BCAgesfemale = 0
   total_individuals = 0
   BRCA1_individuals = 0
+  
+  
 
   #affectedFamiliesList = list()
   #j = 1
@@ -144,7 +150,123 @@ describeFamilies <- function(fams){
   print(summary(BCAgesfemale))
 }
 
-print(describeFamilies(dat))
+
+
+describeFamilies <- function(fams, cancer, gene) {
+  # Validate and translate cancer type
+  if (!cancer %in% CANCER_NAME_MAP$long) {
+    stop("Cancer type '", cancer, "' is not supported. Please choose from the supported list.")
+  }
+  
+  # Get the abbreviation for the cancer type
+  cancer_index <- which(CANCER_NAME_MAP$long == cancer)
+  cancer_short <- CANCER_NAME_MAP$short[cancer_index]
+  
+  # Construct column names based on cancer type and gene input
+  aff_col_name <- paste0("isAff", cancer_short)
+  age_col_name <- paste0("Age", cancer_short)
+  
+  # Initialize counters and vectors for storing data
+  affectedFamilies = 0 
+  affectedProbands = 0
+  famSizes = c()
+  geneFamilies = 0
+  geneProbands = 0 
+  curAges = c()
+  cancerAges = c()
+  pbCancerAges = c()
+  pbCurAges = c()
+  pbCancerAgesFemale = c()
+  affectedFemaleProbands = 0
+  geneFemaleProbands = 0 
+  cancerAgesFemale = c()
+  total_individuals = 0
+  gene_individuals = 0
+  
+  # Process each family
+  for(i in 1:length(fams)){
+    f = fams[[i]]
+    sizeOfFamily = nrow(f)
+    total_individuals = total_individuals + sizeOfFamily
+    famSizes = c(famSizes, sizeOfFamily)
+    curAges = c(curAges, f$CurAge)  
+    f = f %>% dplyr::filter(!!rlang::sym(aff_col_name) == 1, isProband == 0) 
+    cancerAges <- c(cancerAges, f[[age_col_name]])  
+    ff = fams[[i]] %>% dplyr::filter(!!rlang::sym(gene) == 1, !!rlang::sym(aff_col_name) == 1) 
+    gene_individuals = gene_individuals + nrow(ff)
+    cancerAgesFemale <- c(cancerAgesFemale, ff[[age_col_name]])  
+
+    if(nrow(f)>0){
+      affectedFamilies = affectedFamilies + 1
+    }
+    geneFams = fams[[i]] %>% dplyr::filter(isProband == 0, !!rlang::sym(gene) == 1)
+    if(nrow(geneFams) > 0){
+     geneFamilies = geneFamilies + 1
+    }
+    
+    pb <- fams[[i]] %>% dplyr::filter(isProband == 1)
+    pbfemale <- fams[[i]] %>% dplyr::filter(isProband == 1, Sex == 0)
+    
+    if (nrow(pbfemale) > 0) {
+      pbCancerAgesFemale <- c(pbCancerAgesFemale, pbfemale[[age_col_name]])
+      if (any(pbfemale[[aff_col_name]] == 1)){
+        affectedFemaleProbands <- affectedFemaleProbands + 1
+      }
+      if (!is.na(pbfemale[[gene]])){
+        if (any(pbfemale[[gene]] == 1)){
+          geneFemaleProbands <- geneFemaleProbands + 1
+        }
+      }
+    }
+  
+    pbCancerAges <- c(pbCancerAges, pb[[age_col_name]])
+    pbCurAges <- c(pbCurAges, pb$CurAge)  
+    
+    if (any(pb[[aff_col_name]] == 1)){
+      affectedProbands <- affectedProbands + 1
+    }
+    
+    if (!is.na(pb[[gene]])){
+      if (any(pb[[gene]] == 1)){
+        geneProbands <- geneProbands + 1
+      }
+    }
+  }
+
+  print(paste0("Number of families: ", length(fams)))
+  print(paste0("Total Individuals: ", total_individuals))
+  print(paste0("Average family size: ", mean(famSizes)))
+  print("Summary of family sizes")
+  print(summary(famSizes))
+  print("Summary of Current Age for all family members")
+  print(summary(curAges))
+  print("Summary of Current Age for probands")
+  print(summary(pbCurAges))
+  
+  print(paste0("Number of families with affected individuals (", cancer, "): ", 
+               affectedFamilies))
+  print(paste0("Number of families with affected probands (", cancer, "): ", 
+               affectedProbands))
+  print(paste0("Number of families with affected female probands (", cancer, "): ", 
+               affectedFemaleProbands))
+  print(paste0("Number of families with relatives with PV (and not the proband) (", gene, "): ", geneFamilies))
+  print(paste0("Number of probands with PV (", gene, "): ", geneProbands))
+  print(paste0("Number of female probands with PV (", gene, "): ", 
+               geneFemaleProbands))
+  print(paste0("Number of individuals with PV (", gene, "): ", gene_individuals))
+  
+  print("Summary of Cancer Age of (female) probands")
+  print(summary(pbCancerAgesFemale))
+
+  print("Summary of Cancer Age in affected (non-proband) individuals")
+  print(summary(cancerAges))
+  
+  print("Summary of Cancer Age in affected (non-proband) female individuals")
+  print(summary(cancerAgesFemale))
+}
+
+
+print(describeFamilies(dat,"Breast","BRCA1"))
 
 
 ```
@@ -157,58 +279,63 @@ print(describeFamilies(dat))
 allcarriers <- data.frame()
 allnoncarriers <- data.frame()
 
-# Plot the empirical penetrance curve
+# Function for plotting the penetrance curve using KM
 plot_penetrance_curves <- function(fams) {
-  # Create an empty plot
-  plot(0, 0, type = "n", xlim = c(0, 100), ylim = c(0, 1), xlab = "Age", 
-       ylab = "Penetrance",
-       main = "Estimated Penetrance Curves (for females)")
-
-  # Initialize colors and line types
-  colors <- c("red", "blue")  
-  line_types <- c(1, 2)  
-
-  # Create empty data frames to aggregate the data
+  # Initialize data frames
   allcarriers <- data.frame()
   allnoncarriers <- data.frame()
 
-  # Iterate through each family and aggregate the data
+  # Create an empty plot
+  plot(0, 0, type = "n", xlim = c(0, 100), ylim = c(0, 1), xlab = "Age", 
+       ylab = "Penetrance", main = "Estimated Penetrance Curves (for females)")
+
+  # Colors and line types
+  colors <- c("red", "blue")  
+  line_types <- c(1, 2)  
+
+  # Aggregate data from each family
   for (i in 1:length(fams)) {
     f <- fams[[i]]
     carriers <- f %>% filter(BRCA1 == 1) %>% filter(Sex == 0)
     noncarriers <- f %>% filter(BRCA1 == 0) %>% filter(Sex == 0)
     
-    # Append the data to the combined data frames
-    allcarriers<- rbind(allcarriers, carriers)
+    allcarriers <- rbind(allcarriers, carriers)
     allnoncarriers <- rbind(allnoncarriers, noncarriers)
   }
-  
-  # Convert the cancer status variable to survival objects for each genotype
+ 
+  # Kaplan-Meier survival analysis
   surv_obj_1 <- Surv(time = allcarriers$AgeBC, event = allcarriers$isAffBC)
   surv_obj_0 <- Surv(time = allnoncarriers$AgeBC, event = allnoncarriers$isAffBC)
   
-  # Estimate the Kaplan-Meier survival curves for each genotype
   km_fit_1 <- survfit(surv_obj_1 ~ 1, data = allcarriers)
   km_fit_0 <- survfit(surv_obj_0 ~ 1, data = allnoncarriers)
   
-  # Calculate the penetrance functions for carriers and non-carriers
+  # Penetrance curves
   penetrance_1 <- 1 - km_fit_1$surv
   penetrance_0 <- 1 - km_fit_0$surv
   
-  # Plot the aggregated penetrance curves
-  lines(km_fit_1$time, penetrance_1, type = "l", col = colors[1], 
-        lty = line_types[1])
-  lines(km_fit_0$time, penetrance_0, type = "l", col = colors[2], 
-        lty = line_types[2])
-  
-  # Add legend
-  legend("topright", legend = c("PV", "Non-PV"), col = colors[1:2], lty = 1,
-         cex = 0.8)
-}
+  # Plotting the curves
+  lines(km_fit_1$time, penetrance_1, type = "s", col = colors[1], lty = line_types[1])
+  lines(km_fit_0$time, penetrance_0, type = "s", col = colors[2], lty = line_types[2])
+
+  # Add individual points for carriers
+  # Align points with step-wise changes by finding the corresponding y-value for each x (age)
+  #carrier_ages <- allcarriers$AgeBC
+  #for (age in unique(carrier_ages)) {
+    # Find the last penetrance value just before or at this age
+    #idx <- max(which(km_fit_1$time <= age))
+   # if (!is.na(idx)) { # Ensure idx is valid
+    #  penetrance_at_age <- penetrance_1[idx]
+    #  points(age, penetrance_at_age, col = colors[1], pch = 16)
+   # }
+  }
+
+
 
 
 # Plot the empirical penetrance curves
 plot_penetrance_curves(dat)
+
 
 
 
@@ -228,10 +355,13 @@ Application of the PenEstim algorithm using the clipp package for the likelihood
 
 ```{r, echo=TRUE}
 
-# Data Prep for the clipp structure from the classic PP format 
+# Load the data for Simulation study 
+
+
+# Data Prep
 for (i in seq_along(dat)) {
     if ("ID" %in% colnames(dat[[i]])) {
-        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "PedigreeID"
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
     }
 }
 
@@ -247,57 +377,160 @@ for (i in seq_along(dat)) {
     dat[[i]]$PedigreeID <- i
 }
 
-
 # Run Estimation procedure with default prior setting 
 out_sim_100 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 100
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 100, af = 0.9
 )
 
 # print summary stats
 out_sim_100$summary_stats
 ```
 
-**Review: Weibull parameter estimation**
+Using other default priors
 
-The quantile function for the Weibull distribution, adjusted by a shift, is defined as:
+```{r, echo=TRUE}
 
-$Q(p; \beta, \alpha, \delta) = \delta + \beta \left(-\log(1 - p)\right)^{\frac{1}{\alpha}}]$
+# Exploring different priors 
+prior_params_91 <- list(
+    asymptote = list(g1 = 9, g2 = 1),
+    shift = list(min = 15, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
 
-where:
+# Run Estimation procedure with default prior setting 
+out_sim_1k_91 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 10000, prior_params = prior_params_91, af = 0.9
+)
 
-\- $p$ is the quantile probability,
+# print summary stats
+out_sim_1k_91$summary_stats
+```
 
-\- $\beta$ is the scale parameter of the distribution,
+Application - MSH6 
 
-\- $\alpha$ is the shape parameter of the distribution,
+```{r, echo=TRUE}
 
-\- $\delta$ is a constant offset value.
+load("/Users/nicolaskubista/Dropbox (Partners HealthCare)/CCGCRN Hispanic Cohort Data/PenEstim/Data/carrierProbandFamilies_cohPedigree_MSH6_COL.RData")
 
-The conditional median $Q_{50} = Q(0.5)$ and the conditional first quartile $Q_{25} = Q(0.25)$ are then:
+describeFamilies(carrierProbandFamilies_cohPedigree_MSH6_COL,"Colorectal","MSH6")
 
-$Q_{50} = \delta + \beta [ln (2)]^{1/\alpha}$
+# Exploring different priors 
+prior_params_MSH6 <- list(
+    asymptote = list(g1 = 2, g2 = 2),
+    shift = list(min = 0, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
 
-$Q_{25} = \delta + \beta[ln(4 / 3)]^{1/\alpha}$
+# Run Estimation procedure with default prior setting 
+out_sim_5k_MSH6 <- PenEstim(
+    data = carrierProbandFamilies_cohPedigree_MSH6_COL,
+    cancer_type = "Colorectal", gene_input = "MSH6", n_chains = 4, n_iter_per_chain = 5000, prior_params = prior_params_MSH6,
+    af = PanelPRODatabase$AlleleFrequency[["MSH6_anyPV",1]]
+)
 
-The objective function, which is minimized to calculate the Weibull parameters given the median and first quartile drawn as from the prior distributions, is given by:
+# print summary stats
+out_sim_5k_MSH6$summary_stats
+plot_traceSingle(out_sim_5k_MSH6$results[[1]])
 
-$f(\beta, \alpha) = (\frac{\text{given\_median}}{\text{asymptote}} - Q_{50})^2 + (\frac{\text{given\_first\_quartile}}{\text{asymptote}} - Q_{25})^2$
+# Plot the running mean 
 
-We then use an optimization process that seeks the values of $\alpha$ and $\beta$ that minimize this objective function.
+runFQ<- running_mean(out_sim_5k_MSH6$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_5k_MSH6$results[[1]]$median_samples)
+runShift <- running_mean(out_sim_5k_MSH6$results[[1]]$shift_samples)
+runAsy <- running_mean(out_sim_5k_MSH6$results[[1]]$asymptote_samples)
 
-Analytically, a solution is more challenging:
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
 
-\*\*Step 1: Express $\beta$ in terms of $Q\_{50}$, $\delta$, and $\alpha$\*\*
 
-From the equation for $Q\_{50}$, we can express $\beta$ as:
+# Plot the running var 
 
-$\beta = \frac{Q\_{50} - \delta}{[\ln(2)]^{1/\alpha}}$
+runVFQ<- running_variance(out_sim_5k_MSH6$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_5k_MSH6$results[[1]]$median_samples)
+runVShift <- running_variance(out_sim_5k_MSH6$results[[1]]$shift_samples)
+runVAsy <- running_variance(out_sim_5k_MSH6$results[[1]]$asymptote_samples)
 
-\*\*Step 2: Substitute $\beta$ into the equation for $Q\_{25}$\*\*
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
 
-Substitute the expression for $\beta$ from $Q\_{50}$ into the equation for $Q\_{25}$:
 
-$Q\_{25} = \delta + (\frac{Q\_{50} - \delta}{[ln(2)]^{1/\alpha}})[ln(4 / 3)]^{1/\alpha}$
 
-Now solving for $\alpha$ is challenging...
+```
+
+Application - MLH1
+
+```{r, echo=TRUE}
+
+load("/Users/nicolaskubista/Dropbox (Partners HealthCare)/CCGCRN Hispanic Cohort Data/PenEstim/Data/carrierProbandFamilies_cohPedigree_MLH1.RData")
+
+head(carrierProbandFamilies_cohPedigree_MLH1$`00837-0167`)
+
+describeFamilies(carrierProbandFamilies_cohPedigree_MLH1,"Colorectal","MLH1")
+
+# Exploring different priors 
+prior_params_MLH1 <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    shift = list(min = 0, max = 30),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+out_sim_5k_MLH1 <- PenEstim(
+    data = carrierProbandFamilies_cohPedigree_MLH1,
+    cancer_type = "Colorectal", gene_input = "MLH1", n_chains = 4, n_iter_per_chain = 100, prior_params = prior_params_MLH1,
+    af = PanelPRODatabase$AlleleFrequency[["MLH1_anyPV",1]], burn_in = 0.1
+)
+
+# print summary stats
+out_sim_5k_MLH1$summary_stats
+plot_traceSingle(out_sim_5k_MLH1$results[[1]])
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_5k_MLH1$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_5k_MLH1$results[[1]]$median_samples)
+runShift <- running_mean(out_sim_5k_MLH1$results[[1]]$shift_samples)
+runAsy <- running_mean(out_sim_5k_MLH1$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_5k_MLH1$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_5k_MLH1$results[[1]]$median_samples)
+runVShift <- running_variance(out_sim_5k_MLH1$results[[1]]$shift_samples)
+runVAsy <- running_variance(out_sim_5k_MLH1$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+```
+
+Application - MSH6 
+
+```{r, echo=TRUE}
+
+load("/Users/nicolaskubista/Dropbox (Partners HealthCare)/CCGCRN Hispanic Cohort Data/PenEstim/Data/carrierProbandFamilies_cohPedigree_MSH6_COL.RData")
+
+
+
+```

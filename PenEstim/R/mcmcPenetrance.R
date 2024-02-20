@@ -31,13 +31,13 @@ mhChain <- function(
     seed, n_iter, chain_id, data,
     max_age, db,
     prior_distributions, cancer_type, gene_input, af,
-    median_max = TRUE, max_penetrance) {
+    median_max, max_penetrance, homozygote, SeerNC) {
 
   # Set seed
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", db = db)
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", race = "All_Races", sex = "NA", type = "Net", db = db)
   midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
@@ -113,7 +113,9 @@ mhChain <- function(
       max_age = max_age,
       cancer_type = cancer_type,
       db = db,
-      af = af
+      af = af,
+      homozygote = homozygote,
+      SeerNC = SeerNC
     )
 
     loglikelihood_proposal <- mhLogLikelihood_clipp(
@@ -125,7 +127,9 @@ mhChain <- function(
       max_age = max_age,
       cancer_type = cancer_type,
       db = db,
-      af = af
+      af = af,
+      homozygote = homozygote,
+      SeerNC = SeerNC
     )
 
     # Compute the acceptance ratio (likelihood ratio)
@@ -258,6 +262,8 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      max_age = 94,
                      removeProband = FALSE,
                      median_max = TRUE,
+                     homozygote = TRUE,
+                     SeerNC = TRUE,
                      burn_in = 0,
                      thinning_factor = 1,
                      distribution_data = distribution_data_default,
@@ -334,7 +340,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
     "transformDF", "makePriors", "penet.fn",
     "seeds", "n_iter_per_chain",
-    "data", "prop", "af", "max_age",
+    "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
     "GENE_TYPES", "CANCER_NAME_MAP"
   ), envir = environment())
@@ -349,7 +355,10 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
       cancer_type = cancer_type,
       gene_input = gene_input,
       af = af,
-      max_penetrance = max_penetrance
+      max_penetrance = max_penetrance,
+      median_max = median_max,
+      homozygote = homozygote,
+      SeerNC = SeerNC
     )
   })
 

@@ -95,10 +95,10 @@ plot_trace <- function(results, n_chains) {
   par(mfrow = c(n_chains, 4)) # Set up a grid for the plots
   for (chain_id in 1:n_chains) {
     # Extract results for the current chain
-    median_results <- results[chain_id]$median_results
-    shift_results <- results[chain_id]$shift_results
-    first_quartile_results <- results[chain_id]$first_quartile_results
-    asymptote_results <- results[chain_id]$asymptote_results
+    median_results <- results[[chain_id]]$median_samples
+    shift_results <- results[[chain_id]]$shift_samples
+    first_quartile_results <- results[[chain_id]]$first_quartile_samples
+    asymptote_results <- results[[chain_id]]$asymptote_samples
 
     # Create trace plots for the current chain
 
@@ -107,6 +107,33 @@ plot_trace <- function(results, n_chains) {
     plot(first_quartile_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of First Quartile"), xlab = "Iteration", ylab = "First Quartile")
     plot(asymptote_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Asymptote"), xlab = "Iteration", ylab = "Asymptote")
   }
+}
+
+# Trace for just a single chain
+plot_traceSingle <- function(results) {
+  par(mfrow = c(2, 2)) # Set up a grid for the plots
+    # Extract results for the current chain
+    median_results <- results$median_samples
+    shift_results <- results$shift_samples
+    first_quartile_results <- results$first_quartile_samples
+    asymptote_results <- results$asymptote_samples
+    
+    # Create trace plots for the current chain
+    
+    plot(median_results, type = "l", main = "Trace plot of Median", xlab = "Iteration", ylab = "Median")
+    plot(shift_results, type = "l", main = "Trace plot of Shift", xlab = "Iteration", ylab = "Shift")
+    plot(first_quartile_results, type = "l", main = "Trace plot of First Quartile", xlab = "Iteration", ylab = "First Quartile")
+    plot(asymptote_results, type = "l", main = "Trace plot of Asymptote", xlab = "Iteration", ylab = "Asymptote")
+  }
+
+# Running mean calculation
+running_mean <- function(res) {
+  n <- length(res)
+  running_mean <- numeric(n)
+  for (i in 1:n) {
+    running_mean[i] <- mean(res[1:i])
+  }
+  return(running_mean)
 }
 
 #' Print Rejection Rates
