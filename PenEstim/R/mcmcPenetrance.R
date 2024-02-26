@@ -32,7 +32,6 @@ mhChain <- function(
     max_age, db,
     prior_distributions, cancer_type, gene_input, af,
     median_max, max_penetrance, homozygote, SeerNC) {
-
   # Set seed
   set.seed(seed)
 
@@ -84,9 +83,11 @@ mhChain <- function(
   cat("Starting Chain", chain_id, "\n")
 
   for (i in 1:n_iter) {
-    # Propose new values using the prior distributions
-    # generate asymptote parameter (gamma)
-    # repeat
+    # Propose new values using the defined prior distributions for the asymptote, shift,
+    # median and then first quartile
+    # Asymptote proposal is scaled to lie between either 2 * max_penetrane (a user-defined asymptote value
+    # based on prior information) or 1 as the upper bound and the total cumulative probability of
+    # the SEER baseline as the lower bound
     asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
     if (asymptote_factor > 1) {
       asymptote_factor <- 1 - SEER_baseline$total_prob
@@ -94,16 +95,21 @@ mhChain <- function(
     asymptote_proposal <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
     asymptote_proposal <- max(0, min(1, asymptote_proposal))
+    # Shift proposal
     shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
+    # Median proposal scaled to lie between either the median SEER age (basedline_mid), per default,
+    # or the max_age as an upper bound and shift proposal as a lower bound
     median_proposal <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
     } else {
       do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift_proposal) + shift_proposal
     }
+    # First Quartile proposal scaled to lie between the median proposal as an upper bound and shift
+    # proposal as a lower bound
     first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_proposal - shift_proposal) + shift_proposal
 
-    # Compute the likelihood for the current and proposed
+      # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
         median_current,
@@ -220,12 +226,12 @@ mhChain <- function(
 #' @param gene_input Gene information used for risk estimation.
 #' @param n_chains Number of chains for parallel computation.
 #' @param n_iter_per_chain Number of iterations for each chain.
-#' @param db Database for the the baseline risk estimates. The default uses the the 
-#' PanelPRODatabase. 
+#' @param db Database for the the baseline risk estimates. The default uses the the
+#' PanelPRODatabase.
 #' @param max_age Maximum age considered for analysis, default is 94.
 #' @param removeProband Logical, indicating whether to remove probands from the
 #' analysis (default is FALSE).
-#' @param median_max Boolean indicating whether to use SEER median or max_age as an
+#' @param median_max Boolean indicating whether to use SEER median age or max_age as an
 #' upper bound for the median proposal. Defaults to TRUE, i.e. using the SEER median.
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
 #' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
@@ -278,7 +284,6 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      density_plots = TRUE,
                      penetrance_plot = TRUE,
                      probCI = 0.95) {
-  
   # Validate inputs
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")

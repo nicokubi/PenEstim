@@ -26,9 +26,11 @@ source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Sub
 set.seed(2024)
 ```
 
+
 **Simulated Data**
 
 We use simulated data for the first application. Families C were simulated with a wider Weibull distribution with shape parameter, $\alpha = 2.5$, scale parameter, $\beta=50$, a shift of $\delta=20$, and an asymptote parameter $\gamma = 0.9$. This translates into an age-specific penetrance curve which does not allow for cancer age (AgeBC) to be lower than 20 with a median age of $Q_{50}=62$ and a first quartile of $Q_{25}=51$. The allele frequency was set at $0.9$. Only 60 families of this type were generated to improve run-time for the simulation study using the MCMC approach.
+
 
 ```{r desc, echo=FALSE, cache=TRUE}
 
@@ -152,7 +154,9 @@ describeFamilies <- function(fams, cancer, gene) {
 print(describeFamilies(dat,"Breast","BRCA1"))
 ```
 
+
 **Pentrance Curve using Kaplan-Meyer Estimator**
+
 
 ```{r, echo=FALSE, cache=TRUE}
 
@@ -215,6 +219,7 @@ plot_penetrance_curves <- function(fams) {
 
 ```
 
+
 **Estimation using PenEstim**
 
 Application of the PenEstim algorithm using the clipp package for the likelihood calculation and the default prior settings.
@@ -228,6 +233,7 @@ Application of the PenEstim algorithm using the clipp package for the likelihood
 -   Threshold \$\delta\$ & Uniform(0,25)
 
 Results - Simulated Data - Default Prior
+
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -264,9 +270,11 @@ out_sim_15k <- PenEstim(
 out_sim_15k$summary_stats
 ```
 
+
 Results - Simulated Data - New Prior
 
 Here I changed the prior on the asymptote to incorporate an asymptote which is skewed toward later ages.
+
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -325,9 +333,11 @@ acf(out_sim_15k_91$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
 
 ```
 
+
 **Application - CoH Data**
 
 1.  **MSH6 and Colorectal Cancer**
+
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -389,7 +399,9 @@ acf(out_sim_15k_MSH6$results[[1]]$shift_samples, main = "ACF of Shift")
 acf(out_sim_15k_MSH6$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
 ```
 
+
 2.  **MLH1 and Colorectal Cancer**
+
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -453,9 +465,11 @@ acf(out_sim_15k_MLH1$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
 
 ```
 
+
 **Penetrance Estimates from PanelPRO**
 
 As a reference, I added the penetrance curves for the respective gene-cancer combinations from the PanelPRODatabase here.
+
 
 ```{r, echo=TRUE, cache=TRUE}
 db <- PPP::PanelPRODatabase
@@ -499,7 +513,9 @@ legend("topleft", legend=c("Female", "Male"), col=c("blue", "red"), lty=1, lwd=2
 
 
 
+
 3.  Colorectal and MSH6 with new prior
+
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -565,11 +581,13 @@ abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through
 
 ```
 
+
 4.  MSH6 and Colorectal
 
     1.  New Prior
 
     2.  more itterations\
+
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -635,11 +653,13 @@ abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through
 
 ```
 
+
 5.  More Families - SimFamC
 
     1.  Updated Prior
 
     2.  Larger pedigree file with 120 families instead of 60
+
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -730,3 +750,4 @@ plot(out_sim_15k_simC300$combined_chains$median_results, out_sim_15k_simC300$com
 abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
 
 ```
+

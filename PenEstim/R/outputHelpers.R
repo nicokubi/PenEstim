@@ -112,19 +112,19 @@ plot_trace <- function(results, n_chains) {
 # Trace for just a single chain
 plot_traceSingle <- function(results) {
   par(mfrow = c(2, 2)) # Set up a grid for the plots
-    # Extract results for the current chain
-    median_results <- results$median_samples
-    shift_results <- results$shift_samples
-    first_quartile_results <- results$first_quartile_samples
-    asymptote_results <- results$asymptote_samples
-    
-    # Create trace plots for the current chain
-    
-    plot(median_results, type = "l", main = "Trace plot of Median", xlab = "Iteration", ylab = "Median")
-    plot(shift_results, type = "l", main = "Trace plot of Shift", xlab = "Iteration", ylab = "Shift")
-    plot(first_quartile_results, type = "l", main = "Trace plot of First Quartile", xlab = "Iteration", ylab = "First Quartile")
-    plot(asymptote_results, type = "l", main = "Trace plot of Asymptote", xlab = "Iteration", ylab = "Asymptote")
-  }
+  # Extract results for the current chain
+  median_results <- results$median_samples
+  shift_results <- results$shift_samples
+  first_quartile_results <- results$first_quartile_samples
+  asymptote_results <- results$asymptote_samples
+
+  # Create trace plots for the current chain
+
+  plot(median_results, type = "l", main = "Trace plot of Median", xlab = "Iteration", ylab = "Median")
+  plot(shift_results, type = "l", main = "Trace plot of Shift", xlab = "Iteration", ylab = "Shift")
+  plot(first_quartile_results, type = "l", main = "Trace plot of First Quartile", xlab = "Iteration", ylab = "First Quartile")
+  plot(asymptote_results, type = "l", main = "Trace plot of Asymptote", xlab = "Iteration", ylab = "Asymptote")
+}
 
 # Running mean calculation
 running_mean <- function(res) {
@@ -135,6 +135,7 @@ running_mean <- function(res) {
   }
   return(running_mean)
 }
+
 
 #' Print Rejection Rates
 #' @param results A list of MCMC chain results.
