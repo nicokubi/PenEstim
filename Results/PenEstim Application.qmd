@@ -1,8 +1,18 @@
 ---
 title: "PenEstim Application"
-format:
+format: 
   html:
-    theme: default
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: cosmo
+    left:
+        - text: "Home"
+          href: index.html
+        - text: "Section 1"
+          href: #section-1
+        - text: "Section 2"
+          href: #section-2
 ---
 
 ```{r, echo=FALSE, include=FALSE}
@@ -26,7 +36,9 @@ source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Sub
 set.seed(2024)
 ```
 
-**Simulated Data**
+# Simulation 
+
+## Data
 
 We use simulated data for the first application. Families C were simulated with a wider Weibull distribution with shape parameter, $\alpha = 2.5$, scale parameter, $\beta=50$, a shift of $\delta=20$, and an asymptote parameter $\gamma = 0.9$. This translates into an age-specific penetrance curve which does not allow for cancer age (AgeBC) to be lower than 20 with a median age of $Q_{50}=62$ and a first quartile of $Q_{25}=51$. The allele frequency was set at $0.9$. Only 60 families of this type were generated to improve run-time for the simulation study using the MCMC approach.
 
@@ -152,7 +164,7 @@ describeFamilies <- function(fams, cancer, gene) {
 print(describeFamilies(dat,"Breast","BRCA1"))
 ```
 
-**Pentrance Curve using Kaplan-Meyer Estimator**
+ ## Pentrance Curve using Kaplan-Meyer Estimator
 
 ```{r, echo=FALSE, cache=TRUE}
 
@@ -198,24 +210,24 @@ plot_penetrance_curves <- function(fams) {
   lines(km_fit_1$time, penetrance_1, type = "s", col = colors[1], lty = line_types[1])
   lines(km_fit_0$time, penetrance_0, type = "s", col = colors[2], lty = line_types[2])
 
-  # Add individual points for carriers
-  # Align points with step-wise changes by finding the corresponding y-value for each x (age)
-  #carrier_ages <- allcarriers$AgeBC
-  #for (age in unique(carrier_ages)) {
-    # Find the last penetrance value just before or at this age
-    #idx <- max(which(km_fit_1$time <= age))
-   # if (!is.na(idx)) { # Ensure idx is valid
-    #  penetrance_at_age <- penetrance_1[idx]
-    #  points(age, penetrance_at_age, col = colors[1], pch = 16)
-   # }
+  #Add individual points for carriers
+  #Align points with step-wise changes by finding the corresponding y-value for each x (age)
+  carrier_ages <- allcarriers$AgeBC
+  for (age in unique(carrier_ages)) {
+    idx <- max(which(km_fit_1$time <= age))
+    if(!is.na(idx)) {
+      penetrance_at_age <- penetrance_1[idx]
+     points(age, penetrance_at_age, col = colors[1], pch = 16)
+    }
   }
+}
 
-# Plot the empirical penetrance curves
+#Plot the empirical penetrance curves
 #plot_penetrance_curves(dat)
 
 ```
 
-**Estimation using PenEstim**
+## Estimation using PenEstim
 
 Application of the PenEstim algorithm using the clipp package for the likelihood calculation and the default prior settings.
 
@@ -262,9 +274,10 @@ out_sim_15k <- PenEstim(
 
 # print summary stats
 out_sim_15k$summary_stats
+
 ```
 
-Results - Simulated Data - New Prior
+##  New Prior
 
 Here I changed the prior on the asymptote to incorporate an asymptote which is skewed toward later ages.
 
@@ -324,10 +337,200 @@ acf(out_sim_15k_91$results[[1]]$shift_samples, main = "ACF of Shift")
 acf(out_sim_15k_91$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
 
 ```
+## Simulation - BRCA1 and Breast Cancer - Additional families
 
-**Application - CoH Data**
+    1.  Updated Prior
+    2.  Larger pedigree file with 120 families instead of 60 from the first simulation 
+    
 
-1.  **MSH6 and Colorectal Cancer**
+```{r, echo=TRUE, cache=TRUE}
+
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/peelingpearingestim/simFamilies_C_1000_nocen_selected300.RData")
+
+dat<- simFamilies_C_1000_nocen_selected300
+
+# print the description of the families
+print(describeFamilies(dat,"Breast","BRCA1"))
+
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    shift = list(min = 15, max = 25),
+    median = list(m1 = 6, m2 = 3),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_10k_simC300 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 1000, 
+    prior_params = prior_params_BRCA1, af = 0.9, burn_in = 0.1, sex = "Female"
+)
+
+# print summary stats
+out_sim_10k_simC300$summary_stats
+plot_traceSingle(out_sim_10k_simC300$results[[1]])
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_10k_simC300$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_10k_simC300$results[[1]]$median_samples)
+runShift <- running_mean(out_sim_10k_simC300$results[[1]]$shift_samples)
+runAsy <- running_mean(out_sim_10k_simC300$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_10k_simC300$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_10k_simC300$results[[1]]$median_samples)
+runVShift <- running_variance(out_sim_10k_simC300$results[[1]]$shift_samples)
+runVAsy <- running_variance(out_sim_10k_simC300$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+
+  # Autocorrelation plots
+acf(out_sim_10k_simC300$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_10k_simC300$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_10k_simC300$results[[1]]$shift_samples, main = "ACF of Shift")
+acf(out_sim_10k_simC300$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_10k_simC300$combined_chains$median_results, out_sim_10k_simC300$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+## Simulation - Fixed Asymptote
+
+Same code as above but now the asymptote is drawn from a beta with all point mass on 1. 
+
+```{r, echo=TRUE, cache=TRUE}
+
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/peelingpearingestim/simFamilies_C_1000_nocen_selected300.RData")
+
+dat<- simFamilies_C_1000_nocen_selected300
+
+# print the description of the families
+print(describeFamilies(dat,"Breast","BRCA1"))
+
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 10^10, g2 = 1e-10),
+    shift = list(min = 15, max = 25),
+    median = list(m1 = 6, m2 = 3),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_10k_simC300 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 10000, 
+    prior_params = prior_params_BRCA1, af = 0.9, burn_in = 0.1, sex = "Female"
+)
+
+# print summary stats
+out_sim_10k_simC300$summary_stats
+plot_traceSingle(out_sim_10k_simC300$results[[1]])
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_10k_simC300$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_10k_simC300$results[[1]]$median_samples)
+runShift <- running_mean(out_sim_10k_simC300$results[[1]]$shift_samples)
+runAsy <- running_mean(out_sim_10k_simC300$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_10k_simC300$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_10k_simC300$results[[1]]$median_samples)
+runVShift <- running_variance(out_sim_10k_simC300$results[[1]]$shift_samples)
+runVAsy <- running_variance(out_sim_10k_simC300$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+
+  # Autocorrelation plots
+acf(out_sim_10k_simC300$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_10k_simC300$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_10k_simC300$results[[1]]$shift_samples, main = "ACF of Shift")
+acf(out_sim_10k_simC300$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_10k_simC300$combined_chains$median_results, out_sim_10k_simC300$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+
+# Application - CoH Data (Hispanic Cohort)
+
+## MLH6 and Colorectal Cancer
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -389,7 +592,7 @@ acf(out_sim_15k_MSH6$results[[1]]$shift_samples, main = "ACF of Shift")
 acf(out_sim_15k_MSH6$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
 ```
 
-2.  **MLH1 and Colorectal Cancer**
+## MLH1 and Colorectal Cancer
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -453,7 +656,147 @@ acf(out_sim_15k_MLH1$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
 
 ```
 
-**Penetrance Estimates from PanelPRO**
+
+## MSH6 and Colorectal
+
+Here we added are more skewed prior on the median 
+
+```{r, echo=TRUE, cache=TRUE}
+
+# Exploring different priors 
+prior_params_MSH6 <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    shift = list(min = 0, max = 25),
+    median = list(m1 = 8, m2 = 2), # this is new 
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# New
+out_sim_10k_MSH6_newPriorMP <- PenEstim(
+    data = carrierProbandFamilies_cohPedigree_MSH6_COL,
+    cancer_type = "Colorectal", gene_input = "MSH6", n_chains = 4, n_iter_per_chain = 10000, median_max = FALSE,
+    prior_params = prior_params_MSH6, max_penetrance =1,
+    af = PanelPRODatabase$AlleleFrequency[["MSH6_anyPV",1]], burn_in = 0.1
+)
+
+# print summary stats
+out_sim_10k_MSH6_newPriorMP$summary_stats
+plot_traceSingle(out_sim_10k_MSH6_newPriorMP$results[[1]])
+plot_penetrance(out_sim_10k_MSH6_newPriorMP$combined_chains)
+generate_density_plots(out_sim_10k_MSH6_newPriorMP$combined_chains)
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_10k_MSH6_newPriorMP$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_10k_MSH6_newPriorMP$results[[1]]$median_samples)
+runShift <- running_mean(out_sim_10k_MSH6_newPriorMP$results[[1]]$shift_samples)
+runAsy <- running_mean(out_sim_10k_MSH6_newPriorMP$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_10k_MSH6_newPriorMP$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_10k_MSH6_newPriorMP$results[[1]]$median_samples)
+runVShift <- running_variance(out_sim_10k_MSH6_newPriorMP$results[[1]]$shift_samples)
+runVAsy <- running_variance(out_sim_10k_MSH6_newPriorMP$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+  # Autocorrelation plots
+acf(out_sim_10k_MSH6_newPriorMP$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_10k_MSH6_newPriorMP$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_10k_MSH6_newPriorMP$results[[1]]$shift_samples, main = "ACF of Shift")
+acf(out_sim_10k_MSH6_newPriorMP$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_10k_MSH6_newPriorMP$combined_chains$median_results, out_sim_10k_MSH6_newPriorMP$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+
+```
+
+## MSH6 and Colorectal
+
+    1.  New Prior
+
+    2.  more itterations
+
+```{r, echo=TRUE, cache=TRUE}
+
+# Exploring different priors 
+prior_params_MSH6_2 <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    shift = list(min = 0, max = 40), # this is new
+    median = list(m1 = 6, m2 = 3), # this is new 
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# New
+out_sim_10k_MSH6_newPrior2MP <- PenEstim(
+    data = carrierProbandFamilies_cohPedigree_MSH6_COL,
+    cancer_type = "Colorectal", gene_input = "MSH6", n_chains = 4, n_iter_per_chain = 10000, median_max = FALSE,
+    prior_params = prior_params_MSH6_2, max_penetrance = 0.3,
+    af = PanelPRODatabase$AlleleFrequency[["MSH6_anyPV",1]], burn_in = 0.1
+)
+
+# print summary stats
+out_sim_10k_MSH6_newPrior2MP$summary_stats
+plot_traceSingle(out_sim_10k_MSH6_newPrior2MP$results[[1]])
+plot_penetrance(out_sim_10k_MSH6_newPrior2MP$combined_chains)
+generate_density_plots(out_sim_10k_MSH6_newPrior2MP$combined_chains)
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_10k_MSH6_newPrior2MP$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_10k_MSH6_newPrior2MP$results[[1]]$median_samples)
+runShift <- running_mean(out_sim_10k_MSH6_newPrior2MP$results[[1]]$shift_samples)
+runAsy <- running_mean(out_sim_10k_MSH6_newPrior2MP$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_10k_MSH6_newPrior2MP$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_10k_MSH6_newPrior2MP$results[[1]]$median_samples)
+runVShift <- running_variance(out_sim_10k_MSH6_newPrior2MP$results[[1]]$shift_samples)
+runVAsy <- running_variance(out_sim_10k_MSH6_newPrior2MP$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+  # Autocorrelation plots
+acf(out_sim_10k_MSH6_newPrior2MP$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_10k_MSH6_newPrior2MP$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_10k_MSH6_newPrior2MP$results[[1]]$shift_samples, main = "ACF of Shift")
+acf(out_sim_10k_MSH6_newPrior2MP$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_10k_MSH6_newPrior2MP$combined_chains$median_results, out_sim_10k_MSH6_newPrior2MP$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+
+```
+
+
+# Penetrance Estimates from PanelPRO
 
 As a reference, I added the penetrance curves for the respective gene-cancer combinations from the PanelPRODatabase here.
 
@@ -499,234 +842,3 @@ legend("topleft", legend=c("Female", "Male"), col=c("blue", "red"), lty=1, lwd=2
 
 
 
-3.  Colorectal and MSH6 with new prior
-
-```{r, echo=TRUE, cache=TRUE}
-
-# Exploring different priors 
-prior_params_MSH6 <- list(
-    asymptote = list(g1 = 1, g2 = 1),
-    shift = list(min = 0, max = 25),
-    median = list(m1 = 8, m2 = 2), # this is new 
-    first_quartile = list(q1 = 6, q2 = 3)
-)
-
-# New
-out_sim_15k_MSH6_newPriorMP <- PenEstim(
-    data = carrierProbandFamilies_cohPedigree_MSH6_COL,
-    cancer_type = "Colorectal", gene_input = "MSH6", n_chains = 4, n_iter_per_chain = 15000, median_max = FALSE,
-    prior_params = prior_params_MSH6, max_penetrance =1,
-    af = PanelPRODatabase$AlleleFrequency[["MSH6_anyPV",1]], burn_in = 0.1
-)
-
-# print summary stats
-out_sim_15k_MSH6_newPriorMP$summary_stats
-plot_traceSingle(out_sim_15k_MSH6_newPriorMP$results[[1]])
-plot_penetrance(out_sim_15k_MSH6_newPriorMP$combined_chains)
-generate_density_plots(out_sim_15k_MSH6_newPriorMP$combined_chains)
-
-# Plot the running mean 
-
-runFQ<- running_mean(out_sim_15k_MSH6_newPriorMP$results[[1]]$first_quartile_samples)
-runMed <- running_mean(out_sim_15k_MSH6_newPriorMP$results[[1]]$median_samples)
-runShift <- running_mean(out_sim_15k_MSH6_newPriorMP$results[[1]]$shift_samples)
-runAsy <- running_mean(out_sim_15k_MSH6_newPriorMP$results[[1]]$asymptote_samples)
-
-# Plot running mean
-plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
-plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
-plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
-plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
-
-
-# Plot the running var 
-
-runVFQ<- running_variance(out_sim_15k_MSH6_newPriorMP$results[[1]]$first_quartile_samples)
-runVMed <- running_variance(out_sim_15k_MSH6_newPriorMP$results[[1]]$median_samples)
-runVShift <- running_variance(out_sim_15k_MSH6_newPriorMP$results[[1]]$shift_samples)
-runVAsy <- running_variance(out_sim_15k_MSH6_newPriorMP$results[[1]]$asymptote_samples)
-
-# Plot running var
-plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
-plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
-plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
-plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
-
-  # Autocorrelation plots
-acf(out_sim_15k_MSH6_newPriorMP$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
-acf(out_sim_15k_MSH6_newPriorMP$results[[1]]$median_samples, main = "ACF of Median")
-acf(out_sim_15k_MSH6_newPriorMP$results[[1]]$shift_samples, main = "ACF of Shift")
-acf(out_sim_15k_MSH6_newPriorMP$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
-
-
-# plot the scatterplot with the median and first quartile
-plot(out_sim_15k_MSH6_newPriorMP$combined_chains$median_results, out_sim_15k_MSH6_newPriorMP$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
-abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
-
-```
-
-4.  MSH6 and Colorectal
-
-    1.  New Prior
-
-    2.  more itterations\
-
-```{r, echo=TRUE, cache=TRUE}
-
-# Exploring different priors 
-prior_params_MSH6_2 <- list(
-    asymptote = list(g1 = 1, g2 = 1),
-    shift = list(min = 0, max = 40), # this is new
-    median = list(m1 = 6, m2 = 3), # this is new 
-    first_quartile = list(q1 = 6, q2 = 3)
-)
-
-# New
-out_sim_15k_MSH6_newPrior2MP <- PenEstim(
-    data = carrierProbandFamilies_cohPedigree_MSH6_COL,
-    cancer_type = "Colorectal", gene_input = "MSH6", n_chains = 4, n_iter_per_chain = 15000, median_max = FALSE,
-    prior_params = prior_params_MSH6_2, max_penetrance = 0.3,
-    af = PanelPRODatabase$AlleleFrequency[["MSH6_anyPV",1]], burn_in = 0.1
-)
-
-# print summary stats
-out_sim_15k_MSH6_newPrior2MP$summary_stats
-plot_traceSingle(out_sim_15k_MSH6_newPrior2MP$results[[1]])
-plot_penetrance(out_sim_15k_MSH6_newPrior2MP$combined_chains)
-generate_density_plots(out_sim_15k_MSH6_newPrior2MP$combined_chains)
-
-# Plot the running mean 
-
-runFQ<- running_mean(out_sim_15k_MSH6_newPrior2MP$results[[1]]$first_quartile_samples)
-runMed <- running_mean(out_sim_15k_MSH6_newPrior2MP$results[[1]]$median_samples)
-runShift <- running_mean(out_sim_15k_MSH6_newPrior2MP$results[[1]]$shift_samples)
-runAsy <- running_mean(out_sim_15k_MSH6_newPrior2MP$results[[1]]$asymptote_samples)
-
-# Plot running mean
-plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
-plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
-plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
-plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
-
-
-# Plot the running var 
-
-runVFQ<- running_variance(out_sim_15k_MSH6_newPrior2MP$results[[1]]$first_quartile_samples)
-runVMed <- running_variance(out_sim_15k_MSH6_newPrior2MP$results[[1]]$median_samples)
-runVShift <- running_variance(out_sim_15k_MSH6_newPrior2MP$results[[1]]$shift_samples)
-runVAsy <- running_variance(out_sim_15k_MSH6_newPrior2MP$results[[1]]$asymptote_samples)
-
-# Plot running var
-plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
-plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
-plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
-plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
-
-  # Autocorrelation plots
-acf(out_sim_15k_MSH6_newPrior2MP$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
-acf(out_sim_15k_MSH6_newPrior2MP$results[[1]]$median_samples, main = "ACF of Median")
-acf(out_sim_15k_MSH6_newPrior2MP$results[[1]]$shift_samples, main = "ACF of Shift")
-acf(out_sim_15k_MSH6_newPrior2MP$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
-
-
-# plot the scatterplot with the median and first quartile
-plot(out_sim_15k_MSH6_newPrior2MP$combined_chains$median_results, out_sim_15k_MSH6_newPrior2MP$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
-abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
-
-```
-
-5.  More Families - SimFamC
-
-    1.  Updated Prior
-
-    2.  Larger pedigree file with 120 families instead of 60
-
-```{r, echo=TRUE, cache=TRUE}
-
-# Load the additonal families
-load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/peelingpearingestim/simFamilies_C_1000_nocen_selected300.RData")
-
-dat<- simFamilies_C_1000_nocen_selected300
-
-# print the description of the families
-print(describeFamilies(simFamilies_C_10000,"Breast","BRCA1"))
-
-
-# Data Prep
-for (i in seq_along(dat)) {
-    if ("ID" %in% colnames(dat2[[i]])) {
-        colnames(dat[[i]])[colnames(dat2[[i]]) == "PedigreeID"] <- "FamilyID"
-    }
-}
-
-#  Data Prep
-for (i in seq_along(dat)) {
-    if ("ID" %in% colnames(dat[[i]])) {
-        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
-    }
-}
-
-for (i in seq_along(dat)) {
-    # Add a new column "PedigreeID" with the list number
-    dat[[i]]$PedigreeID <- i
-}
-
-
-# Exploring different priors 
-prior_params_BRCA1 <- list(
-    asymptote = list(g1 = 9, g2 = 1),
-    shift = list(min = 15, max = 25),
-    median = list(m1 = 6, m2 = 3),
-    first_quartile = list(q1 = 6, q2 = 3)
-)
-
-# Run Estimation procedure with default prior setting 
-out_sim_15k_simC300 <- PenEstim(
-    data = simFamilies_C_1000_nocen_selected300,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 15000, 
-    prior_params = prior_params_91, af = 0.9, burn_in = 0.1
-)
-
-# print summary stats
-out_sim_15k_simC300$summary_stats
-plot_traceSingle(out_sim_15k_simC300$results[[1]])
-
-# Plot the running mean 
-
-runFQ<- running_mean(out_sim_15k_simC300$results[[1]]$first_quartile_samples)
-runMed <- running_mean(out_sim_15k_simC300$results[[1]]$median_samples)
-runShift <- running_mean(out_sim_15k_simC300$results[[1]]$shift_samples)
-runAsy <- running_mean(out_sim_15k_simC300$results[[1]]$asymptote_samples)
-
-# Plot running mean
-plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
-plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
-plot(runShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Shift Samples")
-plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
-
-
-# Plot the running var 
-
-runVFQ<- running_variance(out_sim_15k_simC300$results[[1]]$first_quartile_samples)
-runVMed <- running_variance(out_sim_15k_simC300$results[[1]]$median_samples)
-runVShift <- running_variance(out_sim_15k_simC300$results[[1]]$shift_samples)
-runVAsy <- running_variance(out_sim_15k_simC300$results[[1]]$asymptote_samples)
-
-# Plot running var
-plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
-plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
-plot(runVShift, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Shift Samples")
-plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
-
-
-  # Autocorrelation plots
-acf(out_sim_15k_simC300$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
-acf(out_sim_15k_simC300$results[[1]]$median_samples, main = "ACF of Median")
-acf(out_sim_15k_simC300$results[[1]]$shift_samples, main = "ACF of Shift")
-acf(out_sim_15k_simC300$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
-
-# plot the scatterplot with the median and first quartile
-plot(out_sim_15k_simC300$combined_chains$median_results, out_sim_15k_simC300$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
-abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
-
-```

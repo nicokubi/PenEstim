@@ -136,6 +136,17 @@ running_mean <- function(res) {
   return(running_mean)
 }
 
+# Running var calculation
+running_variance <- function(res) {
+  n <- length(res)
+  running_var <- numeric(n)
+  for (i in 1:n) {
+    running_var[i] <- var(res[1:i])
+  }
+  return(running_var)
+}
+
+
 
 #' Print Rejection Rates
 #' @param results A list of MCMC chain results.

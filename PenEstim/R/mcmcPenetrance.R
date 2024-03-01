@@ -1,42 +1,47 @@
-#' Execution of a Single Chain in Metropolis-Hastings
+#' Execution of a Single Chain in Metropolis-Hastings for Cancer Risk Estimation
 #'
-#' This function performs a single chain execution in the Metropolis-Hastings algorithm
-#' for Bayesian inference, specifically tailored for cancer risk estimation.
+#' Performs a single chain execution in the Metropolis-Hastings algorithm for Bayesian inference,
+#' specifically tailored for cancer risk estimation. It estimates parameters related to cancer penetrance
+#' based on family data, genetic information, and SEER database estimates.
 #'
 #' @param seed Seed value for random number generation.
 #' @param n_iter Number of iterations for the chain.
 #' @param chain_id Identifier for the chain.
 #' @param data List of families data.
 #' @param max_age Maximum age to be considered.
-#' @param PanelPRODatabase Database containing PanelPRO information.
-#' @param proposal_distributions List of the parameters for the distributions of the proposal.
+#' @param db Database containing baseline risk estimates.
+#' @param prior_distributions List of the parameters for the distributions of the proposal, including asymptote, shift, median, and first quartile distributions.
 #' @param cancer_type Type of cancer for which risk is being estimated.
 #' @param gene_input Gene information for risk estimation.
-#' @param median_max Boolean indicating whether to use SEER median or max_age as an upper bound for the median proposal. Defaults to TRUE, i.e. using the SEER median.
+#' @param af Allele frequency for the risk allele.
+#' @param median_max Boolean indicating whether to use SEER median or max_age as an upper bound for the median proposal. Defaults to TRUE, i.e., using the SEER median.
+#' @param max_penetrance Maximum penetrance considered for analysis.
+#' @param homozygote Boolean indicating whether to exclude the possibility of homozygous carriers of the pathogenic variant in the genetic model for penetrance estimation.
+#' @param SeerNC Boolean indicating if non-carrier penetrance is assumed to be the SEER penetrance.
+#' @param sex Specifies the sex for which the estimation is performed; can be "NA" (default), "Female", or "Male".
 #' @return A list containing samples, log likelihoods, acceptance ratio, and rejection rate for each iteration.
 #' @importFrom stats set.seed
 #' @importFrom parallel makeCluster stopCluster parLapply
 #' @examples
-#' # Example usage:
 #' result <- mhChain(
 #'   seed = 123, n_iter = 1000, chain_id = 1, data = familyData,
-#'   max_age = 90, PanelPRODatabase = database,
-#'   proposal_distributions = propDist, cancer_type = "breast",
-#'   gene_input = "BRCA1", median_max = TRUE
+#'   max_age = 90, db = database,
+#'   prior_distributions = propDist, cancer_type = "breast",
+#'   gene_input = "BRCA1", af = 0.0001, median_max = TRUE,
+#'   max_penetrance = 1, homozygote = TRUE, SeerNC = TRUE, sex = "NA"
 #' )
 #' @export
-
 # Main mhChain function
 mhChain <- function(
     seed, n_iter, chain_id, data,
     max_age, db,
     prior_distributions, cancer_type, gene_input, af,
-    median_max, max_penetrance, homozygote, SeerNC) {
+    median_max, max_penetrance, homozygote, SeerNC, sex) {
   # Set seed
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", race = "All_Races", sex = "NA", type = "Net", db = db)
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", race = "All_Races", sex=sex, type = "Net", db = db)
   midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
@@ -121,7 +126,8 @@ mhChain <- function(
       db = db,
       af = af,
       homozygote = homozygote,
-      SeerNC = SeerNC
+      SeerNC = SeerNC,
+      sex = sex
     )
 
     loglikelihood_proposal <- mhLogLikelihood_clipp(
@@ -135,7 +141,8 @@ mhChain <- function(
       db = db,
       af = af,
       homozygote = homozygote,
-      SeerNC = SeerNC
+      SeerNC = SeerNC,
+      sex = sex
     )
 
     # Compute the acceptance ratio (likelihood ratio)
@@ -233,6 +240,15 @@ mhChain <- function(
 #' analysis (default is FALSE).
 #' @param median_max Boolean indicating whether to use SEER median age or max_age as an
 #' upper bound for the median proposal. Defaults to TRUE, i.e. using the SEER median.
+#' @param sex Option to run the estimation for each sex seperately. The default is estimation 
+#' of one penetrance curve for both sexes (sex = "NA"). Other settings are sex = "Female" and 
+#' sex = "Male". 
+#' @param homozygote Boolean to exclude the possibility of homozygous carriers of the PV in the 
+#' genetic model for the penetrance estimation. Default setting is "True", which sets the likelihood
+#' of a homozygous carrier to zero.
+#' @param SeerNC Boolean with default value "True" indicating that the non-carrier penetrance
+#'  is assumed to be the SEER penetrance. If "False", the non-carrier penetrance is calculated 
+#' using the carrier penetrance in calculateNCPen. 
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
 #' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
 #' @param distribution_data Data for generating prior distributions.
@@ -265,6 +281,7 @@ mhChain <- function(
 PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      n_iter_per_chain = 200,
                      db = PPP::PanelPRODatabase,
+                     sex ="NA",
                      max_age = 94,
                      removeProband = FALSE,
                      median_max = TRUE,
@@ -344,7 +361,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
     "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
     "transformDF", "makePriors", "penet.fn",
-    "seeds", "n_iter_per_chain",
+    "seeds", "n_iter_per_chain", "sex",
     "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
     "GENE_TYPES", "CANCER_NAME_MAP"
@@ -363,7 +380,8 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
       max_penetrance = max_penetrance,
       median_max = median_max,
       homozygote = homozygote,
-      SeerNC = SeerNC
+      SeerNC = SeerNC,
+      sex = sex
     )
   })
 

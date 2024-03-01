@@ -180,12 +180,3 @@ makePriors <- function(
   # Return the prior_distributions list
   return(prior_distributions)
 }
-
-prop2 <- makePriors(
-  data = distribution_data_default,
-  sample_size = NULL,
-  cancer = "Colorectal",
-  ratio = NULL,
-  prior_params = prior_params_default,
-  risk_proportion = risk_proportion_default
-)

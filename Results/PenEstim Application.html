@@ -100,10 +100,21 @@ window.Quarto = {
 
 </head>
 
-<body class="fullcontent">
+<body>
 
 <div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
-
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#simulation---breast-and-brca1" id="toc-simulation---breast-and-brca1" class="nav-link active" data-scroll-target="#simulation---breast-and-brca1">Simulation - Breast and BRCA1</a>
+  <ul class="collapse">
+  <li><a href="#data" id="toc-data" class="nav-link" data-scroll-target="#data">Data</a></li>
+  </ul></li>
+  </ul>
+</nav>
+</div>
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
@@ -125,7 +136,10 @@ window.Quarto = {
 </header>
 
 
-<p><strong>Simulated Data</strong></p>
+<section id="simulation---breast-and-brca1" class="level1">
+<h1>Simulation - Breast and BRCA1</h1>
+<section id="data" class="level2">
+<h2 class="anchored" data-anchor-id="data">Data</h2>
 <p>We use simulated data for the first application. Families C were simulated with a wider Weibull distribution with shape parameter, <span class="math inline">\(\alpha = 2.5\)</span>, scale parameter, <span class="math inline">\(\beta=50\)</span>, a shift of <span class="math inline">\(\delta=20\)</span>, and an asymptote parameter <span class="math inline">\(\gamma = 0.9\)</span>. This translates into an age-specific penetrance curve which does not allow for cancer age (AgeBC) to be lower than 20 with a median age of <span class="math inline">\(Q_{50}=62\)</span> and a first quartile of <span class="math inline">\(Q_{25}=51\)</span>. The allele frequency was set at <span class="math inline">\(0.9\)</span>. Only 60 families of this type were generated to improve run-time for the simulation study using the MCMC approach.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
@@ -375,7 +389,7 @@ window.Quarto = {
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>prior_params_MSH6 <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">asymptote =</span> <span class="fu">list</span>(<span class="at">g1 =</span> <span class="dv">1</span>, <span class="at">g2 =</span> <span class="dv">1</span>),</span>
 <span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">shift =</span> <span class="fu">list</span>(<span class="at">min =</span> <span class="dv">0</span>, <span class="at">max =</span> <span class="dv">25</span>),</span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">median =</span> <span class="fu">list</span>(<span class="at">m1 =</span> <span class="dv">2</span>, <span class="at">m2 =</span> <span class="dv">2</span>),</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">median =</span> <span class="fu">list</span>(<span class="at">m1 =</span> <span class="dv">1</span>, <span class="at">m2 =</span> <span class="dv">1</span>),</span>
 <span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">first_quartile =</span> <span class="fu">list</span>(<span class="at">q1 =</span> <span class="dv">6</span>, <span class="at">q2 =</span> <span class="dv">3</span>)</span>
 <span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
@@ -391,7 +405,7 @@ window.Quarto = {
 acceptance rate. Please consider running the chain longer.</code></pre>
 </div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Rejection rates:  0.9550667 0.9569333 0.9546667 0.9569333 </code></pre>
+<pre><code>Rejection rates:  0.9190667 0.9184667 0.9156667 0.9189333 </code></pre>
 </div>
 <div class="cell-output-display">
 <div>
@@ -410,13 +424,13 @@ acceptance rate. Please consider running the chain longer.</code></pre>
 <div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># print summary stats</span></span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>out_sim_15k_MSH6<span class="sc">$</span>summary_stats</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>     Median           Shift          First_Quartile    Asymptote_Value  
- Min.   : 1.272   Min.   : 0.01307   Min.   : 0.9632   Min.   :0.07275  
- 1st Qu.:18.387   1st Qu.: 5.93739   1st Qu.:17.2213   1st Qu.:0.30699  
- Median :25.309   Median :11.97254   Median :24.0203   Median :0.54489  
- Mean   :25.764   Mean   :12.14783   Mean   :24.4596   Mean   :0.54119  
- 3rd Qu.:32.989   3rd Qu.:18.33277   3rd Qu.:31.2829   3rd Qu.:0.77029  
- Max.   :63.427   Max.   :24.99656   Max.   :63.1337   Max.   :0.99992  </code></pre>
+<pre><code>     Median            Shift           First_Quartile     Asymptote_Value  
+ Min.   : 0.1004   Min.   : 0.006679   Min.   : 0.08037   Min.   :0.07275  
+ 1st Qu.:12.6328   1st Qu.: 5.998516   1st Qu.:11.74796   1st Qu.:0.30398  
+ Median :19.5277   Median :11.924618   Median :18.58181   Median :0.53870  
+ Mean   :19.9654   Mean   :12.156192   Mean   :19.05335   Mean   :0.53798  
+ 3rd Qu.:25.8206   3rd Qu.:18.214065   3rd Qu.:24.94265   3rd Qu.:0.76411  
+ Max.   :62.1598   Max.   :24.996555   Max.   :61.64862   Max.   :0.99992  </code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_traceSingle</span>(out_sim_15k_MSH6<span class="sc">$</span>results[[<span class="dv">1</span>]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
@@ -675,6 +689,455 @@ acceptance rate. Please consider running the chain longer.</code></pre>
 </div>
 </div>
 </div>
+<ol start="3" type="1">
+<li>Colorectal and MSH6 with new prior</li>
+</ol>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Exploring different priors </span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>prior_params_MSH6 <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">asymptote =</span> <span class="fu">list</span>(<span class="at">g1 =</span> <span class="dv">1</span>, <span class="at">g2 =</span> <span class="dv">1</span>),</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">shift =</span> <span class="fu">list</span>(<span class="at">min =</span> <span class="dv">0</span>, <span class="at">max =</span> <span class="dv">25</span>),</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">median =</span> <span class="fu">list</span>(<span class="at">m1 =</span> <span class="dv">8</span>, <span class="at">m2 =</span> <span class="dv">2</span>), <span class="co">#&nbsp;this is new </span></span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">first_quartile =</span> <span class="fu">list</span>(<span class="at">q1 =</span> <span class="dv">6</span>, <span class="at">q2 =</span> <span class="dv">3</span>)</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a><span class="co"># New</span></span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>out_sim_10k_MSH6_newPriorMP <span class="ot">&lt;-</span> <span class="fu">PenEstim</span>(</span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> carrierProbandFamilies_cohPedigree_MSH6_COL,</span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">cancer_type =</span> <span class="st">"Colorectal"</span>, <span class="at">gene_input =</span> <span class="st">"MSH6"</span>, <span class="at">n_chains =</span> <span class="dv">4</span>, <span class="at">n_iter_per_chain =</span> <span class="dv">10000</span>, <span class="at">median_max =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">prior_params =</span> prior_params_MSH6, <span class="at">max_penetrance =</span><span class="dv">1</span>,</span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">af =</span> PanelPRODatabase<span class="sc">$</span>AlleleFrequency[[<span class="st">"MSH6_anyPV"</span>,<span class="dv">1</span>]], <span class="at">burn_in =</span> <span class="fl">0.1</span></span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in PenEstim(data = carrierProbandFamilies_cohPedigree_MSH6_COL, : Low
+acceptance rate. Please consider running the chain longer.</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rejection rates:  0.9984 0.998 0.9976 0.9985 </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co"># print summary stats</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>summary_stats</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     Median          Shift          First_Quartile  Asymptote_Value 
+ Min.   :35.56   Min.   : 0.04886   Min.   :31.63   Min.   :0.2085  
+ 1st Qu.:41.43   1st Qu.: 4.34838   1st Qu.:36.50   1st Qu.:0.7994  
+ Median :44.20   Median : 6.17387   Median :39.77   Median :0.8385  
+ Mean   :45.26   Mean   : 7.77524   Mean   :39.44   Mean   :0.7618  
+ 3rd Qu.:51.43   3rd Qu.:10.64260   3rd Qu.:41.73   3rd Qu.:0.9619  
+ Max.   :67.80   Max.   :22.49311   Max.   :57.73   Max.   :1.0000  </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_traceSingle</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_penetrance</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>combined_chains)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="fu">generate_density_plots</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>combined_chains)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-5.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&nbsp;Plot the running mean </span></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>runFQ<span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples)</span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>runMed <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples)</span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>runShift <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples)</span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a>runAsy <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples)</span>
+<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-8"><a href="#cb46-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot running mean</span></span>
+<span id="cb46-9"><a href="#cb46-9" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runFQ, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of First Quartile Samples"</span>)</span>
+<span id="cb46-10"><a href="#cb46-10" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runMed, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Median Samples"</span>)</span>
+<span id="cb46-11"><a href="#cb46-11" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runShift, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Shift Samples"</span>)</span>
+<span id="cb46-12"><a href="#cb46-12" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runAsy, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Asymptote Samples"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-6.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&nbsp;Plot the running var </span></span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>runVFQ<span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples)</span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>runVMed <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples)</span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>runVShift <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples)</span>
+<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>runVAsy <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples)</span>
+<span id="cb47-7"><a href="#cb47-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-8"><a href="#cb47-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot running var</span></span>
+<span id="cb47-9"><a href="#cb47-9" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVFQ, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of First Quartile Samples"</span>)</span>
+<span id="cb47-10"><a href="#cb47-10" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVMed, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Median Samples"</span>)</span>
+<span id="cb47-11"><a href="#cb47-11" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVShift, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Shift Samples"</span>)</span>
+<span id="cb47-12"><a href="#cb47-12" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVAsy, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Asymptote Samples"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-7.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Autocorrelation plots</span></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples, <span class="at">main =</span> <span class="st">"ACF of First Quartile"</span>)</span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples, <span class="at">main =</span> <span class="st">"ACF of Median"</span>)</span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples, <span class="at">main =</span> <span class="st">"ACF of Shift"</span>)</span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples, <span class="at">main =</span> <span class="st">"ACF of Asymptote"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-8.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot the scatterplot with the median and first quartile</span></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>combined_chains<span class="sc">$</span>median_results, out_sim_10k_MSH6_newPriorMP<span class="sc">$</span>combined_chains<span class="sc">$</span>first_quartile_results, <span class="at">xlim =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">100</span>), <span class="at">ylim =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">100</span>))</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">a=</span><span class="dv">0</span>, <span class="at">b=</span><span class="dv">1</span>, <span class="at">col=</span><span class="st">"red"</span>) <span class="co"># This draws a red line with slope 1 passing through the origin</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-8-9.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<ol start="4" type="1">
+<li><p>MSH6 and Colorectal</p>
+<ol type="1">
+<li><p>New Prior</p></li>
+<li><p>more itterations<br>
+</p></li>
+</ol></li>
+</ol>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Exploring different priors </span></span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>prior_params_MSH6_2 <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">asymptote =</span> <span class="fu">list</span>(<span class="at">g1 =</span> <span class="dv">1</span>, <span class="at">g2 =</span> <span class="dv">1</span>),</span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">shift =</span> <span class="fu">list</span>(<span class="at">min =</span> <span class="dv">0</span>, <span class="at">max =</span> <span class="dv">40</span>), <span class="co">#&nbsp;this is new</span></span>
+<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">median =</span> <span class="fu">list</span>(<span class="at">m1 =</span> <span class="dv">6</span>, <span class="at">m2 =</span> <span class="dv">3</span>), <span class="co">#&nbsp;this is new </span></span>
+<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">first_quartile =</span> <span class="fu">list</span>(<span class="at">q1 =</span> <span class="dv">6</span>, <span class="at">q2 =</span> <span class="dv">3</span>)</span>
+<span id="cb50-7"><a href="#cb50-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb50-8"><a href="#cb50-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-9"><a href="#cb50-9" aria-hidden="true" tabindex="-1"></a><span class="co"># New</span></span>
+<span id="cb50-10"><a href="#cb50-10" aria-hidden="true" tabindex="-1"></a>out_sim_10k_MSH6_newPrior2MP <span class="ot">&lt;-</span> <span class="fu">PenEstim</span>(</span>
+<span id="cb50-11"><a href="#cb50-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> carrierProbandFamilies_cohPedigree_MSH6_COL,</span>
+<span id="cb50-12"><a href="#cb50-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">cancer_type =</span> <span class="st">"Colorectal"</span>, <span class="at">gene_input =</span> <span class="st">"MSH6"</span>, <span class="at">n_chains =</span> <span class="dv">4</span>, <span class="at">n_iter_per_chain =</span> <span class="dv">10000</span>, <span class="at">median_max =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb50-13"><a href="#cb50-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">prior_params =</span> prior_params_MSH6_2, <span class="at">max_penetrance =</span> <span class="fl">0.3</span>,</span>
+<span id="cb50-14"><a href="#cb50-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">af =</span> PanelPRODatabase<span class="sc">$</span>AlleleFrequency[[<span class="st">"MSH6_anyPV"</span>,<span class="dv">1</span>]], <span class="at">burn_in =</span> <span class="fl">0.1</span></span>
+<span id="cb50-15"><a href="#cb50-15" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rejection rates:  0.7021 0.6963 0.709 0.7071 </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb52"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="co"># print summary stats</span></span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>summary_stats</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     Median          Shift         First_Quartile  Asymptote_Value  
+ Min.   :27.63   Min.   : 0.9726   Min.   :25.60   Min.   :0.07263  
+ 1st Qu.:68.07   1st Qu.:31.0704   1st Qu.:54.53   1st Qu.:0.20502  
+ Median :74.99   Median :34.1910   Median :60.50   Median :0.33219  
+ Mean   :73.96   Mean   :34.0183   Mean   :60.73   Mean   :0.33551  
+ 3rd Qu.:80.82   3rd Qu.:37.0943   3rd Qu.:66.99   3rd Qu.:0.46352  
+ Max.   :92.93   Max.   :39.9998   Max.   :88.63   Max.   :0.59997  </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_traceSingle</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_penetrance</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>combined_chains)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="fu">generate_density_plots</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>combined_chains)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-5.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb57"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&nbsp;Plot the running mean </span></span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a>runFQ<span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples)</span>
+<span id="cb57-4"><a href="#cb57-4" aria-hidden="true" tabindex="-1"></a>runMed <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples)</span>
+<span id="cb57-5"><a href="#cb57-5" aria-hidden="true" tabindex="-1"></a>runShift <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples)</span>
+<span id="cb57-6"><a href="#cb57-6" aria-hidden="true" tabindex="-1"></a>runAsy <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples)</span>
+<span id="cb57-7"><a href="#cb57-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb57-8"><a href="#cb57-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot running mean</span></span>
+<span id="cb57-9"><a href="#cb57-9" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runFQ, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of First Quartile Samples"</span>)</span>
+<span id="cb57-10"><a href="#cb57-10" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runMed, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Median Samples"</span>)</span>
+<span id="cb57-11"><a href="#cb57-11" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runShift, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Shift Samples"</span>)</span>
+<span id="cb57-12"><a href="#cb57-12" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runAsy, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Asymptote Samples"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-6.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&nbsp;Plot the running var </span></span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a>runVFQ<span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples)</span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a>runVMed <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples)</span>
+<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>runVShift <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples)</span>
+<span id="cb58-6"><a href="#cb58-6" aria-hidden="true" tabindex="-1"></a>runVAsy <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples)</span>
+<span id="cb58-7"><a href="#cb58-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-8"><a href="#cb58-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot running var</span></span>
+<span id="cb58-9"><a href="#cb58-9" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVFQ, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of First Quartile Samples"</span>)</span>
+<span id="cb58-10"><a href="#cb58-10" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVMed, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Median Samples"</span>)</span>
+<span id="cb58-11"><a href="#cb58-11" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVShift, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Shift Samples"</span>)</span>
+<span id="cb58-12"><a href="#cb58-12" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVAsy, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Asymptote Samples"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-7.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb59"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Autocorrelation plots</span></span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples, <span class="at">main =</span> <span class="st">"ACF of First Quartile"</span>)</span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples, <span class="at">main =</span> <span class="st">"ACF of Median"</span>)</span>
+<span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples, <span class="at">main =</span> <span class="st">"ACF of Shift"</span>)</span>
+<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples, <span class="at">main =</span> <span class="st">"ACF of Asymptote"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-8.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot the scatterplot with the median and first quartile</span></span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>combined_chains<span class="sc">$</span>median_results, out_sim_10k_MSH6_newPrior2MP<span class="sc">$</span>combined_chains<span class="sc">$</span>first_quartile_results, <span class="at">xlim =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">100</span>), <span class="at">ylim =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">100</span>))</span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">a=</span><span class="dv">0</span>, <span class="at">b=</span><span class="dv">1</span>, <span class="at">col=</span><span class="st">"red"</span>) <span class="co"># This draws a red line with slope 1 passing through the origin</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-9-9.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>5. Simulation - BRCA1 and Breast Cancer - Additional families</strong></p>
+<pre><code>1.  Updated Prior
+2.  Larger pedigree file with 120 families instead of 60 from the first simulation </code></pre>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the additonal families</span></span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="st">"/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/peelingpearingestim/simFamilies_C_1000_nocen_selected300.RData"</span>)</span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a>dat<span class="ot">&lt;-</span> simFamilies_C_1000_nocen_selected300</span>
+<span id="cb62-5"><a href="#cb62-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-6"><a href="#cb62-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&nbsp;print the description of the families</span></span>
+<span id="cb62-7"><a href="#cb62-7" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">describeFamilies</span>(dat,<span class="st">"Breast"</span>,<span class="st">"BRCA1"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "Number of families: 120"
+[1] "Total Individuals: 3349"
+[1] "Average family size: 27.9083333333333"
+[1] "Summary of family sizes"
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  22.00   25.00   26.00   27.91   30.25   46.00 
+[1] "Summary of Current Age for all family members"
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+     94      94      94      94      94      94 
+[1] "Summary of Current Age for probands"
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+     94      94      94      94      94      94 
+[1] "Number of families with affected individuals (Breast): 120"
+[1] "Number of families with affected probands (Breast): 99"
+[1] "Number of families with affected female probands (Breast): 99"
+[1] "Number of families with relatives with PV (and not the proband) (BRCA1): 0"
+[1] "Number of probands with PV (BRCA1): 120"
+[1] "Number of female probands with PV (BRCA1): 120"
+[1] "Number of individuals with PV (BRCA1): 99"
+[1] "Summary of Cancer Age of (female) probands"
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  28.00   52.75   69.50   67.55   82.75   94.00 
+[1] "Summary of Cancer Age in affected (non-proband) individuals"
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  22.00   49.00   60.00   60.84   73.00   94.00 
+[1] "Summary of Cancer Age in affected (non-proband) female individuals"
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  28.00   49.50   62.00   61.94   74.00   89.00 
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  28.00   49.50   62.00   61.94   74.00   89.00 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&nbsp;Data Prep</span></span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(dat)) {</span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="st">"ID"</span> <span class="sc">%in%</span> <span class="fu">colnames</span>(dat[[i]])) {</span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a>        <span class="fu">colnames</span>(dat[[i]])[<span class="fu">colnames</span>(dat[[i]]) <span class="sc">==</span> <span class="st">"PedigreeID"</span>] <span class="ot">&lt;-</span> <span class="st">"FamilyID"</span></span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb64-7"><a href="#cb64-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-8"><a href="#cb64-8" aria-hidden="true" tabindex="-1"></a><span class="co"># &nbsp;Data Prep</span></span>
+<span id="cb64-9"><a href="#cb64-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(dat)) {</span>
+<span id="cb64-10"><a href="#cb64-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="st">"ID"</span> <span class="sc">%in%</span> <span class="fu">colnames</span>(dat[[i]])) {</span>
+<span id="cb64-11"><a href="#cb64-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">colnames</span>(dat[[i]])[<span class="fu">colnames</span>(dat[[i]]) <span class="sc">==</span> <span class="st">"ID"</span>] <span class="ot">&lt;-</span> <span class="st">"SubjectID"</span></span>
+<span id="cb64-12"><a href="#cb64-12" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb64-13"><a href="#cb64-13" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb64-14"><a href="#cb64-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-15"><a href="#cb64-15" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(dat)) {</span>
+<span id="cb64-16"><a href="#cb64-16" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Add a new column "PedigreeID" with the list number</span></span>
+<span id="cb64-17"><a href="#cb64-17" aria-hidden="true" tabindex="-1"></a>    dat[[i]]<span class="sc">$</span>PedigreeID <span class="ot">&lt;-</span> i</span>
+<span id="cb64-18"><a href="#cb64-18" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb64-19"><a href="#cb64-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-20"><a href="#cb64-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-21"><a href="#cb64-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Exploring different priors </span></span>
+<span id="cb64-22"><a href="#cb64-22" aria-hidden="true" tabindex="-1"></a>prior_params_BRCA1 <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb64-23"><a href="#cb64-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">asymptote =</span> <span class="fu">list</span>(<span class="at">g1 =</span> <span class="dv">9</span>, <span class="at">g2 =</span> <span class="dv">1</span>),</span>
+<span id="cb64-24"><a href="#cb64-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">shift =</span> <span class="fu">list</span>(<span class="at">min =</span> <span class="dv">15</span>, <span class="at">max =</span> <span class="dv">25</span>),</span>
+<span id="cb64-25"><a href="#cb64-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">median =</span> <span class="fu">list</span>(<span class="at">m1 =</span> <span class="dv">6</span>, <span class="at">m2 =</span> <span class="dv">3</span>),</span>
+<span id="cb64-26"><a href="#cb64-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">first_quartile =</span> <span class="fu">list</span>(<span class="at">q1 =</span> <span class="dv">6</span>, <span class="at">q2 =</span> <span class="dv">3</span>)</span>
+<span id="cb64-27"><a href="#cb64-27" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb64-28"><a href="#cb64-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-29"><a href="#cb64-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Run Estimation procedure with default prior setting </span></span>
+<span id="cb64-30"><a href="#cb64-30" aria-hidden="true" tabindex="-1"></a>out_sim_10k_simC300 <span class="ot">&lt;-</span> <span class="fu">PenEstim</span>(</span>
+<span id="cb64-31"><a href="#cb64-31" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> dat,</span>
+<span id="cb64-32"><a href="#cb64-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">cancer_type =</span> <span class="st">"Breast"</span>, <span class="at">gene_input =</span> <span class="st">"BRCA1"</span>, <span class="at">n_chains =</span> <span class="dv">4</span>, <span class="at">n_iter_per_chain =</span> <span class="dv">10000</span>, </span>
+<span id="cb64-33"><a href="#cb64-33" aria-hidden="true" tabindex="-1"></a>    <span class="at">prior_params =</span> prior_params_91, <span class="at">af =</span> <span class="fl">0.9</span>, <span class="at">burn_in =</span> <span class="fl">0.1</span></span>
+<span id="cb64-34"><a href="#cb64-34" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rejection rates:  0.8947 0.8978 0.8989 0.8969 </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-10-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb66"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="co"># print summary stats</span></span>
+<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a>out_sim_10k_simC300<span class="sc">$</span>summary_stats</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     Median          Shift       First_Quartile  Asymptote_Value 
+ Min.   :15.85   Min.   :15.01   Min.   :15.83   Min.   :0.4371  
+ 1st Qu.:27.59   1st Qu.:17.65   1st Qu.:26.47   1st Qu.:0.8705  
+ Median :33.37   Median :20.30   Median :31.51   Median :0.9331  
+ Mean   :34.60   Mean   :20.17   Mean   :32.98   Mean   :0.9097  
+ 3rd Qu.:40.61   3rd Qu.:22.87   3rd Qu.:38.52   3rd Qu.:0.9717  
+ Max.   :67.41   Max.   :25.00   Max.   :66.31   Max.   :1.0000  </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb68"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_traceSingle</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-10-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb69"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&nbsp;Plot the running mean </span></span>
+<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a>runFQ<span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples)</span>
+<span id="cb69-4"><a href="#cb69-4" aria-hidden="true" tabindex="-1"></a>runMed <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples)</span>
+<span id="cb69-5"><a href="#cb69-5" aria-hidden="true" tabindex="-1"></a>runShift <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples)</span>
+<span id="cb69-6"><a href="#cb69-6" aria-hidden="true" tabindex="-1"></a>runAsy <span class="ot">&lt;-</span> <span class="fu">running_mean</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples)</span>
+<span id="cb69-7"><a href="#cb69-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb69-8"><a href="#cb69-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot running mean</span></span>
+<span id="cb69-9"><a href="#cb69-9" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runFQ, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of First Quartile Samples"</span>)</span>
+<span id="cb69-10"><a href="#cb69-10" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runMed, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Median Samples"</span>)</span>
+<span id="cb69-11"><a href="#cb69-11" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runShift, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Shift Samples"</span>)</span>
+<span id="cb69-12"><a href="#cb69-12" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runAsy, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Mean of Asymptote Samples"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-10-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb70"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="co">#&nbsp;Plot the running var </span></span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a>runVFQ<span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples)</span>
+<span id="cb70-4"><a href="#cb70-4" aria-hidden="true" tabindex="-1"></a>runVMed <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples)</span>
+<span id="cb70-5"><a href="#cb70-5" aria-hidden="true" tabindex="-1"></a>runVShift <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples)</span>
+<span id="cb70-6"><a href="#cb70-6" aria-hidden="true" tabindex="-1"></a>runVAsy <span class="ot">&lt;-</span> <span class="fu">running_variance</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples)</span>
+<span id="cb70-7"><a href="#cb70-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-8"><a href="#cb70-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot running var</span></span>
+<span id="cb70-9"><a href="#cb70-9" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVFQ, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of First Quartile Samples"</span>)</span>
+<span id="cb70-10"><a href="#cb70-10" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVMed, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Median Samples"</span>)</span>
+<span id="cb70-11"><a href="#cb70-11" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVShift, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Shift Samples"</span>)</span>
+<span id="cb70-12"><a href="#cb70-12" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(runVAsy, <span class="at">type =</span> <span class="st">"l"</span>, <span class="at">xlab =</span> <span class="st">"Iteration"</span>, <span class="at">ylab =</span> <span class="st">"Running Mean"</span>, <span class="at">main =</span> <span class="st">"Running Var of Asymptote Samples"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-10-5.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Autocorrelation plots</span></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>first_quartile_samples, <span class="at">main =</span> <span class="st">"ACF of First Quartile"</span>)</span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>median_samples, <span class="at">main =</span> <span class="st">"ACF of Median"</span>)</span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>shift_samples, <span class="at">main =</span> <span class="st">"ACF of Shift"</span>)</span>
+<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a><span class="fu">acf</span>(out_sim_10k_simC300<span class="sc">$</span>results[[<span class="dv">1</span>]]<span class="sc">$</span>asymptote_samples, <span class="at">main =</span> <span class="st">"ACF of Asymptote"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-10-6.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb72"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot the scatterplot with the median and first quartile</span></span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(out_sim_10k_simC300<span class="sc">$</span>combined_chains<span class="sc">$</span>median_results, out_sim_10k_simC300<span class="sc">$</span>combined_chains<span class="sc">$</span>first_quartile_results, <span class="at">xlim =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">100</span>), <span class="at">ylim =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">100</span>))</span>
+<span id="cb72-3"><a href="#cb72-3" aria-hidden="true" tabindex="-1"></a><span class="fu">abline</span>(<span class="at">a=</span><span class="dv">0</span>, <span class="at">b=</span><span class="dv">1</span>, <span class="at">col=</span><span class="st">"red"</span>) <span class="co"># This draws a red line with slope 1 passing through the origin</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="PenEstim-Application_files/figure-html/unnamed-chunk-10-7.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
 
 </main>
 <!-- /main column -->
