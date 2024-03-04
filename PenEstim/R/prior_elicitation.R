@@ -1,6 +1,6 @@
 #' Make Priors 
 #'
-#' This function generates prior distributions based on user input or default parameters. It is designed to aid in the statistical analysis of risk proportions in populations, particularly in the context of cancer research. The distributions are calculated for various statistical metrics such as asymptote, shift, median, and first quartile.
+#' This function generates prior distributions based on user input or default parameters. It is designed to aid in the statistical analysis of risk proportions in populations, particularly in the context of cancer research. The distributions are calculated for various statistical metrics such as asymptote, threshold, median, and first quartile.
 #'
 #' @param data A data frame containing age and risk data. If NULL or contains NA values, default parameters are used.
 #' @param sample_size The total sample size used for risk proportion calculations.
@@ -14,9 +14,9 @@
 #'
 #' If the OR/RR ratio is provided, the asymptote parameters are computed based on this ratio, overriding other inputs for the asymptote.
 #'
-#' The function returns a list of distribution functions for the asymptote, shift, median, and first quartile, which can be used for further statistical analysis.
+#' The function returns a list of distribution functions for the asymptote, threshold, median, and first quartile, which can be used for further statistical analysis.
 #'
-#' @return A list of functions representing the prior distributions for asymptote, shift, median, and first quartile.
+#' @return A list of functions representing the prior distributions for asymptote, threshold, median, and first quartile.
 #'
 #' @examples
 #' # Example usage with default parameters
@@ -28,7 +28,7 @@
 # Default parameter settings
 prior_params_default <- list(
   asymptote = list(g1 = 1, g2 = 1),
-  shift = list(min = 15, max = 25),
+  threshold = list(min = 15, max = 25),
   median = list(m1 = 2, m2 = 2),
   first_quartile = list(q1 = 6, q2 = 3)
 )
@@ -137,7 +137,7 @@ makePriors <- function(
     # Update the prior_params object with the newly calculated parameters
     prior_params <- list(
       asymptote = list(g1 = res_asymptote$g1, g2 = res_asymptote$g2),
-      shift = list(min = 0, max = min_age),
+      threshold = list(min = 0, max = min_age),
       median = list(m1 = res_median$m1, m2 = res_median$m2),
       first_quartile = list(q1 = res_first_quartile$q1, q2 = res_first_quartile$q2)
     )
@@ -154,9 +154,9 @@ makePriors <- function(
     qbeta(runif(n), prior_params$asymptote$g1, prior_params$asymptote$g2)
   }
 
-  # Shift parameter distribution using either custom or default min and max
-  shift_distribution <- function(n) {
-    runif(n, prior_params$shift$min, prior_params$shift$max)
+  # threshold parameter distribution using either custom or default min and max
+  threshold_distribution <- function(n) {
+    runif(n, prior_params$threshold$min, prior_params$threshold$max)
   }
 
   # Median distribution using parameters from compute_parameters_median
@@ -172,7 +172,7 @@ makePriors <- function(
   # Create a list with the distributions
   prior_distributions <- list(
     asymptote_distribution = asymptote_distribution,
-    shift_distribution = shift_distribution,
+    threshold_distribution = threshold_distribution,
     median_distribution = median_distribution,
     first_quartile_distribution = first_quartile_distribution
   )

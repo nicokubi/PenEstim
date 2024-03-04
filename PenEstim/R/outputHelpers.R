@@ -3,14 +3,14 @@
 #'
 #' @param results A list of MCMC chain results.
 #'
-#' @return A list with combined results, including median, shift, first quartile, and asymptote values.
+#' @return A list with combined results, including median, threshold, first quartile, and asymptote values.
 #' @examples
 #' combine_results <- combine_chains(mcmc_results)
 #'
 combine_chains <- function(results) {
   list(
     median_results = do.call(c, lapply(results, function(x) x$median_samples)),
-    shift_results = do.call(c, lapply(results, function(x) x$shift_samples)),
+    threshold_results = do.call(c, lapply(results, function(x) x$threshold_samples)),
     first_quartile_results = do.call(c, lapply(results, function(x) x$first_quartile_samples)),
     asymptote_results = do.call(c, lapply(results, function(x) x$asymptote_samples)),
     loglikelihood_current_results = do.call(c, lapply(results, function(x) x$loglikelihood_current)),
@@ -24,7 +24,7 @@ combine_chains <- function(results) {
 #'
 #' @param data A list with combined results.
 #'
-#' @return A summary data frame containing Median, Shift, First Quartile, and Asymptote Value.
+#' @return A summary data frame containing Median, threshold, First Quartile, and Asymptote Value.
 #'
 #' @examples
 #' summary_stats <- generate_summary(combine_results)
@@ -32,7 +32,7 @@ combine_chains <- function(results) {
 generate_summary <- function(data) {
   summary_data <- data.frame(
     Median = data$median_results,
-    Shift = data$shift_results,
+    threshold = data$threshold_results,
     First_Quartile = data$first_quartile_results,
     Asymptote_Value = data$asymptote_results
   )
@@ -51,7 +51,7 @@ generate_density_plots <- function(data) {
   par(mfrow = c(2, 2), las = 1, mar = c(5, 4, 4, 2) + 0.1)
 
   # Define the specific vectors to plot
-  plot_names <- c("median_results", "first_quartile_results", "asymptote_results", "shift_results")
+  plot_names <- c("median_results", "first_quartile_results", "asymptote_results", "threshold_results")
 
   for (name in plot_names) {
     if (is.null(data[[name]]) || length(data[[name]]) == 0) {
@@ -62,7 +62,7 @@ generate_density_plots <- function(data) {
     mod_name <- paste0(toupper(substring(mod_name, 1, 1)), substring(mod_name, 2))
 
     # Set xlim based on the name of the vector
-    xlim <- if (name %in% c("median_results", "first_quartile_results", "shift_results")) {
+    xlim <- if (name %in% c("median_results", "first_quartile_results", "threshold_results")) {
       c(0, 100)
     } else if (name == "asymptote_results") {
       c(0.15, 1)
@@ -96,14 +96,14 @@ plot_trace <- function(results, n_chains) {
   for (chain_id in 1:n_chains) {
     # Extract results for the current chain
     median_results <- results[[chain_id]]$median_samples
-    shift_results <- results[[chain_id]]$shift_samples
+    threshold_results <- results[[chain_id]]$threshold_samples
     first_quartile_results <- results[[chain_id]]$first_quartile_samples
     asymptote_results <- results[[chain_id]]$asymptote_samples
 
     # Create trace plots for the current chain
 
     plot(median_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Median"), xlab = "Iteration", ylab = "Median")
-    plot(shift_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Shift"), xlab = "Iteration", ylab = "Shift")
+    plot(threshold_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Threshold"), xlab = "Iteration", ylab = "Threshold")
     plot(first_quartile_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of First Quartile"), xlab = "Iteration", ylab = "First Quartile")
     plot(asymptote_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Asymptote"), xlab = "Iteration", ylab = "Asymptote")
   }
@@ -114,14 +114,14 @@ plot_traceSingle <- function(results) {
   par(mfrow = c(2, 2)) # Set up a grid for the plots
   # Extract results for the current chain
   median_results <- results$median_samples
-  shift_results <- results$shift_samples
+  threshold_results <- results$threshold_samples
   first_quartile_results <- results$first_quartile_samples
   asymptote_results <- results$asymptote_samples
 
   # Create trace plots for the current chain
 
   plot(median_results, type = "l", main = "Trace plot of Median", xlab = "Iteration", ylab = "Median")
-  plot(shift_results, type = "l", main = "Trace plot of Shift", xlab = "Iteration", ylab = "Shift")
+  plot(threshold_results, type = "l", main = "Trace plot of Threshold", xlab = "Iteration", ylab = "Threshold")
   plot(first_quartile_results, type = "l", main = "Trace plot of First Quartile", xlab = "Iteration", ylab = "First Quartile")
   plot(asymptote_results, type = "l", main = "Trace plot of Asymptote", xlab = "Iteration", ylab = "Asymptote")
 }
@@ -145,8 +145,6 @@ running_variance <- function(res) {
   }
   return(running_var)
 }
-
-
 
 #' Print Rejection Rates
 #' @param results A list of MCMC chain results.
@@ -243,7 +241,7 @@ apply_thinning <- function(results, thinning_factor) {
 #' @examples
 #' plot_weibull_distribution(combine_results, prob = 0.95)
 #'
-plot_penetrance <- function(data, prob = 0.95) {
+plot_penetrance <- function(data, prob, max_age) {
   # Ensure 'prob' is between 0 and 1
   if (prob <= 0 || prob >= 1) {
     stop("prob must be between 0 and 1")
@@ -253,16 +251,16 @@ plot_penetrance <- function(data, prob = 0.95) {
   params <- calculate_weibull_parameters(
     data$median_results,
     data$first_quartile_results,
-    data$shift_results, data$asymptote_results
+    data$threshold_results, data$asymptote_results
   )
 
   alphas <- params$alpha
   betas <- params$beta
   asymptotes <- data$asymptote_results
-  shifts <- data$shift_results
+  thresholds <- data$threshold_results
 
   # Define the range for the distribution
-  x_values <- seq(0, 100, length.out = 101)
+  x_values <- seq(0, max_age, length.out = max_age + 1)
 
   # Initialize an empty list for distributions
   distributions <- vector("list", length(alphas))
@@ -270,10 +268,10 @@ plot_penetrance <- function(data, prob = 0.95) {
   for (i in seq_along(alphas)) {
     if (validate_weibull_parameters(
       data$first_quartile_results[i],
-      data$median_results[i], data$shift_results[i],
+      data$median_results[i], data$threshold_results[i],
       data$asymptote_results[i]
     )) {
-      distributions[[i]] <- pweibull(x_values - shifts[i],
+      distributions[[i]] <- pweibull(x_values - thresholds[i],
         shape = alphas[i], scale = betas[i]
       ) * asymptotes[i]
     } else {
@@ -300,7 +298,7 @@ plot_penetrance <- function(data, prob = 0.95) {
   # Plotting
   plot(age_range, mean_density,
     type = "l", col = "blue", ylim = c(min(ci_lower), max(ci_upper)),
-    xlab = "Age", ylab = "Density", main = "Density Curve with Credible Interval"
+    xlab = "Age", ylab = "Cumulative Penetrance", main = "Penetrance Curve with Credible Interval"
   )
   lines(age_range, ci_lower, col = "red", lty = 2) # Lower CI
   lines(age_range, ci_upper, col = "red", lty = 2) # Upper CI

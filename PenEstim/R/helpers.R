@@ -80,9 +80,9 @@ calculate_weibull_parameters <-
     }
 
 validate_weibull_parameters <-
-    function(given_first_quartile, given_median, shift, asymptote) {
+    function(given_first_quartile, given_median, threshold, asymptote) {
         # Check for negative or zero values
-        if (given_median <= 0 || given_first_quartile <= 0 || shift < 0) {
+        if (given_median <= 0 || given_first_quartile <= 0 || threshold < 0) {
             return(FALSE)
         }
 
@@ -92,12 +92,12 @@ validate_weibull_parameters <-
         }
 
         # Check if the logarithmic calculations will be valid
-        if (given_first_quartile <= shift || given_median <= shift) {
+        if (given_first_quartile <= threshold || given_median <= threshold) {
             return(FALSE)
         }
 
         # Check if the denominator in the alpha calculation would be zero
-        if ((given_first_quartile - shift) == (given_median - shift)) {
+        if ((given_first_quartile - threshold) == (given_median - threshold)) {
             return(FALSE)
         }
 

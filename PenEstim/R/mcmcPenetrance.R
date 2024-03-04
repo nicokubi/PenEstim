@@ -10,7 +10,7 @@
 #' @param data List of families data.
 #' @param max_age Maximum age to be considered.
 #' @param db Database containing baseline risk estimates.
-#' @param prior_distributions List of the parameters for the distributions of the proposal, including asymptote, shift, median, and first quartile distributions.
+#' @param prior_distributions List of the parameters for the distributions of the proposal, including asymptote, threshold, median, and first quartile distributions.
 #' @param cancer_type Type of cancer for which risk is being estimated.
 #' @param gene_input Gene information for risk estimation.
 #' @param af Allele frequency for the risk allele.
@@ -54,21 +54,21 @@ mhChain <- function(
     asymptote <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
     asymptote <- max(0, min(1, asymptote))
-    shift <- do.call(prior_distributions$shift_distribution, list(1))
+    threshold <- do.call(prior_distributions$threshold_distribution, list(1))
     median <- if (median_max) {
-      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift) + shift
+      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - threshold) + threshold
     } else {
-      do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift) + shift
+      do.call(prior_distributions$median_distribution, list(1)) * (max_age - threshold) + threshold
     }
-    first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - shift) + shift
-    return(c(first_quartile, median, shift, asymptote))
+    first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - threshold) + threshold
+    return(c(first_quartile, median, threshold, asymptote))
   }
 
   # Draw initial valid parameters
   initial_params <- draw_initial_params()
   first_quartile_current <- initial_params[1]
   median_current <- initial_params[2]
-  shift_current <- initial_params[3]
+  threshold_current <- initial_params[3]
   asymptote_current <- initial_params[4]
 
   num_rejections <- 0
@@ -76,7 +76,7 @@ mhChain <- function(
   # Set up an object to record the results for one chain
   out <- list(
     median_samples = numeric(n_iter),
-    shift_samples = numeric(n_iter),
+    threshold_samples = numeric(n_iter),
     first_quartile_samples = numeric(n_iter),
     asymptote_samples = numeric(n_iter),
     loglikelihood_current = numeric(n_iter),
@@ -88,7 +88,7 @@ mhChain <- function(
   cat("Starting Chain", chain_id, "\n")
 
   for (i in 1:n_iter) {
-    # Propose new values using the defined prior distributions for the asymptote, shift,
+    # Propose new values using the defined prior distributions for the asymptote, threshold,
     # median and then first quartile
     # Asymptote proposal is scaled to lie between either 2 * max_penetrane (a user-defined asymptote value
     # based on prior information) or 1 as the upper bound and the total cumulative probability of
@@ -100,25 +100,25 @@ mhChain <- function(
     asymptote_proposal <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
     asymptote_proposal <- max(0, min(1, asymptote_proposal))
-    # Shift proposal
-    shift_proposal <- do.call(prior_distributions$shift_distribution, list(1))
+    # threshold proposal
+    threshold_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
     # Median proposal scaled to lie between either the median SEER age (basedline_mid), per default,
-    # or the max_age as an upper bound and shift proposal as a lower bound
+    # or the max_age as an upper bound and threshold proposal as a lower bound
     median_proposal <- if (median_max) {
-      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - shift_proposal) + shift_proposal
+      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - threshold_proposal) + threshold_proposal
     } else {
-      do.call(prior_distributions$median_distribution, list(1)) * (max_age - shift_proposal) + shift_proposal
+      do.call(prior_distributions$median_distribution, list(1)) * (max_age - threshold_proposal) + threshold_proposal
     }
-    # First Quartile proposal scaled to lie between the median proposal as an upper bound and shift
+    # First Quartile proposal scaled to lie between the median proposal as an upper bound and threshold
     # proposal as a lower bound
     first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
-      (median_proposal - shift_proposal) + shift_proposal
+      (median_proposal - threshold_proposal) + threshold_proposal
 
       # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
         median_current,
-        first_quartile_current, shift_current,
+        first_quartile_current, threshold_current,
         asymptote_current
       ), families = data,
       max_age = max_age,
@@ -134,7 +134,7 @@ mhChain <- function(
       paras =
         c(
           median_proposal, first_quartile_proposal,
-          shift_proposal, asymptote_proposal
+          threshold_proposal, asymptote_proposal
         ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
@@ -151,7 +151,7 @@ mhChain <- function(
     # Accept or reject the proposal
     if (runif(1) < acceptance_ratio) {
       median_current <- median_proposal
-      shift_current <- shift_proposal
+      threshold_current <- threshold_proposal
       first_quartile_current <- first_quartile_proposal
       asymptote_current <- asymptote_proposal
     } else {
@@ -160,7 +160,7 @@ mhChain <- function(
 
     # Update the outputs
     out$median_samples[i] <- median_current
-    out$shift_samples[i] <- shift_current
+    out$threshold_samples[i] <- threshold_current
     out$first_quartile_samples[i] <- first_quartile_current
     out$asymptote_samples[i] <- asymptote_current
     out$loglikelihood_current[i] <- loglikelihood_current
@@ -426,7 +426,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
       if (penetrance_plot) {
         # Generate penetrance plot
-        output$penetrance_plot <- plot_penetrance(combined_chains, probCI)
+        output$penetrance_plot <- plot_penetrance(combined_chains, probCI, max_age)
       }
     },
     error = function(e) {

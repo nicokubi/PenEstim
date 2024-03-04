@@ -219,7 +219,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
         penet.fn(i, families, alpha, beta, delta, gamma, max_age, baselineRisk,homozygote = homozygote, SeerNC = SeerNC, sex = sex)
     }))
 
-    # Compute log-likelihooda
+    # Compute log-likelihood
     loglik <- pedigree_loglikelihood(families, geno_freq, trans, penet, ncores = 1)
 
     # Handle -Inf values
