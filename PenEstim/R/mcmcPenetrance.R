@@ -358,7 +358,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   })
 
   parallel::clusterExport(cl, c(
-    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk",
+    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
     "transformDF", "makePriors", "penet.fn",
     "seeds", "n_iter_per_chain", "sex",
@@ -426,7 +426,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
 
       if (penetrance_plot) {
         # Generate penetrance plot
-        output$penetrance_plot <- plot_penetrance(combined_chains, probCI, max_age)
+        output$penetrance_plot <- plot_penetrance(combined_chains, prob = probCI, max_age = max_age)
       }
     },
     error = function(e) {

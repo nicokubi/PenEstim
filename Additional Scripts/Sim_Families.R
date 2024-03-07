@@ -9,25 +9,24 @@ library(survival)
 library(MASS)
 library(profvis)
 
-
 # set seed 
-set.seed(2023)
+set.seed(2024)
 
 # Generate Families ----
 
-families_B_1000_nocen= list()
+families_sim1= list()
 probandIDS = c()
 probandBRCA1Status = c()
 probandAffectionStatus = c()
 
 
 # Set number of families to be generates
-numberFamilies <- 1000
+numberFamilies <- 2000
 # age
 age <- seq(1, 94, 1)  # same as in the panelpro db
 
 # use same BRCA1 frequency (not estimated)
-BRCA1freq <- 0.9
+BRCA1freq <- 0.1
 PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",1]] <- BRCA1freq
 PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",2]] <- BRCA1freq
 PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
@@ -88,21 +87,21 @@ for(i in 1:numberFamilies){
   fam = sim.runSimFam(nSibsPatern, nSibsMatern, nSibs, nChild,
                       PanelPRODatabase, genes, cancers,
                       includeGeno = TRUE, includeBiomarkers = FALSE, 
-                      censoring = FALSE)
+                      censoring = TRUE)
   
   famDF = as.data.frame(fam)
   proband = famDF %>% filter(isProband==1)
   probandIDS = c(probandIDS, proband$ID)
   probandBRCA1Status = c(probandBRCA1Status, proband$BRCA1)
   probandAffectionStatus = c(probandAffectionStatus, proband$isAffBC)
-  families_B_1000_nocen[[i]] = famDF
+  families_sim1[[i]] = famDF
   
 }
 
-save(families_B_1000_nocen, file = "families_B_1000_nocen.RData")
+save(families_sim1, file = "families_sim1.RData")
 # Filter families with affected probands
-carrierProbandFamilies_B_1000_nocen <- Filter(function(fam) 
-  any(fam$isProband == 1 & fam$BRCA1 == 1 & fam$Sex == 0), families_B_1000_nocen)
+carrierProbandfamilies_sim1 <- Filter(function(fam) 
+  any(fam$isProband == 1 & fam$BRCA1 == 1 & fam$Sex == 0), families_sim1)
 
 
 # hide genotype information for everyone but the proband
@@ -122,9 +121,9 @@ simFamiliesGeno <- function(fams) {
 }
 
 # Subset the family list
-simFamilies_B_1000_nocen <- simFamiliesGeno(carrierProbandFamilies_B_1000_nocen)
+simfamilies_sim1 <- simFamiliesGeno(carrierProbandfamilies_sim1)
 
-save(simFamilies_B_1000_nocen, file = "simFamilies_B_1000_nocen.Rdata")
+save(simfamilies_sim1, file = "simfamilies_sim1.Rdata")
 
 # Function to select families 
 
@@ -141,9 +140,9 @@ selectfam <- function(input_families, n) {
   
   save(list = new_name, file = paste0(new_name, ".RData"))
 }
-selectfam(simFamilies_B_1000_nocen,60)
+selectfam(simfamilies_sim1,60)
 
 simFamilies_C_1000_nocen_selected60 <- simFamilies_C_1000_nocen_selected300
 
-save(simFamilies_B_1000_nocen_selected, file = "simFamilies_B_1000_nocen_selected.Rdata")
+save(simfamilies_sim1_selected, file = "simfamilies_sim1_selected.Rdata")
 
