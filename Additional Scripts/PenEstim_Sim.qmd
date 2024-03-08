@@ -222,7 +222,6 @@ abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through
 # Families Sim2
 ## Default Prior
 
-
 ```{r, echo=TRUE, cache=TRUE}
 
 # Load the additonal families
@@ -352,7 +351,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_3 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2000, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 1000, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
 save(out_sim_3, file = "out_sim_3.Rdata")
@@ -440,25 +439,25 @@ prior_params_BRCA1 <- list(
 
 # Run Estimation procedure with default prior setting 
 # Main Estimation for Female
-out_sim_3 <- PenEstim(
+out_sim_3_fixed<- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2000, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 1000, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
-save(out_sim_3, file = "out_sim_3.Rdata")
+save(out_sim_3_fixed, file = "out_sim_3_fixed.Rdata")
 
 # print summary stats
-out_sim_3$summary_stats
-plot_traceSingle(out_sim_3$results[[1]])
+out_sim_3_fixed$summary_stats
+plot_traceSingle(out_sim_3_fixed$results[[1]])
 ages <- 1:94
-plot_penetrance_sim(out_sim_3$combined_chains, prob = 0.95, max_age = 94,2.5,50,20,0.9)
+plot_penetrance_sim(out_sim_3_fixed$combined_chains, prob = 0.95, max_age = 94,2.5,50,20,0.9)
 
 # Plot the running mean 
 
-runFQ<- running_mean(out_sim_3$results[[1]]$first_quartile_samples)
-runMed <- running_mean(out_sim_3$results[[1]]$median_samples)
-runThreshold <- running_mean(out_sim_3$results[[1]]$threshold_samples)
-runAsy <- running_mean(out_sim_3$results[[1]]$asymptote_samples)
+runFQ<- running_mean(out_sim_3_fixed$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_3_fixed$results[[1]]$median_samples)
+runThreshold <- running_mean(out_sim_3_fixed$results[[1]]$threshold_samples)
+runAsy <- running_mean(out_sim_3_fixed$results[[1]]$asymptote_samples)
 
 # Plot running mean
 plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
@@ -469,10 +468,10 @@ plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Runn
 
 # Plot the running var 
 
-runVFQ<- running_variance(out_sim_3$results[[1]]$first_quartile_samples)
-runVMed <- running_variance(out_sim_3$results[[1]]$median_samples)
-runVThreshold <- running_variance(out_sim_3$results[[1]]$threshold_samples)
-runVAsy <- running_variance(out_sim_3$results[[1]]$asymptote_samples)
+runVFQ<- running_variance(out_sim_3_fixed$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_3_fixed$results[[1]]$median_samples)
+runVThreshold <- running_variance(out_sim_3_fixed$results[[1]]$threshold_samples)
+runVAsy <- running_variance(out_sim_3_fixed$results[[1]]$asymptote_samples)
 
 # Plot running var
 plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
@@ -482,12 +481,12 @@ plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Run
 
 
   # Autocorrelation plots
-acf(out_sim_3$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
-acf(out_sim_3$results[[1]]$median_samples, main = "ACF of Median")
-acf(out_sim_3$results[[1]]$threshold_samples, main = "ACF of Threshold")
-acf(out_sim_3$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+acf(out_sim_3_fixed$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_3_fixed$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_3_fixed$results[[1]]$threshold_samples, main = "ACF of Threshold")
+acf(out_sim_3_fixed$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
 
 # plot the scatterplot with the median and first quartile
-plot(out_sim_3$combined_chains$median_results, out_sim_3$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+plot(out_sim_3_fixed$combined_chains$median_results, out_sim_3_fixed$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
 abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
 ```
