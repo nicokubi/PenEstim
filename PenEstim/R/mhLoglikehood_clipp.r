@@ -72,34 +72,45 @@ calculateBaseline <- function(cancer_type, gene, race, type, db) {
 #' calculateNCPen(SEER_baseline, carrierPenetrances, af, homozygous = TRUE)
 #'
 #' @export
-calculateNCPen <- function(SEER_baseline, carrierPenetrances, af, homozygous = FALSE) {
+#'
+calculateNCPen <- function(SEER_baseline, alpha, beta, delta, gamma, af, max_age, homozygote) {
     # Calculate probability weights for carriers based on allele frequencies
     weights1 <- 2 * af * (1 - af) # Heterozygous carriers
-    weights2 <- af^2 # Homozygous carriers
+    weights2 <- af^2 # Homozygous carriers, if considered
+    weights <- if (homozygote) weights1 + weights2 else weights1
 
-    # Conditionally include weights for homozygous carriers
-    weights <- if (homozygous) {
-        weights1 + weights2
-    } else {
-        weights1
+    # Initialize vectors to store the yearly and cumulative probability of not getting the disease
+    weightedCarrierRisk <- numeric(max_age)
+    yearlyProb <- numeric(max_age) # For single-year probability
+    cumulativeProb <- numeric(max_age) # For cumulative probability
+
+    # Start with 100% probability of not having the disease
+    cumulativeProbability <- 1
+
+    for (age in 1:max_age) {
+        # Calculate the risk for carriers at this age
+        carrierRisk <- dweibull(age - delta, shape = alpha, scale = beta) * gamma
+        # Calculate the weighted risk for carriers based on allele frequency
+        weightedCarrierRisk[age] <- carrierRisk * weights
+
+        # Calculate the single-year probability of not getting the disease
+        yearlyProb[age] <- 1 - weightedCarrierRisk[age]
+
+        # Update cumulative probability of not getting the disease
+        cumulativeProbability <- cumulativeProbability * yearlyProb[age]
+        cumulativeProb[age] <- cumulativeProbability
     }
-    # Assuming carrierPenetrances is structured to align with the age and possibly sex
-    # This might require adjustment based on your data
-    weightedCarrierPenetrances <- carrierPenetrances * weights
-    weightedSumCarrierPenetrances <- sum(weightedCarrierPenetrances)
 
-    # Calculate age-specific non-carrier penetrance
-    nonCarrierPenetrance <- (SEER_baseline - weightedSumCarrierPenetrances) / (1 - sum(weights))
-
-    # Ensure non-negative value
-    nonCarrierPenetrance <- max(0, nonCarrierPenetrance)
-
-    return(nonCarrierPenetrance)
+    # Return both yearly and cumulative probabilities
+    return(list(
+        weightedCarrierRisk = weightedCarrierRisk,
+        yearlyProb = yearlyProb, cumulativeProb = cumulativeProb
+    ))
 }
 
 #' Penetrance Function
 #'
-#' This function calculates the penetrance for an individual based on a Weibull distribution. 
+#' This function calculates the penetrance for an individual based on a Weibull distribution.
 #' Given this simple penetrance function we assume a single age-specific penetrance function.
 #'
 #' @param i The index of the individual.
@@ -119,13 +130,8 @@ calculateNCPen <- function(SEER_baseline, carrierPenetrances, af, homozygous = F
 #'
 # Define the penetrance function
 penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote, SeerNC, sex) {
-    if (is.na(data$sex[i])) {
-        # Handle NA in sex - using average risk
-        sex_indices <- 1:nrow(baselineRisk)
-    } else {
-        # Map sex to row index: Assuming "Female" is 1st row and "Male" is 2nd row
-        sex_index <- ifelse(data$sex[i] == 2, 1, 2)
-    }
+    # Map sex to row index: "Female" is 1st row and "Male" is 2nd row
+    sex_index <- ifelse(data$sex[i] == 2, 1, 2)
 
     if (data$age[i] == 0) {
         penet.i <- c(1, 1, 1) # Assuming people aged 0 years are all unaffected
@@ -133,26 +139,39 @@ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, 
         # Ensure age is within the valid range
         age_index <- min(max_age, data$age[i])
 
-        # Weibull hazard and survival calculation differs for males and females
-        if (data$sex[i] == 2) { # Assuming "Male" is coded as 2
-            c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
-        } else { # Female 
-            c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
-        }
+        # Weibull with four parameters for the penetrance
+        # For now we just have one penetrance, irrespective of sex
+        c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
+        # Cumulative penetrance calculation using product of 1-year survival probabilities
+        c.pen.c <- exp(-gamma * pweibull(data$age[i] - delta, alpha, beta, lower.tail = FALSE))
 
         # Extract the corresponding baseline risk for sex and age
+        SEER_baseline_max <- baselineRisk[sex_index, 1:max_age]
+        SEER_baseline_cum <- baselineRisk[sex_index, 1:age_index]
         SEER_baseline_i <- baselineRisk[sex_index, age_index]
 
-        # If Assuming the non-carrier risk is equal to the SEER baseline risk
+        # Calculate cumulative risk for non-carriers based on SEER data or other model
         if (SeerNC == TRUE) {
             nc.pen <- SEER_baseline_i
+            # calculative cumulative product for being cancer-free for non-carriers
+            nc.pen.c <- prod(1 - SEER_baseline_cum)
         } else {
-            nc.pen <- calculateNCPen(SEER_baseline = SEER_baseline_i, carrierPenetrances = c.pen, af = af)
+            nc.pen <- calculateNCPen(
+                SEER_baseline = SEER_baseline_max, alpha = alpha,
+                beta = beta, delta = delta, gamma = gamma, , af = af, max_age = max_age,
+                homozygote = homozygote
+            )$weightedCarrierRisk[age_index]
+            # calculative cumulative product for being cancer-free for non-carriers
+            nc.pen.c <- calculateNCPen(
+                SEER_baseline = SEER_baseline_max, alpha = alpha,
+                beta = beta, delta = delta, gamma = gamma, , af = af, max_age = max_age,
+                homozygote = homozygote
+            )$cumulativeProb[age_index]
         }
 
         # Penetrance calculations based on genotype
-        # Assuming same penetrance for homozygous and heterozygous carriers 
-        penet.i <- c(1 - nc.pen, 1 - c.pen, 1 - c.pen) # if person is not affected
+        # Assuming same penetrance for homozygous and heterozygous carriers
+        penet.i <- c(1 - nc.pen.c, 1 - c.pen.c, 1 - c.pen.c) # if person is not affected
         if (data$aff[i] == 1) penet.i <- c(nc.pen, c.pen, c.pen)
     }
 
@@ -165,7 +184,7 @@ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, 
         penet.i[3] <- 0
     }
 
-    #Adjusting for gender
+    # Adjusting for gender
     pen <- 1e-28
     if (sex == "Male" && data$sex[i] != 2) penet.i <- c(pen, pen, pen)
     if (sex == "Female" && data$sex[i] != 1) penet.i <- c(pen, pen, pen)
@@ -216,7 +235,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
 
     # Calculate penetrance
     penet <- t(sapply(1:nrow(families), function(i) {
-        penet.fn(i, families, alpha, beta, delta, gamma, max_age, baselineRisk,homozygote = homozygote, SeerNC = SeerNC, sex = sex)
+        penet.fn(i, families, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote = homozygote, SeerNC = SeerNC, sex = sex)
     }))
 
     # Compute log-likelihood
