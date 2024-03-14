@@ -1,52 +1,40 @@
 #' Calculate Baseline Penetrance
 #'
-#' This function calculates the baseline penetrance for a specific cancer type, gene, race, sex, and type.
-#' It extracts the necessary information from the provided data object.
+#' Calculates the baseline penetrance for a given cancer type, gene, race, sex, and penetrance type.
+#' Extracts the necessary information from the provided database object.
 #'
-#' @param cancer_type The type of cancer.
-#' @param gene The gene (default is "SEER").
-#' @param race The race (default is "All_Races").
-#' @param sex The sex (default is "Male").
-#' @param type The type of penetrance (default is "Crude").
-#' @param data The data object containing penetrance information.
+#' @param cancer_type String, the type of cancer.
+#' @param gene String, the gene, with default "SEER".
+#' @param race String, the race, with default "All_Races".
+#' @param sex String, the sex, with default "Male".
+#' @param type String, the type of penetrance, with default "Crude".
+#' @param db Data frame or list, the data object containing penetrance information.
 #'
-#' @return A matrix containing the baseline penetrance values.
+#' @return Numeric matrix, the baseline penetrance values.
 #'
 #' @seealso \code{\link{penet.fn}}
-#'
 #' @examples
 #' # Calculate baseline penetrance
-#' baseline <- calculateBaseline("Lung Cancer", data = my_data)
-#'
-calculateBaseline <- function(cancer_type, gene, race, type, db) {
-    # Check if dimnames are available and correct
-    if (is.null(db$Penetrance) || is.null(attr(db$Penetrance, "dimnames"))) {
+#' baseline <- calculateBaseline(
+#'     cancer_type = "Lung Cancer", gene = "SEER",
+#'     race = "All_Races", type = "Crude", db = my_data
+#' )
+#' @export
+calculateBaseline <- function(cancer_type, gene = "SEER", race = "All_Races", sex = "Male", type = "Crude", db) {
+    # Validations and index retrieval
+    if (is.null(db$Penetrance) || is.null(dimnames(db$Penetrance))) {
         stop("Penetrance data or its dimension names are not properly defined.")
     }
 
-    dim_names <- attr(db$Penetrance, "dimnames")
-    required_dims <- c("Cancer", "Gene", "Race", "Age", "PenetType")
-    if (!all(required_dims %in% names(dim_names))) {
-        stop("One or more required dimensions are missing in Penetrance data.")
-    }
-
-    # Function to safely extract index
-    get_index <- function(dim_name, value) {
-        idx <- which(dim_names[[dim_name]] == value)
-        if (length(idx) == 0) {
-            stop(paste("Value", value, "not found in dimension", dim_name))
-        }
+    # Extracting indices for filtering
+    indices <- lapply(list(Cancer = cancer_type, Gene = gene, Race = race, Sex = sex, PenetType = type), function(value, dim_name) {
+        idx <- which(dimnames(db$Penetrance)[[dim_name]] == value)
+        if (length(idx) == 0) stop(paste("Value", value, "not found in dimension", dim_name))
         idx
-    }
+    }, dim_name = names(dimnames(db$Penetrance)))
 
-    # Extracting indices for each dimension except Age
-    cancer_index <- get_index("Cancer", cancer_type)
-    gene_index <- get_index("Gene", gene)
-    race_index <- get_index("Race", race)
-    type_index <- get_index("PenetType", type)
-
-    # Subsetting Penetrance data for all ages using indices
-    lifetime_risk <- db$Penetrance[cancer_index, gene_index, race_index, , , type_index]
+    # Subsetting the Penetrance data for specified filters
+    lifetime_risk <- db$Penetrance[indices$Cancer, indices$Gene, indices$Race, , indices$Sex, indices$PenetType]
     return(lifetime_risk)
 }
 
@@ -110,69 +98,66 @@ calculateNCPen <- function(SEER_baseline, alpha, beta, delta, gamma, af, max_age
 
 #' Penetrance Function
 #'
-#' This function calculates the penetrance for an individual based on a Weibull distribution.
-#' Given this simple penetrance function we assume a single age-specific penetrance function.
+#' Calculates the penetrance for an individual based on Weibull distribution parameters.
+#' This function estimates the probability of developing cancer given the individual's genetic and demographic information.
 #'
-#' @param i The index of the individual.
-#' @param data The data object containing individual information.
-#' @param alpha Weibull distribution parameter alpha.
-#' @param beta Weibull distribution parameter beta.
-#' @param delta The delta parameter.
-#' @param gamma The gamma parameter.
-#' @param max_age The maximum age considered.
-#' @param baselineRisk The baseline penetrance values.
+#' @param i Integer, index of the individual in the data set.
+#' @param data Data frame, containing individual demographic and genetic information.
+#' @param alpha Numeric, Weibull distribution shape parameter.
+#' @param beta Numeric, Weibull distribution scale parameter.
+#' @param delta Numeric, shift parameter for the Weibull function.
+#' @param gamma Numeric, adjustment factor for the penetrance.
+#' @param max_age Integer, maximum age considered in the analysis.
+#' @param baselineRisk Numeric vector, baseline risk for each age.
+#' @param homozygote Logical, indicates if homozygous carriers should be considered.
+#' @param SeerNC Logical, indicates if non-carrier penetrance should be based on SEER data.
+#' @param sex Character, the sex of the individuals ('Male', 'Female', or 'NA').
 #'
-#' @return A vector containing penetrance values for unaffected and affected individuals.
-#'
+#' @return Numeric vector, containing penetrance values for unaffected and affected individuals.
 #' @examples
-#' # Calculate penetrance for an individual
-#' penetrance <- penet.fn(1, individual_data, 1.0, 2.0, 0.5, 0.8, 80, baseline_risk)
+#' # Example usage
+#' baselineRisk <- calculateBaseline("Breast", "BRCA1", "All_Races", "Female", "Net", db)
+#' individual_data <- data.frame(sex = c(2), age = c(30), aff = c(0), geno = c("1/2"))
+#' penet.fn(1, individual_data, 1.0, 2.0, 0.5, 0.8, 80, baselineRisk, FALSE, TRUE, "Female")
+#' @export
 #'
 # Define the penetrance function
 penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote, SeerNC, sex) {
     # Map sex to row index: "Female" is 1st row and "Male" is 2nd row
     sex_index <- ifelse(data$sex[i] == 2, 1, 2)
 
+    # Early return for age 0 as fully unaffected
     if (data$age[i] == 0) {
-        penet.i <- c(1, 1, 1) # Assuming people aged 0 years are all unaffected
+        return(c(1, 1, 1)) # Unaffected for all genetic statuses
+    }
+
+    age_index <- min(data$age[i], max_age)
+    baselineRiskAge <- baselineRisk[sex_index, age_index]
+
+    # Weibull with four parameters for the penetrance
+    # For now we just have one penetrance, irrespective of sex
+    c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
+    # Cumulative penetrance calculation using product of 1-year survival probabilities
+    c.pen.c <- pweibull(data$age[i] - delta, alpha, beta)
+
+    # Calculate cumulative risk for non-carriers based on SEER data or other model
+    if (SeerNC == TRUE) {
+        nc.pen <- baselineRiskAge
+        # calculative cumulative product for being cancer-free for non-carriers
+        nc.pen.c <- prod(1 - baselineRisk[sex_index, 1:age_index])
     } else {
-        # Ensure age is within the valid range
-        age_index <- min(max_age, data$age[i])
+        calculatedNCRisk <- calculateNCPen(baselineRisk[sex_index, ], alpha, beta, delta, gamma, data$af[i], age_index, homozygote)
+        nc.pen <- calculatedNCRisk$yearlyProb[age_index]
+        # calculative cumulative product for being cancer-free for non-carriers
+        nc.pen.c <- calculatedNCRisk$cumulativeProb[age_index]
+    }
 
-        # Weibull with four parameters for the penetrance
-        # For now we just have one penetrance, irrespective of sex
-        c.pen <- dweibull(data$age[i] - delta, alpha, beta) * gamma
-        # Cumulative penetrance calculation using product of 1-year survival probabilities
-        c.pen.c <- exp(-gamma * pweibull(data$age[i] - delta, alpha, beta, lower.tail = FALSE))
-
-        # Extract the corresponding baseline risk for sex and age
-        SEER_baseline_max <- baselineRisk[sex_index, 1:max_age]
-        SEER_baseline_cum <- baselineRisk[sex_index, 1:age_index]
-        SEER_baseline_i <- baselineRisk[sex_index, age_index]
-
-        # Calculate cumulative risk for non-carriers based on SEER data or other model
-        if (SeerNC == TRUE) {
-            nc.pen <- SEER_baseline_i
-            # calculative cumulative product for being cancer-free for non-carriers
-            nc.pen.c <- prod(1 - SEER_baseline_cum)
-        } else {
-            nc.pen <- calculateNCPen(
-                SEER_baseline = SEER_baseline_max, alpha = alpha,
-                beta = beta, delta = delta, gamma = gamma, , af = af, max_age = max_age,
-                homozygote = homozygote
-            )$weightedCarrierRisk[age_index]
-            # calculative cumulative product for being cancer-free for non-carriers
-            nc.pen.c <- calculateNCPen(
-                SEER_baseline = SEER_baseline_max, alpha = alpha,
-                beta = beta, delta = delta, gamma = gamma, , af = af, max_age = max_age,
-                homozygote = homozygote
-            )$cumulativeProb[age_index]
-        }
-
-        # Penetrance calculations based on genotype
-        # Assuming same penetrance for homozygous and heterozygous carriers
-        penet.i <- c(1 - nc.pen.c, 1 - c.pen.c, 1 - c.pen.c) # if person is not affected
-        if (data$aff[i] == 1) penet.i <- c(nc.pen, c.pen, c.pen)
+    # Penetrance calculations based on genotype
+    # Assuming same penetrance for homozygous and heterozygous carriers
+    penet.i <- if (data$aff[i] == 1) {
+        penet.i <- c(nc.pen, c.pen, c.pen)
+    } else {
+        c(nc.pen.c, 1 - c.pen.c, 1 - c.pen.c)
     }
 
     if (data$geno[i] == "1/1") penet.i[-1] <- 0
@@ -235,7 +220,10 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
 
     # Calculate penetrance
     penet <- t(sapply(1:nrow(families), function(i) {
-        penet.fn(i, families, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote = homozygote, SeerNC = SeerNC, sex = sex)
+        penet.fn(i, families, alpha, beta, delta, gamma, max_age,
+            baselineRisk,
+            homozygote = homozygote, SeerNC = SeerNC, sex = sex
+        )
     }))
 
     # Compute log-likelihood
