@@ -53,7 +53,7 @@ mhChain <- function(
     }
     asymptote <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
-    asymptote <- max(0, min(1, asymptote))
+    asymptote <- max(0.6, min(1, asymptote))
     threshold <- do.call(prior_distributions$threshold_distribution, list(1))
     median <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - threshold) + threshold

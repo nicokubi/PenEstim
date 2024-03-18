@@ -1,0 +1,497 @@
+---
+title: "PenEstim_Simulations_v1"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc_float: true
+    toc-depth: 3
+    code-fold: true
+    number_sections: true
+    left:
+        - text: "Home"
+          href: index.html
+        - text: "Section 1"
+          href: #section-1
+        - text: "Section 2"
+          href: #section-2
+---
+
+```{r, echo=FALSE, include=FALSE}
+library(tidyverse)
+library(PPP)
+library(parallel)
+library(dplyr)
+library(stats4)
+library(clipp)
+library(survival)
+
+
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/prior_elicitation.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/helpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/outputHelpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mhLoglikehood_clipp.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mcmcPenetrance.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/InternalVars.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional Scripts/EstimEval.R")
+
+set.seed(2024)
+```
+
+
+# Families Sim1
+
+## Default Prior
+In this simulation the penetrance estimation is applied to the first set of families from sim1.
+The default prior settings are applied here with a uniform prior on the asymptote parameter. 
+
+```{r, echo=TRUE, cache=TRUE}
+
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated\ Families/simfamilies_sim1.RData")
+dat <- simfamilies_sim1
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    threshold = list(min = 15, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_1 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
+)
+save(out_sim_1, file = "out_sim_1.Rdata")
+
+# print summary stats
+out_sim_1$summary_stats
+plot_traceSingle(out_sim_1$results[[1]])
+ages <- 1:94
+plot_penetrance(out_sim_1$combined_chains, prob = 0.95, max_age = 94)
+lines(ages, pweibull(ages - 20, 2.5, 50)*0.9, type = "l", lwd=2)
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_1$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_1$results[[1]]$median_samples)
+runThreshold <- running_mean(out_sim_1$results[[1]]$threshold_samples)
+runAsy <- running_mean(out_sim_1$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Threshold Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_1$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_1$results[[1]]$median_samples)
+runVThreshold <- running_variance(out_sim_1$results[[1]]$threshold_samples)
+runVAsy <- running_variance(out_sim_1$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Threshold Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+
+  # Autocorrelation plots
+acf(out_sim_1$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_1$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_1$results[[1]]$threshold_samples, main = "ACF of Threshold")
+acf(out_sim_1$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_1$combined_chains$median_results, out_sim_1$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+## Fixed Asymptote
+
+Now we rerun the simulation but with the prior narrowly centered around the known asymptote parameter of $\gamma = 0.9$.
+
+```{r, echo=TRUE, cache=TRUE}
+
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated\ Families/simfamilies_sim1.RData")
+dat <- simfamilies_sim1
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 900, g2 = 100),
+    threshold = list(min = 15, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_1_fixed <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
+)
+save(out_sim_1_fixed, file = "out_sim_1_fixed.Rdata")
+
+# print summary stats
+out_sim_1_fixed$summary_stats
+plot_traceSingle(out_sim_1_fixed$results[[1]])
+ages <- 1:94
+plot_penetrance(out_sim_1_fixed$combined_chains, prob = 0.95, max_age = 94)
+lines(ages, pweibull(ages - 20, 2.5, 50)*0.9, type = "l", lwd=2)
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_1_fixed$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_1_fixed$results[[1]]$median_samples)
+runThreshold <- running_mean(out_sim_1_fixed$results[[1]]$threshold_samples)
+runAsy <- running_mean(out_sim_1_fixed$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Threshold Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_1_fixed$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_1_fixed$results[[1]]$median_samples)
+runVThreshold <- running_variance(out_sim_1_fixed$results[[1]]$threshold_samples)
+runVAsy <- running_variance(out_sim_1_fixed$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Threshold Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+
+  # Autocorrelation plots
+acf(out_sim_1_fixed$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_1_fixed$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_1_fixed$results[[1]]$threshold_samples, main = "ACF of Threshold")
+acf(out_sim_1_fixed$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_1_fixed$combined_chains$median_results, out_sim_1_fixed$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+# Families Sim2
+## Default Prior
+
+```{r, echo=TRUE, cache=TRUE}
+
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated\ Families/simfamilies_sim2.RData")
+dat <- simfamilies_sim2
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    threshold = list(min = 15, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_2 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
+)
+save(out_sim_2, file = "out_sim_2.Rdata")
+
+# print summary stats
+out_sim_2$summary_stats
+plot_traceSingle(out_sim_2$results[[1]])
+ages <- 1:94
+plot_penetrance(out_sim_2$combined_chains, prob = 0.95, max_age = 94)
+lines(ages, pweibull(ages - 20, 2.5, 50)*0.9, type = "l", lwd=2)
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_2$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_2$results[[1]]$median_samples)
+runThreshold <- running_mean(out_sim_2$results[[1]]$threshold_samples)
+runAsy <- running_mean(out_sim_2$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Threshold Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_2$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_2$results[[1]]$median_samples)
+runVThreshold <- running_variance(out_sim_2$results[[1]]$threshold_samples)
+runVAsy <- running_variance(out_sim_2$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Threshold Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+
+  # Autocorrelation plots
+acf(out_sim_2$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_2$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_2$results[[1]]$threshold_samples, main = "ACF of Threshold")
+acf(out_sim_2$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_2$combined_chains$median_results, out_sim_2$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+# Families Sim3
+## Default Prior
+
+
+```{r, echo=TRUE, cache=TRUE}
+
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated\ Families/simfamilies_sim3.RData")
+dat <- simfamilies_sim3
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    threshold = list(min = 15, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_3 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
+)
+save(out_sim_3, file = "out_sim_3.Rdata")
+
+# print summary stats
+out_sim_3$summary_stats
+plot_traceSingle(out_sim_3$results[[1]])
+ages <- 1:94
+plot_penetrance_sim(out_sim_3$combined_chains, prob = 0.95, max_age = 94,2.5,50,20,0.9)
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_3$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_3$results[[1]]$median_samples)
+runThreshold <- running_mean(out_sim_3$results[[1]]$threshold_samples)
+runAsy <- running_mean(out_sim_3$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Threshold Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_3$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_3$results[[1]]$median_samples)
+runVThreshold <- running_variance(out_sim_3$results[[1]]$threshold_samples)
+runVAsy <- running_variance(out_sim_3$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Threshold Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+
+  # Autocorrelation plots
+acf(out_sim_3$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_3$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_3$results[[1]]$threshold_samples, main = "ACF of Threshold")
+acf(out_sim_3$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_3$combined_chains$median_results, out_sim_3$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+## Fixed Prior
+
+```{r, echo=TRUE, cache=TRUE}
+
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated\ Families/simfamilies_sim3.RData")
+dat <- simfamilies_sim3
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 900, g2 = 100),
+    threshold = list(min = 15, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_3_fixed<- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
+)
+save(out_sim_3_fixed, file = "out_sim_3_fixed.Rdata")
+
+# print summary stats
+out_sim_3_fixed$summary_stats
+plot_traceSingle(out_sim_3_fixed$results[[1]])
+ages <- 1:94
+plot_penetrance_sim(out_sim_3_fixed$combined_chains, prob = 0.95, max_age = 94,2.5,50,20,0.9)
+
+# Plot the running mean 
+
+runFQ<- running_mean(out_sim_3_fixed$results[[1]]$first_quartile_samples)
+runMed <- running_mean(out_sim_3_fixed$results[[1]]$median_samples)
+runThreshold <- running_mean(out_sim_3_fixed$results[[1]]$threshold_samples)
+runAsy <- running_mean(out_sim_3_fixed$results[[1]]$asymptote_samples)
+
+# Plot running mean
+plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+plot(runThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Threshold Samples")
+plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+
+# Plot the running var 
+
+runVFQ<- running_variance(out_sim_3_fixed$results[[1]]$first_quartile_samples)
+runVMed <- running_variance(out_sim_3_fixed$results[[1]]$median_samples)
+runVThreshold <- running_variance(out_sim_3_fixed$results[[1]]$threshold_samples)
+runVAsy <- running_variance(out_sim_3_fixed$results[[1]]$asymptote_samples)
+
+# Plot running var
+plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+plot(runVThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Threshold Samples")
+plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+
+  # Autocorrelation plots
+acf(out_sim_3_fixed$results[[1]]$first_quartile_samples, main = "ACF of First Quartile")
+acf(out_sim_3_fixed$results[[1]]$median_samples, main = "ACF of Median")
+acf(out_sim_3_fixed$results[[1]]$threshold_samples, main = "ACF of Threshold")
+acf(out_sim_3_fixed$results[[1]]$asymptote_samples, main = "ACF of Asymptote")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_3_fixed$combined_chains$median_results, out_sim_3_fixed$combined_chains$first_quartile_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```

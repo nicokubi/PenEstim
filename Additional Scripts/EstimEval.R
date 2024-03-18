@@ -1,4 +1,3 @@
-
 #  Plotting of the estimated penetrance and the data-generating curve for simulation studies
 
 plot_penetrance_sim <- function(data, prob, max_age, data_gen_alpha, data_gen_beta, data_gen_threshold, data_gen_asymptote) {
@@ -117,4 +116,3 @@ calculate_ci_coverage <- function(true_curve, ci_lower, ci_upper) {
     coverage <- mean(true_curve >= ci_lower & true_curve <= ci_upper)
     return(coverage)
 }
-
