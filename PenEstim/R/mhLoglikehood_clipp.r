@@ -143,7 +143,7 @@ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, 
 
         # Weibull with four parameters for the penetrance
         # For now we just have one penetrance, irrespective of sex
-        survival_prob <- pweibull(data$age[i] - delta, shape = alpha, scale = beta, lower.tail = FALSE) * gamma
+        survival_prob <- 1 - pweibull(data$age[i] - delta, shape = alpha, scale = beta) * gamma
         c.pen <- dweibull(data$age[i] - delta, shape = alpha, scale = beta) * gamma 
 
         # Extract the corresponding baseline risk for sex and age
@@ -158,7 +158,7 @@ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, 
         if (SeerNC == TRUE) {
             nc.pen <- SEER_baseline_i
             # calculative cumulative product for being cancer-free for non-carriers
-            nc.pen.c <- prod(1 - SEER_baseline_cum)
+            nc.pen.c <- 1 - sum(SEER_baseline_cum)
         } else {
             nc.pen <- calculateNCPen(
                 SEER_baseline = SEER_baseline_max, alpha = alpha,
@@ -190,10 +190,10 @@ penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, 
     }
 
     # Adjusting for gender
-    pen <- 1e-28
-    if (sex == "Male" && data$sex[i] != 2) penet.i <- c(pen, pen, pen)
-    if (sex == "Female" && data$sex[i] != 1) penet.i <- c(pen, pen, pen)
-    if (sex == "NA") penet.i <- penet.i
+    #pen <- 1e-28
+    #if (sex == "Male" && data$sex[i] != 2) penet.i <- c(pen, pen, pen)
+    #if (sex == "Female" && data$sex[i] != 1) penet.i <- c(pen, pen, pen)
+    #if (sex == "NA") penet.i <- penet.i
 
     return(penet.i)
 }

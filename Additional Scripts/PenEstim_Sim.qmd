@@ -1,20 +1,22 @@
 ---
-title: "PenEstim_Simulations_v1"
-format:
+title: "PenEstim"
+subtitle: "Simulation Study"
+format: 
   html:
-    theme: cosmo
     toc: true
-    toc_float: true
-    toc-depth: 3
-    code-fold: true
-    number_sections: true
-    left:
-        - text: "Home"
-          href: index.html
-        - text: "Section 1"
-          href: #section-1
-        - text: "Section 2"
-          href: #section-2
+    toc-location: body
+date: 3-19-2024
+theme: lightly
+author:
+  - name: "Nicolas Kubista"
+    affiliations: "Harvard University"
+embed-resources: true
+toc: true
+toc-expand: 2
+toc-title: Contents
+page-layout: full
+code-fold: true
+editor: visual
 ---
 
 ```{r, echo=FALSE, include=FALSE}
@@ -38,12 +40,55 @@ source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Sub
 set.seed(2024)
 ```
 
+# Simulated Families
+
+# Likelihood
+
+The likelihood model in `penet.fn` is based on the Weibull distribution for carriers and, per default, the SEER peentrance data for non-carriers. For an individual $i$, the model considers the following parameters:
+
+- $\alpha$: Shape parameter of the Weibull distribution
+- $\beta$: Scale parameter of the Weibull distribution
+- $\delta$: Shift parameter for the age in the Weibull function
+- $\gamma$: Multiplier to adjust the scale of the Weibull function
+- $\text{age}_i$: Age of the individual $i$
+- $\text{aff}_i$: Affection status (1 if affected, 0 otherwise)
+
+The survival probability for individual $i$ is given by:
+
+$$\text{Survival\_prob}_i = 1 - pweibull(\text{age}_i - \delta, \alpha, \beta) \times \gamma$$
+where pweibull is the CDF of the Weibull. 
+
+The density (for affected individuals) is calculated as:
+
+$$c.pen_i = dweibull(\text{age}_i - \delta, \alpha, \beta) \times \gamma$$
+
+The baseline risk $\text{SEER\_baseline}_i$ is derived from SEER data:
+
+$$
+\text{nc.pen}_i = 
+\begin{cases} 
+\text{SEER\_baseline}_i & \text{if SeerNC is TRUE} \\
+\text{Custom non-carrier penetrance model} & \text{otherwise}
+\end{cases}
+$$
+
+For censored observations, the penetrance is considered as the cumulative probability of being cancer-free, while for affected observations, it is based on the calculated density at their age of diagnosis.
+
+Hence, the penetrance $\text{penet}_i$ for individual $i$ and for all three potential genotypes 1/1 (non-carriers), 1/2 (heterozygous carrier), and 2/2 (homozygous carrier) is:
+
+$$
+\text{penet}_i = 
+\begin{cases} 
+1 - \sum_{j=1}^{\text{age}_i} \text{SEER\_baseline}_j, \text{Survival\_prob}_i, \text{Survival\_prob}_i & \text{if } \text{aff}_i = 0 \\
+\text{nc.pen}_i, c.pen_i, c.pen_i & \text{if } \text{aff}_i = 1
+\end{cases}
+$$
 
 # Families Sim1
 
 ## Default Prior
-In this simulation the penetrance estimation is applied to the first set of families from sim1.
-The default prior settings are applied here with a uniform prior on the asymptote parameter. 
+
+In this simulation the penetrance estimation is applied to the first set of families from sim1. The default prior settings are applied here with a uniform prior on the asymptote parameter.
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -82,7 +127,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_1 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 100, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
 save(out_sim_1, file = "out_sim_1.Rdata")
@@ -91,8 +136,7 @@ save(out_sim_1, file = "out_sim_1.Rdata")
 out_sim_1$summary_stats
 plot_traceSingle(out_sim_1$results[[1]])
 ages <- 1:94
-plot_penetrance(out_sim_1$combined_chains, prob = 0.95, max_age = 94)
-lines(ages, pweibull(ages - 20, 2.5, 50)*0.9, type = "l", lwd=2)
+plot_penetrance_sim(out_sim_1$combined_chains, prob = 0.95, max_age = 94,2.5,50,20,0.9)
 
 # Plot the running mean 
 
@@ -174,7 +218,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_1_fixed <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 10, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
 save(out_sim_1_fixed, file = "out_sim_1_fixed.Rdata")
@@ -183,8 +227,7 @@ save(out_sim_1_fixed, file = "out_sim_1_fixed.Rdata")
 out_sim_1_fixed$summary_stats
 plot_traceSingle(out_sim_1_fixed$results[[1]])
 ages <- 1:94
-plot_penetrance(out_sim_1_fixed$combined_chains, prob = 0.95, max_age = 94)
-lines(ages, pweibull(ages - 20, 2.5, 50)*0.9, type = "l", lwd=2)
+plot_penetrance_sim(out_sim_1_fixed$combined_chains, prob = 0.95, max_age = 94,2.5,50,20,0.9)
 
 # Plot the running mean 
 
@@ -226,6 +269,7 @@ abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through
 ```
 
 # Families Sim2
+
 ## Default Prior
 
 ```{r, echo=TRUE, cache=TRUE}
@@ -265,7 +309,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_2 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 111, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
 save(out_sim_2, file = "out_sim_2.Rdata")
@@ -273,9 +317,7 @@ save(out_sim_2, file = "out_sim_2.Rdata")
 # print summary stats
 out_sim_2$summary_stats
 plot_traceSingle(out_sim_2$results[[1]])
-ages <- 1:94
-plot_penetrance(out_sim_2$combined_chains, prob = 0.95, max_age = 94)
-lines(ages, pweibull(ages - 20, 2.5, 50)*0.9, type = "l", lwd=2)
+plot_penetrance_sim(out_sim_2$combined_chains, prob = 0.95, max_age = 94,2.5,50,20,0.9)
 
 # Plot the running mean 
 
@@ -317,8 +359,8 @@ abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through
 ```
 
 # Families Sim3
-## Default Prior
 
+## Default Prior
 
 ```{r, echo=TRUE, cache=TRUE}
 
@@ -357,7 +399,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_3 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 11, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
 save(out_sim_3, file = "out_sim_3.Rdata")
@@ -446,7 +488,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_3_fixed<- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 5000, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 111, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
 save(out_sim_3_fixed, file = "out_sim_3_fixed.Rdata")

@@ -53,7 +53,7 @@ mhChain <- function(
     }
     asymptote <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
-    asymptote <- max(0.6, min(1, asymptote))
+    asymptote <- max(0, min(1, asymptote))
     threshold <- do.call(prior_distributions$threshold_distribution, list(1))
     median <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - threshold) + threshold
@@ -74,11 +74,16 @@ mhChain <- function(
   num_rejections <- 0
 
   # Set up an object to record the results for one chain
+  # Enhance the output object to store the proposed values
   out <- list(
     median_samples = numeric(n_iter),
     threshold_samples = numeric(n_iter),
     first_quartile_samples = numeric(n_iter),
     asymptote_samples = numeric(n_iter),
+    median_proposals = numeric(n_iter),
+    threshold_proposals = numeric(n_iter),
+    first_quartile_proposals = numeric(n_iter),
+    asymptote_proposals = numeric(n_iter),
     loglikelihood_current = numeric(n_iter),
     loglikelihood_proposal = numeric(n_iter),
     acceptance_ratio = numeric(n_iter),
@@ -113,6 +118,12 @@ mhChain <- function(
     # proposal as a lower bound
     first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_proposal - threshold_proposal) + threshold_proposal
+    
+    # Record the proposed values
+    out$median_proposals[i] <- median_proposal
+    out$threshold_proposals[i] <- threshold_proposal
+    out$first_quartile_proposals[i] <- first_quartile_proposal
+    out$asymptote_proposals[i] <- asymptote_proposal
 
       # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood_clipp(

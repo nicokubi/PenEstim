@@ -15,7 +15,11 @@ combine_chains <- function(results) {
     asymptote_results = do.call(c, lapply(results, function(x) x$asymptote_samples)),
     loglikelihood_current_results = do.call(c, lapply(results, function(x) x$loglikelihood_current)),
     loglikelihood_proposal_results = do.call(c, lapply(results, function(x) x$loglikelihood_proposal)),
-    acceptance_ratio_results = do.call(c, lapply(results, function(x) x$acceptance_ratio))
+    acceptance_ratio_results = do.call(c, lapply(results, function(x) x$acceptance_ratio)),
+    median_proposals = do.call(c, lapply(results, function(x) x$median_proposals)),
+    threshold_proposals = do.call(c, lapply(results, function(x) x$threshold_proposals)),
+    first_quartile_proposals = do.call(c, lapply(results, function(x) x$first_quartile_proposals)),
+    asymptote_proposals = do.call(c, lapply(results, function(x) x$asymptote_proposals))
   )
 }
 
