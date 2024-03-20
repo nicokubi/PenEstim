@@ -1,66 +1,39 @@
 #  Plotting of the estimated penetrance and the data-generating curve for simulation studies
-
-plot_penetrance_sim <- function(data, prob, max_age, data_gen_alpha, data_gen_beta, data_gen_threshold, data_gen_asymptote) {
-    if (prob <= 0 || prob >= 1) {
-        stop("prob must be between 0 and 1")
-    }
-
-    params <- calculate_weibull_parameters(
-        data$median_results,
-        data$first_quartile_results,
-        data$threshold_results,
-        data$asymptote_results
-    )
-
-    alphas <- params$alpha
-    betas <- params$beta
-    asymptotes <- data$asymptote_results
-    thresholds <- data$threshold_results
-
-    x_values <- seq(0, max_age, length.out = max_age + 1)
-    distributions <- vector("list", length(alphas))
-
-    for (i in seq_along(alphas)) {
-        if (validate_weibull_parameters(
-            data$first_quartile_results[i],
-            data$median_results[i],
-            data$threshold_results[i],
-            data$asymptote_results[i]
-        )) {
-            distributions[[i]] <- pweibull(x_values - thresholds[i],
-                shape = alphas[i], scale = betas[i]
-            ) * asymptotes[i]
-        } else {
-            distributions[[i]] <- rep(NA, length(x_values))
-        }
-    }
-
-    distributions_matrix <- do.call(cbind, distributions)
-    ci_lower <- apply(distributions_matrix, 1, function(x) quantile(x, probs = (1 - prob) / 2, na.rm = TRUE))
-    ci_upper <- apply(distributions_matrix, 1, function(x) quantile(x, probs = 1 - (1 - prob) / 2, na.rm = TRUE))
-    mean_density <- rowMeans(distributions_matrix, na.rm = TRUE)
-
-    # Data-generating curve using the given parameters
-    data_generating_curve <- pweibull(x_values - data_gen_threshold,
-        shape = data_gen_alpha, scale = data_gen_beta
-    ) * data_gen_asymptote
-
-    par(mfrow = c(1, 1))
-
-    plot(x_values, mean_density,
-        type = "l", col = "blue", ylim = c(min(ci_lower), max(ci_upper)), xlim = c(1, max_age),
-        xlab = "Age", ylab = "Estimated Penetrance", main = "Penetrance Curve with Credible Interval"
-    )
-    lines(x_values, ci_lower, col = "red", lty = 2)
-    lines(x_values, ci_upper, col = "red", lty = 2)
-    lines(x_values, data_generating_curve, col = "black", lty = 1)
-    polygon(c(x_values, rev(x_values)), c(ci_lower, rev(ci_upper)), col = rgb(1, 0, 0, 0.1), border = NA)
-
-    legend("topleft",
-        legend = c("Estimated Penetrance", "Credible Interval", "Data-Generating Penetrance"),
-        col = c("blue", "red", "black"), lty = c(1, 2, 1), cex = 0.8
-    )
+plot_penetrance_sim <- function(data, prob, max_age, sex, data_gen_alpha, data_gen_beta, data_gen_threshold, data_gen_asymptote_male, data_gen_asymptote_female) {
+  if (prob <= 0 || prob >= 1) {
+    stop("prob must be between 0 and 1")
+  }
+  
+  x_values <- seq(0, max_age, length.out = max_age + 1)
+  asymptotes <- if (sex == "Male") data$asymptote_male_results else data$asymptote_female_results
+  
+  # Data-generating curve
+  data_gen_asymptote <- if (sex == "Male") data_gen_asymptote_male else data_gen_asymptote_female
+  data_generating_curve <- pweibull(x_values - data_gen_threshold, shape = data_gen_alpha, scale = data_gen_beta) * data_gen_asymptote
+  
+  # Calculating mean, lower, and upper CI for the estimated curve
+  distributions <- sapply(asymptotes, function(asymptote) pweibull(x_values - data_gen_threshold, shape = data_gen_alpha, scale = data_gen_beta) * asymptote)
+  mean_density <- rowMeans(distributions, na.rm = TRUE)
+  ci_lower <- apply(distributions, 1, function(x) quantile(x, probs = (1 - prob) / 2, na.rm = TRUE))
+  ci_upper <- apply(distributions, 1, function(x) quantile(x, probs = 1 - (1 - prob) / 2, na.rm = TRUE))
+  
+  # Plot
+  plot(x_values, mean_density,
+       type = "l", col = if (sex == "Male") "blue" else "red",
+       ylim = c(min(ci_lower, data_generating_curve, na.rm = TRUE), max(ci_upper, data_generating_curve, na.rm = TRUE)),
+       xlab = "Age", ylab = "Cumulative Penetrance", main = paste("Penetrance Curve with Credible Interval -", sex)
+  )
+  lines(x_values, data_generating_curve, col = "black", lty = 1)
+  lines(x_values, ci_lower, col = "grey", lty = 2)
+  lines(x_values, ci_upper, col = "grey", lty = 2)
+  polygon(c(x_values, rev(x_values)), c(ci_lower, rev(ci_upper)), col = rgb(0, 0, 1, 0.1), border = NA)
+  
+  legend("topleft",
+         legend = c("Estimated Penetrance", "95% CI", "Data-Generating Curve"),
+         col = c(if (sex == "Male") "blue" else "red", "grey", "black"), lty = c(1, 2, 1), cex = 0.8
+  )
 }
+
 
 # Calculating the required penetrance data 
 

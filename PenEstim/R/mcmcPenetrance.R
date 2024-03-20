@@ -41,7 +41,7 @@ mhChain <- function(
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", race = "All_Races", sex=sex, type = "Net", db = db)
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", race = "All_Races", sex = sex, type = "Net", db = db)
   midpoint_prob <- SEER_baseline$total_prob / 2
   midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
   baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
@@ -51,9 +51,14 @@ mhChain <- function(
     if (asymptote_factor > 1) {
       asymptote_factor <- 1 - SEER_baseline$total_prob
     }
-    asymptote <- SEER_baseline$total_prob +
+    asymptote_male <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
-    asymptote <- max(0, min(1, asymptote))
+    asymptote_female <- SEER_baseline$total_prob +
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+
+    asymptote_male <- max(0, min(1, asymptote_male))
+    asymptote_female <- max(0, min(1, asymptote_female))
+
     threshold <- do.call(prior_distributions$threshold_distribution, list(1))
     median <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - threshold) + threshold
@@ -61,29 +66,33 @@ mhChain <- function(
       do.call(prior_distributions$median_distribution, list(1)) * (max_age - threshold) + threshold
     }
     first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - threshold) + threshold
-    return(c(first_quartile, median, threshold, asymptote))
+
+    return(list(
+      first_quartile = first_quartile, median = median, threshold = threshold,
+      asymptote_male = asymptote_male, asymptote_female = asymptote_female
+    ))
   }
 
-  # Draw initial valid parameters
   initial_params <- draw_initial_params()
-  first_quartile_current <- initial_params[1]
-  median_current <- initial_params[2]
-  threshold_current <- initial_params[3]
-  asymptote_current <- initial_params[4]
+  first_quartile_current <- initial_params$first_quartile
+  median_current <- initial_params$median
+  threshold_current <- initial_params$threshold
+  asymptote_male_current <- initial_params$asymptote_male
+  asymptote_female_current <- initial_params$asymptote_female
 
   num_rejections <- 0
 
-  # Set up an object to record the results for one chain
-  # Enhance the output object to store the proposed values
   out <- list(
     median_samples = numeric(n_iter),
     threshold_samples = numeric(n_iter),
     first_quartile_samples = numeric(n_iter),
-    asymptote_samples = numeric(n_iter),
+    asymptote_male_samples = numeric(n_iter),
+    asymptote_female_samples = numeric(n_iter),
     median_proposals = numeric(n_iter),
     threshold_proposals = numeric(n_iter),
     first_quartile_proposals = numeric(n_iter),
-    asymptote_proposals = numeric(n_iter),
+    asymptote_male_proposals = numeric(n_iter),
+    asymptote_female_proposals = numeric(n_iter),
     loglikelihood_current = numeric(n_iter),
     loglikelihood_proposal = numeric(n_iter),
     acceptance_ratio = numeric(n_iter),
@@ -102,9 +111,14 @@ mhChain <- function(
     if (asymptote_factor > 1) {
       asymptote_factor <- 1 - SEER_baseline$total_prob
     }
-    asymptote_proposal <- SEER_baseline$total_prob +
+    # For now assume that the the asymptotes for males and females have the same distribituion
+    asymptote_male_proposal <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
-    asymptote_proposal <- max(0, min(1, asymptote_proposal))
+    asymptote_male_proposal <- max(0, min(1, asymptote_male_proposal))
+    asymptote_female_proposal <- SEER_baseline$total_prob +
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+    asymptote_female_proposal <- max(0, min(1, asymptote_female_proposal))
+
     # threshold proposal
     threshold_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
     # Median proposal scaled to lie between either the median SEER age (basedline_mid), per default,
@@ -118,19 +132,20 @@ mhChain <- function(
     # proposal as a lower bound
     first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_proposal - threshold_proposal) + threshold_proposal
-    
+
     # Record the proposed values
     out$median_proposals[i] <- median_proposal
     out$threshold_proposals[i] <- threshold_proposal
     out$first_quartile_proposals[i] <- first_quartile_proposal
-    out$asymptote_proposals[i] <- asymptote_proposal
+    out$asymptote_male_proposals[i] <- asymptote_male_proposal
+    out$asymptote_female_proposals[i] <- asymptote_female_proposal
 
-      # Compute the likelihood for the current and proposed
+    # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
         median_current,
         first_quartile_current, threshold_current,
-        asymptote_current
+        asymptote_male_current, asymptote_female_current
       ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
@@ -145,7 +160,7 @@ mhChain <- function(
       paras =
         c(
           median_proposal, first_quartile_proposal,
-          threshold_proposal, asymptote_proposal
+          threshold_proposal, asymptote_male_proposal, asymptote_female_proposal
         ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
@@ -164,7 +179,8 @@ mhChain <- function(
       median_current <- median_proposal
       threshold_current <- threshold_proposal
       first_quartile_current <- first_quartile_proposal
-      asymptote_current <- asymptote_proposal
+      asymptote_male_current <- asymptote_male_proposal
+      asymptote_female_current <- asymptote_female_proposal
     } else {
       num_rejections <- num_rejections + 1 # Increment the rejection counter
     }
@@ -173,7 +189,8 @@ mhChain <- function(
     out$median_samples[i] <- median_current
     out$threshold_samples[i] <- threshold_current
     out$first_quartile_samples[i] <- first_quartile_current
-    out$asymptote_samples[i] <- asymptote_current
+    out$asymptote_male_samples[i] <- asymptote_male_current
+    out$asymptote_female_samples[i] <- asymptote_female_current
     out$loglikelihood_current[i] <- loglikelihood_current
     out$loglikelihood_proposal[i] <- loglikelihood_proposal
     out$acceptance_ratio[i] <- acceptance_ratio
@@ -251,15 +268,15 @@ mhChain <- function(
 #' analysis (default is FALSE).
 #' @param median_max Boolean indicating whether to use SEER median age or max_age as an
 #' upper bound for the median proposal. Defaults to TRUE, i.e. using the SEER median.
-#' @param sex Option to run the estimation for each sex seperately. The default is estimation 
-#' of one penetrance curve for both sexes (sex = "NA"). Other settings are sex = "Female" and 
-#' sex = "Male". 
-#' @param homozygote Boolean to exclude the possibility of homozygous carriers of the PV in the 
+#' @param sex Option to run the estimation for each sex seperately. The default is estimation
+#' of one penetrance curve for both sexes (sex = "NA"). Other settings are sex = "Female" and
+#' sex = "Male".
+#' @param homozygote Boolean to exclude the possibility of homozygous carriers of the PV in the
 #' genetic model for the penetrance estimation. Default setting is "True", which sets the likelihood
 #' of a homozygous carrier to zero.
 #' @param SeerNC Boolean with default value "True" indicating that the non-carrier penetrance
-#'  is assumed to be the SEER penetrance. If "False", the non-carrier penetrance is calculated 
-#' using the carrier penetrance in calculateNCPen. 
+#'  is assumed to be the SEER penetrance. If "False", the non-carrier penetrance is calculated
+#' using the carrier penetrance in calculateNCPen.
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
 #' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
 #' @param distribution_data Data for generating prior distributions.
@@ -292,7 +309,7 @@ mhChain <- function(
 PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
                      n_iter_per_chain = 200,
                      db = PPP::PanelPRODatabase,
-                     sex ="NA",
+                     sex = "NA",
                      max_age = 94,
                      removeProband = FALSE,
                      median_max = TRUE,
@@ -371,7 +388,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
   parallel::clusterExport(cl, c(
     "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline",
-    "transformDF", "makePriors", "penet.fn",
+    "transformDF", "makePriors", "lik.fn",
     "seeds", "n_iter_per_chain", "sex",
     "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",

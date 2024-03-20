@@ -12,14 +12,16 @@ combine_chains <- function(results) {
     median_results = do.call(c, lapply(results, function(x) x$median_samples)),
     threshold_results = do.call(c, lapply(results, function(x) x$threshold_samples)),
     first_quartile_results = do.call(c, lapply(results, function(x) x$first_quartile_samples)),
-    asymptote_results = do.call(c, lapply(results, function(x) x$asymptote_samples)),
+    asymptote_male_results = do.call(c, lapply(results, function(x) x$asymptote_male_samples)),
+    asymptote_female_results = do.call(c, lapply(results, function(x) x$asymptote_female_samples)),
     loglikelihood_current_results = do.call(c, lapply(results, function(x) x$loglikelihood_current)),
     loglikelihood_proposal_results = do.call(c, lapply(results, function(x) x$loglikelihood_proposal)),
     acceptance_ratio_results = do.call(c, lapply(results, function(x) x$acceptance_ratio)),
     median_proposals = do.call(c, lapply(results, function(x) x$median_proposals)),
     threshold_proposals = do.call(c, lapply(results, function(x) x$threshold_proposals)),
     first_quartile_proposals = do.call(c, lapply(results, function(x) x$first_quartile_proposals)),
-    asymptote_proposals = do.call(c, lapply(results, function(x) x$asymptote_proposals))
+    asymptote_male_proposals = do.call(c, lapply(results, function(x) x$asymptote_male_proposals)),
+    asymptote_female_proposals = do.call(c, lapply(results, function(x) x$asymptote_female_proposals))
   )
 }
 
@@ -38,7 +40,8 @@ generate_summary <- function(data) {
     Median = data$median_results,
     threshold = data$threshold_results,
     First_Quartile = data$first_quartile_results,
-    Asymptote_Value = data$asymptote_results
+    Asymptote_Male_Value = data$asymptote_male_results,
+    Asymptote_Female_Value = data$asymptote_female_results
   )
   summary(summary_data)
 }
@@ -52,41 +55,48 @@ generate_summary <- function(data) {
 #'
 generate_density_plots <- function(data) {
   # Set the plotting parameters
-  par(mfrow = c(2, 2), las = 1, mar = c(5, 4, 4, 2) + 0.1)
-
+  par(mfrow = c(3, 2), las = 1, mar = c(5, 4, 4, 2) + 0.1)  # Adjust grid for 5 plots, now 3 rows and 2 columns
+  
   # Define the specific vectors to plot
-  plot_names <- c("median_results", "first_quartile_results", "asymptote_results", "threshold_results")
-
+  plot_names <- c("median_results", "first_quartile_results", "asymptote_male_results", "asymptote_female_results", "threshold_results")
+  
   for (name in plot_names) {
     if (is.null(data[[name]]) || length(data[[name]]) == 0) {
-      next # Skip this iteration if the data is empty
+      next  # Skip this iteration if the data is empty
     }
-
+    
     mod_name <- gsub("_", " ", name)
     mod_name <- paste0(toupper(substring(mod_name, 1, 1)), substring(mod_name, 2))
-
+    
     # Set xlim based on the name of the vector
     xlim <- if (name %in% c("median_results", "first_quartile_results", "threshold_results")) {
       c(0, 100)
-    } else if (name == "asymptote_results") {
-      c(0.15, 1)
+    } else if (name %in% c("asymptote_male_results", "asymptote_female_results")) {
+      c(0, 1)  # Assuming asymptote values are between 0 and 1
+    } else {
+      range(data[[name]], na.rm = TRUE)  # Default to data range
     }
-
+    
     # Ensure xlim is finite and valid
     if (any(is.infinite(xlim))) {
       xlim <- c(min(data[[name]], na.rm = TRUE), max(data[[name]], na.rm = TRUE))
     }
-
+    
     # Create the histogram
     hist(data[[name]],
-      main = paste("Density Plot of", mod_name),
-      xlab = mod_name,
-      freq = FALSE,
-      xlim = xlim,
-      xaxp = c(min(xlim), max(xlim), 10)
+         main = paste("Density Plot of", mod_name),
+         xlab = mod_name,
+         freq = FALSE,
+         xlim = xlim,
+         breaks = "Sturges",  # Default break algorithm
+         col = "lightblue"  # Optional: color for the histogram
     )
   }
+  
+  # Reset to default single plot setting after plotting
+  par(mfrow = c(1, 1))
 }
+
 
 #' Plot Trace
 #' @param results A list of MCMC chain results.
@@ -102,14 +112,16 @@ plot_trace <- function(results, n_chains) {
     median_results <- results[[chain_id]]$median_samples
     threshold_results <- results[[chain_id]]$threshold_samples
     first_quartile_results <- results[[chain_id]]$first_quartile_samples
-    asymptote_results <- results[[chain_id]]$asymptote_samples
+    asymptote_male_results <- results[[chain_id]]$asymptote_male_samples
+    asymptote_female_results <- results[[chain_id]]$asymptote_female_samples
 
     # Create trace plots for the current chain
 
     plot(median_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Median"), xlab = "Iteration", ylab = "Median")
     plot(threshold_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Threshold"), xlab = "Iteration", ylab = "Threshold")
     plot(first_quartile_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of First Quartile"), xlab = "Iteration", ylab = "First Quartile")
-    plot(asymptote_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Asymptote"), xlab = "Iteration", ylab = "Asymptote")
+    plot(asymptote_male_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Asymptote Male"), xlab = "Iteration", ylab = "Asymptote")
+    plot(asymptote_female_results, type = "l", main = paste("Chain", chain_id, "- Trace plot of Asymptote Female"), xlab = "Iteration", ylab = "Asymptote")
   }
 }
 
@@ -120,14 +132,16 @@ plot_traceSingle <- function(results) {
   median_results <- results$median_samples
   threshold_results <- results$threshold_samples
   first_quartile_results <- results$first_quartile_samples
-  asymptote_results <- results$asymptote_samples
+  asymptote_male_results <- results$asymptote_male_samples
+  asymptote_female_results <- results$asymptote_female_samples
 
   # Create trace plots for the current chain
 
   plot(median_results, type = "l", main = "Trace plot of Median", xlab = "Iteration", ylab = "Median")
   plot(threshold_results, type = "l", main = "Trace plot of Threshold", xlab = "Iteration", ylab = "Threshold")
   plot(first_quartile_results, type = "l", main = "Trace plot of First Quartile", xlab = "Iteration", ylab = "First Quartile")
-  plot(asymptote_results, type = "l", main = "Trace plot of Asymptote", xlab = "Iteration", ylab = "Asymptote")
+  plot(asymptote_male_results, type = "l", main = "Trace plot of Asymptote Male", xlab = "Iteration", ylab = "Asymptote")
+  plot(asymptote_female_results, type = "l", main = "Trace plot of Asymptote Female", xlab = "Iteration", ylab = "Asymptote")
 }
 
 # Running mean calculation
@@ -245,67 +259,69 @@ apply_thinning <- function(results, thinning_factor) {
 #' @examples
 #' plot_weibull_distribution(combine_results, prob = 0.95)
 #'
-plot_penetrance <- function(data, prob, max_age) {
-  # Ensure 'prob' is between 0 and 1
+plot_penetrance <- function(data, prob, max_age, sex = "NA") {
   if (prob <= 0 || prob >= 1) {
     stop("prob must be between 0 and 1")
   }
-
-  # Recover the parameters for plotting the Weibull
+  
   params <- calculate_weibull_parameters(
     data$median_results,
     data$first_quartile_results,
-    data$threshold_results, data$asymptote_results
+    data$threshold_results
   )
-
+  
   alphas <- params$alpha
   betas <- params$beta
-  asymptotes <- data$asymptote_results
   thresholds <- data$threshold_results
-
-  # Define the range for the distribution
+  
   x_values <- seq(0, max_age, length.out = max_age + 1)
-
-  # Initialize an empty list for distributions
-  distributions <- vector("list", length(alphas))
-
-  for (i in seq_along(alphas)) {
-    if (validate_weibull_parameters(
-      data$first_quartile_results[i],
-      data$median_results[i], data$threshold_results[i],
-      data$asymptote_results[i]
-    )) {
-      distributions[[i]] <- pweibull(x_values - thresholds[i],
-        shape = alphas[i], scale = betas[i]
-      ) * asymptotes[i]
+  
+  # Depending on the sex, select the corresponding asymptote values or prepare for both
+  asymptotes_male <- data$asymptote_male_results
+  asymptotes_female <- data$asymptote_female_results
+  
+  plot_distribution <- function(alphas, betas, thresholds, asymptotes, x_values, prob, color, add = FALSE) {
+    distributions <- mapply(function(alpha, beta, threshold, asymptote) {
+      pweibull(x_values - threshold, shape = alpha, scale = beta) * asymptote
+    }, alphas, betas, thresholds, asymptotes, SIMPLIFY = FALSE)
+    
+    distributions_matrix <- matrix(unlist(distributions), nrow = length(x_values), byrow = FALSE)
+    mean_density <- rowMeans(distributions_matrix, na.rm = TRUE)
+    ci_lower <- apply(distributions_matrix, 1, quantile, probs = (1 - prob) / 2, na.rm = TRUE)
+    ci_upper <- apply(distributions_matrix, 1, quantile, probs = 1 - (1 - prob) / 2, na.rm = TRUE)
+    
+    if (!add) {
+      plot(x_values, mean_density, type = "l", col = color,
+           ylim = c(min(ci_lower, na.rm = TRUE), max(ci_upper, na.rm = TRUE)),
+           xlab = "Age", ylab = "Cumulative Penetrance", main = "Penetrance Curve with Credible Interval")
     } else {
-      distributions[[i]] <- rep(NA, length(x_values))
+      lines(x_values, mean_density, col = color)
     }
+    lines(x_values, ci_lower, col = color, lty = 2)
+    lines(x_values, ci_upper, col = color, lty = 2)
+    polygon(c(x_values, rev(x_values)), c(ci_lower, rev(ci_upper)), col = rgb(0, 0, 1, 0.1), border = NA)
   }
-
-  # Convert list to matrix
-  distributions_matrix <- do.call(cbind, distributions)
-
-  # Calculate the credible interval bounds directly from the MCMC samples
-  ci_lower <- apply(distributions_matrix, 1, function(x) quantile(x, probs = (1 - prob) / 2, na.rm = TRUE))
-  ci_upper <- apply(distributions_matrix, 1, function(x) quantile(x, probs = 1 - (1 - prob) / 2, na.rm = TRUE))
-
-  # Calculate the mean density if you want to plot it as well
-  mean_density <- rowMeans(distributions_matrix, na.rm = TRUE)
-
-  # Define the age_range for plotting (corresponds to x_values)
-  age_range <- x_values
-
-   # Reset the plotting window to a single plot layout
-   par(mfrow = c(1, 1))
-
-  # Plotting
-  plot(age_range, mean_density,
-    type = "l", col = "blue", ylim = c(min(ci_lower), max(ci_upper)), xlim =c(1,100),
-    xlab = "Age", ylab = "Cumulative Penetrance", main = "Penetrance Curve with Credible Interval"
-  )
-  lines(age_range, ci_lower, col = "red", lty = 2) # Lower CI
-  lines(age_range, ci_upper, col = "red", lty = 2) # Upper CI
-  polygon(c(age_range, rev(age_range)), c(ci_lower, rev(ci_upper)), col = rgb(1, 0, 0, 0.1), border = NA)
-  legend("topleft", legend = c("Estimated Penetrance", "Credible Interval"), col = c("blue", "red"), lty = c(1, 2), cex = 0.8)
+  
+  if (sex == "Male") {
+    plot_distribution(alphas, betas, thresholds, asymptotes_male, x_values, prob, "blue")
+    legend_text <- "Male Estimated Penetrance"
+  } else if (sex == "Female") {
+    plot_distribution(alphas, betas, thresholds, asymptotes_female, x_values, prob, "red")
+    legend_text <- "Female Estimated Penetrance"
+  } else {
+    plot_distribution(alphas, betas, thresholds, asymptotes_male, x_values, prob, "blue")
+    plot_distribution(alphas, betas, thresholds, asymptotes_female, x_values, prob, "red", add = TRUE)
+    legend_text <- c("Male Estimated Penetrance", "Female Estimated Penetrance")
+  }
+  
+  legend("topleft", 
+         legend = legend_text, 
+         col = c("blue", "red"), 
+         lty = c(1, 1), 
+         cex = 0.8)
 }
+
+
+
+plot_penetrance(out_sim_1$combined_chains,0.95,94)
+

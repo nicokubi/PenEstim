@@ -68,7 +68,7 @@ generate_proposal <- function(distribution_func, args_list) {
 #' @export
 
 calculate_weibull_parameters <-
-    function(given_median, given_first_quartile, delta, gamma) {
+    function(given_median, given_first_quartile, delta) {
         # Calculate alpha
         alpha <- log(log(4 / 3) / log(2)) /
             log((given_first_quartile - delta) / (given_median - delta))

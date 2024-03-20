@@ -131,71 +131,62 @@ calculateNCPen <- function(SEER_baseline, alpha, beta, delta, gamma, af, max_age
 #' penet.fn(1, individual_data, 1.0, 2.0, 0.5, 0.8, 80, baselineRisk, FALSE, TRUE, "Female")
 #' @export
 #'
-penet.fn <- function(i, data, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote, SeerNC, sex) {
+lik.fn <- function(i, data, alpha, beta, delta, gamma_male, gamma_female, max_age, baselineRisk, homozygote, SeerNC, sex) {
     # Map sex to row index: "Female" is 1st row and "Male" is 2nd row
     sex_index <- ifelse(data$sex[i] == 2, 1, 2)
 
+    # Select gamma based on individual's sex
+    # in data the 1 indicates male, 2 indicates female 
+    gamma <- ifelse(data$sex[i] == 1, gamma_male, gamma_female)
+
     if (data$age[i] == 0) {
-        penet.i <- c(1, 1, 1) # Assuming people aged 0 years are all unaffected
+        lik.i <- c(1, 1, 1) # Assuming people aged 0 years are all unaffected
     } else {
         # Ensure age is within the valid range
         age_index <- min(max_age, data$age[i])
 
-        # Weibull with four parameters for the penetrance
-        # For now we just have one penetrance, irrespective of sex
+        # Weibull parameters for penetrance, using sex-specific gamma
         survival_prob <- 1 - pweibull(data$age[i] - delta, shape = alpha, scale = beta) * gamma
-        c.pen <- dweibull(data$age[i] - delta, shape = alpha, scale = beta) * gamma 
+        c.pen <- dweibull(data$age[i] - delta, shape = alpha, scale = beta) * gamma
 
         # Extract the corresponding baseline risk for sex and age
-        #  Cumulative baseline until max_age
         SEER_baseline_max <- baselineRisk[sex_index, 1:max_age]
-        # cumulative baseline until age of individual i
         SEER_baseline_cum <- baselineRisk[sex_index, 1:age_index]
-        # baseline probability for the age of individual i
         SEER_baseline_i <- baselineRisk[sex_index, age_index]
 
-        # Calculate cumulative risk for non-carriers based on SEER data or other model  
+        # Calculate cumulative risk for non-carriers based on SEER data or other model
         if (SeerNC == TRUE) {
             nc.pen <- SEER_baseline_i
-            # calculative cumulative product for being cancer-free for non-carriers
             nc.pen.c <- 1 - sum(SEER_baseline_cum)
         } else {
             nc.pen <- calculateNCPen(
                 SEER_baseline = SEER_baseline_max, alpha = alpha,
-                beta = beta, delta = delta, gamma = gamma, , af = af, max_age = max_age,
+                beta = beta, delta = delta, gamma = gamma, max_age = max_age,
                 homozygote = homozygote
             )$weightedCarrierRisk[age_index]
-            # calculative cumulative product for being cancer-free for non-carriers
             nc.pen.c <- calculateNCPen(
                 SEER_baseline = SEER_baseline_max, alpha = alpha,
-                beta = beta, delta = delta, gamma = gamma, , af = af, max_age = max_age,
+                beta = beta, delta = delta, gamma = gamma, max_age = max_age,
                 homozygote = homozygote
             )$cumulativeProb[age_index]
         }
 
-        # Penetrance calculations based on genotype
-        # Assuming same penetrance for homozygous and heterozygous carriers of the PV
-        penet.i <- c(nc.pen.c, survival_prob, survival_prob) # for censored observations
-        if (data$aff[i] == 1) penet.i <- c(nc.pen, c.pen, c.pen) # for affected observations
+        # Penetrance calculations based on genotype and affection status
+        lik.i <- c(nc.pen.c, survival_prob, survival_prob) # for censored observations
+        if (data$aff[i] == 1) lik.i <- c(nc.pen, c.pen, c.pen) # for affected observations
     }
 
     # Adjustment for observed genotypes
-    if (data$geno[i] == "1/1") penet.i[-1] <- 0
-    if (data$geno[i] == "1/2") penet.i[-2] <- 0
-    if (data$geno[i] == "2/2") penet.i[-3] <- 0
+    if (data$geno[i] == "1/1") lik.i[-1] <- 0
+    if (data$geno[i] == "1/2") lik.i[-2] <- 0
+    if (data$geno[i] == "2/2") lik.i[-3] <- 0
 
     # Setting the third element to 0 if homozygote is FALSE
     if (!homozygote) {
-        penet.i[3] <- 0
+        lik.i[3] <- 0
     }
 
-    # Adjusting for gender
-    #pen <- 1e-28
-    #if (sex == "Male" && data$sex[i] != 2) penet.i <- c(pen, pen, pen)
-    #if (sex == "Female" && data$sex[i] != 1) penet.i <- c(pen, pen, pen)
-    #if (sex == "NA") penet.i <- penet.i
-
-    return(penet.i)
+    return(lik.i)
 }
 
 #' Calculate Log Likelihood using clipp Package
@@ -223,10 +214,11 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     given_median <- paras[1]
     given_first_quartile <- paras[2]
     delta <- paras[3]
-    gamma <- paras[4]
+    gamma_male <- paras[4]
+    gamma_female <- paras[5]
 
     # Calculate Weibull parameters
-    params <- calculate_weibull_parameters(given_median, given_first_quartile, delta, gamma)
+    params <- calculate_weibull_parameters(given_median, given_first_quartile, delta)
     alpha <- params$alpha
     beta <- params$beta
 
@@ -239,19 +231,21 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     )
 
     # Calculate penetrance
-    penet <- t(sapply(1:nrow(families), function(i) {
-        penet.fn(i, families, alpha, beta, delta, gamma, max_age, baselineRisk, homozygote = homozygote, SeerNC = SeerNC, sex = sex)
+    lik <- t(sapply(1:nrow(families), function(i) {
+        lik.fn(i, families, alpha, beta, delta, gamma_male, gamma_female,
+         max_age, baselineRisk, homozygote = homozygote, SeerNC = SeerNC, sex = sex)
     }))
 
     # Compute log-likelihood
-    loglik <- pedigree_loglikelihood(families, geno_freq, trans, penet, ncores = 1)
+    loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 1)
 
     # Handle -Inf values
     if (is.infinite(loglik) && loglik == -Inf) {
         penalty <- 1e-28
         loglik <- log(penalty)
     } else {
-        cat("Parameters:", given_median, given_first_quartile, alpha, beta, delta, gamma, "\n")
+        cat("Parameters:", given_median, given_first_quartile, alpha, beta, delta, 
+        gamma_male, gamma_female, "\n")
         cat("Log Likelihood:", loglik, "\n")
     }
 
