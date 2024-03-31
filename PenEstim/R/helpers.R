@@ -18,26 +18,37 @@
 #'
 #' @export
 
-calculate_lifetime_risk <- function(cancer_type, gene, race, sex, type, db) {
+calculate_lifetime_risk <- function(cancer_type, gene, race, type, db) {
     # Find the indices for the respective attributes
     dim_names <- attr(db$Penetrance, "dimnames")
     gene_index <- which(dim_names$Gene == gene)
     cancer_index <- which(dim_names$Cancer == cancer_type)
     race_index <- which(dim_names$Race == race)
     type_index <- which(dim_names$PenetType == type)
+    
+    cumulative_risk <- list(
+      female = numeric(94),
+      male = numeric(94),
+      joint = numeric(93)
+    )
+    
+    lifetime_risk <- list(
+      female = numeric(94),
+      male = numeric(94),
+      joint = numeric(93)
+    )
 
     # Calculate the cumulative risk
-    if (sex == "NA") {
-    lifetime_risk <- db$Penetrance[cancer_index, gene_index, race_index, , , type_index]
-    lifetime_risk <- colMeans(lifetime_risk)
-    } else {
-       sex_index <- which(dim_names$Sex == sex)
-       lifetime_risk <- db$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
-    }
-    cumulative_risk <- cumsum(lifetime_risk)
-    total_prob <- sum(lifetime_risk)
+        risk <- db$Penetrance[cancer_index, gene_index, race_index, , , type_index]
+        cumulative_risk$female <- cumsum(risk[1,])
+        cumulative_risk$male <- cumsum(risk[2,])
+        cumulative_risk$joint <- cumsum(colMeans(risk))
+        
+        lifetime_risk$female <- sum(risk[1,])
+        lifetime_risk$male <- sum(risk[2,])
+        lifetime_risk$joint <- sum(colMeans(risk))
 
-    return(list(lifetime_risk = lifetime_risk, cumulative_risk = cumulative_risk, total_prob = total_prob))
+    return(list(risk = risk, cumulative_risk = cumulative_risk, lifetime_risk = lifetime_risk))
 }
 
 # Function to generate proposals
@@ -193,7 +204,6 @@ prepAges <- function(data, removeProband = FALSE) {
 #' @examples
 #' # Transform a data frame
 #' transformed_df <- transformDF(input_df)
-
 transformDF <- function(df, cancer_type, gene_input) {
     # Check if the cancer type is valid
     if (!cancer_type %in% CANCER_NAME_MAP$long) {

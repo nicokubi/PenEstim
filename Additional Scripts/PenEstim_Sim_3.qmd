@@ -1,0 +1,446 @@
+---
+title: "PenEstim"
+subtitle: "Simulation Study"
+format: 
+  html:
+    toc: true
+    toc-location: body
+date: 3-19-2024
+theme: lightly
+author:
+  - name: "Nicolas Kubista"
+    affiliations: "Harvard University"
+embed-resources: true
+toc: true
+toc-expand: 2
+toc-title: Contents
+page-layout: full
+code-fold: true
+editor: visual
+---
+
+```{r, echo=FALSE, include=FALSE}
+library(tidyverse)
+library(PPP)
+library(parallel)
+library(dplyr)
+library(stats4)
+library(clipp)
+library(survival)
+
+
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/prior_elicitation.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/helpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/outputHelpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mhLoglikehood_clipp.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mcmcPenetrance.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/InternalVars.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional Scripts/EstimEval.R")
+
+set.seed(2024)
+```
+
+# Simulated Families
+
+```{r desc fams, echo=FALSE, cache=TRUE}
+
+# Function to describe the families
+describeFamilies <- function(fams, cancer, gene) {
+  # Validate and translate cancer type
+  if (!cancer %in% CANCER_NAME_MAP$long) {
+    stop("Cancer type '", cancer, "' is not supported. Please choose from the supported list.")
+  }
+  
+  # Get the abbreviation for the cancer type
+  cancer_index <- which(CANCER_NAME_MAP$long == cancer)
+  cancer_short <- CANCER_NAME_MAP$short[cancer_index]
+  
+  # Construct column names based on cancer type and gene input
+  aff_col_name <- paste0("isAff", cancer_short)
+  age_col_name <- paste0("Age", cancer_short)
+  
+  # Initialize counters and vectors for storing data
+  affectedFamilies = 0 
+  affectedProbands = 0
+  famSizes = c()
+  geneFamilies = 0
+  geneProbands = 0 
+  curAges = c()
+  cancerAges = c()
+  pbCancerAges = c()
+  pbCurAges = c()
+  pbCancerAgesFemale = c()
+  affectedFemaleProbands = 0
+  geneFemaleProbands = 0 
+  cancerAgesFemale = c()
+  total_individuals = 0
+  gene_individuals = 0
+  
+  # Process each family
+  for(i in 1:length(fams)){
+    f = fams[[i]]
+    sizeOfFamily = nrow(f)
+    total_individuals = total_individuals + sizeOfFamily
+    famSizes = c(famSizes, sizeOfFamily)
+    curAges = c(curAges, f$CurAge)  
+    f = f %>% dplyr::filter(!!rlang::sym(aff_col_name) == 1, isProband == 0) 
+    cancerAges <- c(cancerAges, f[[age_col_name]])  
+    ff = fams[[i]] %>% dplyr::filter(!!rlang::sym(gene) == 1, !!rlang::sym(aff_col_name) == 1) 
+    gene_individuals = gene_individuals + nrow(ff)
+    cancerAgesFemale <- c(cancerAgesFemale, ff[[age_col_name]])  
+
+    if(nrow(f)>0){
+      affectedFamilies = affectedFamilies + 1
+    }
+    geneFams = fams[[i]] %>% dplyr::filter(isProband == 0, !!rlang::sym(gene) == 1)
+    if(nrow(geneFams) > 0){
+     geneFamilies = geneFamilies + 1
+    }
+    
+    pb <- fams[[i]] %>% dplyr::filter(isProband == 1)
+    pbfemale <- fams[[i]] %>% dplyr::filter(isProband == 1, Sex == 0)
+    
+    if (nrow(pbfemale) > 0) {
+      pbCancerAgesFemale <- c(pbCancerAgesFemale, pbfemale[[age_col_name]])
+      if (any(pbfemale[[aff_col_name]] == 1)){
+        affectedFemaleProbands <- affectedFemaleProbands + 1
+      }
+      if (!is.na(pbfemale[[gene]])){
+        if (any(pbfemale[[gene]] == 1)){
+          geneFemaleProbands <- geneFemaleProbands + 1
+        }
+      }
+    }
+  
+    pbCancerAges <- c(pbCancerAges, pb[[age_col_name]])
+    pbCurAges <- c(pbCurAges, pb$CurAge)  
+    
+    if (any(pb[[aff_col_name]] == 1)){
+      affectedProbands <- affectedProbands + 1
+    }
+    
+    if (!is.na(pb[[gene]])){
+      if (any(pb[[gene]] == 1)){
+        geneProbands <- geneProbands + 1
+      }
+    }
+  }
+
+  print(paste0("Number of families: ", length(fams)))
+  print(paste0("Total Individuals: ", total_individuals))
+  print(paste0("Average family size: ", mean(famSizes)))
+  print("Summary of family sizes")
+  print(summary(famSizes))
+  print("Summary of Current Age for all family members")
+  print(summary(curAges))
+  print("Summary of Current Age for probands")
+  print(summary(pbCurAges))
+  
+  print(paste0("Number of families with affected individuals (", cancer, "): ", 
+               affectedFamilies))
+  print(paste0("Number of families with affected probands (", cancer, "): ", 
+               affectedProbands))
+  print(paste0("Number of families with affected female probands (", cancer, "): ", 
+               affectedFemaleProbands))
+  print(paste0("Number of families with relatives with PV (and not the proband) (", gene, "): ", geneFamilies))
+  print(paste0("Number of probands with PV (", gene, "): ", geneProbands))
+  print(paste0("Number of female probands with PV (", gene, "): ", 
+               geneFemaleProbands))
+  print(paste0("Number of individuals with PV (", gene, "): ", gene_individuals))
+  
+  print("Summary of Cancer Age of (female) probands")
+  print(summary(pbCancerAgesFemale))
+
+  print("Summary of Cancer Age in affected (non-proband) individuals")
+  print(summary(cancerAges))
+}
+
+# Load the families of the simulation
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated\ Families/simfamilies_sim1.RData")
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated\ Families/simfamilies_sim2.RData")
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Simulated\ Families/simfamilies_sim3.RData")
+
+# Load the additonal families
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Old/peelingpearingestim/simFamilies_C_1000_nocen_selected300.RData")
+```
+
+We simulated three different sizes of families. For each simulation run we subsetted the families to only include those families where the proband was a carrier of the PV. The simulation was done using the PedUtils package. The penetrance for non-carriers is based on the SEER penetrances in the PanelPRO Database. For carriers we specify a Weibull penetrance with the following parameters:
+
+-   Alpha = 2.5
+
+-   Beta = 50
+
+-   Delta = 20
+
+-   Gamma = 0.9
+
+## Family Sim 1- Uncensored
+```{r fam1, echo=FALSE, cache=TRUE}
+print(describeFamilies(simFamilies_C_1000_nocen_selected300, "Breast","BRCA1"))
+```
+
+Censoring is based on a $$N(85,10)$$. The simulated age of death is centered at 85 with a standard deviation of 10, but values above ageMax (default = 94) are re-simulated to be centered around ageMax - 15.
+
+## Family Sim 3 - Uncensored 
+
+```{r fam3, echo=FALSE, cache=TRUE}
+print(describeFamilies(simfamilies_sim3, "Breast","BRCA1"))
+```
+
+# Likelihood
+
+The likelihood model in `penet.fn` is based on the Weibull distribution for carriers and, per default, the SEER peentrance data for non-carriers. For an individual $i$, the model considers the following parameters:
+
+-   $\alpha$: Shape parameter of the Weibull distribution
+-   $\beta$: Scale parameter of the Weibull distribution
+-   $\delta$: Shift parameter for the age in the Weibull function
+-   $\gamma$: Asymptote parameter to adjust the scale of the Weibull function
+-   $\text{age}_i$: Age of the individual $i$
+-   $\text{aff}_i$: Affection status (1 if affected, 0 otherwise)
+
+An indiviudal that develops cancer at $\text{age}_i$ contributes a term $f$ to the likelihood, which is just the density of the Weibull in our model. The contribution from an individual whose survival time is censored at is the survival probability $S_i = 1 - F$ where $F$ is corresponding cumulative distribution function of the Weibull. 
+
+The survival probability for individual $i$ is calculated as: $$S_i = 1 - pweibull(\text{age}_i - \delta, \alpha, \beta) \times \gamma$$ where pweibull is the CDF of the Weibull.
+
+The density (for affected individuals) is calculated as:
+
+$$ carrierLik_i = dweibull(\text{age}_i - \delta, \alpha, \beta) \times \gamma $$
+
+For the function \( f(x; \alpha, \beta, \delta, \gamma) \) we define:
+
+$$
+f(x; \alpha, \beta, \delta, \gamma) = 
+\begin{cases} 
+\gamma \left( \frac{\alpha}{\beta} \left( \frac{x - \delta}{\beta} \right)^{\alpha - 1} e^{-\left( \frac{x - \delta}{\beta} \right)^\alpha } \right), & x \geq \delta \\
+0, & x < \delta
+\end{cases}
+$$
+
+And for the cumulative distribution function \( F(x; \alpha, \beta, \delta, \gamma) \):
+
+$$
+F(x; \alpha, \beta, \delta, \gamma) =
+\begin{cases} 
+\gamma \left( 1 - e^{-\left( \frac{x - \delta}{\beta} \right)^\alpha } \right), & x \geq \delta \\
+0, & x < \delta
+\end{cases}
+$$
+
+
+The baseline risk $\text{SEER\_baseline}_i$ is derived from SEER data:
+
+$$
+\text{noncarrierLik}_i = 
+\begin{cases} 
+\text{SEER\_baseline}_i & \text{if SeerNC is TRUE} \\
+\text{Custom non-carrier penetrance model} & \text{otherwise}
+\end{cases}
+$$
+
+For censored observations, the likelihood contribution for each individual is considered as the cumulative probability of being cancer-free, while for affected observations, it is based on the calculated density at their age of diagnosis.
+
+Hence, the penetrance likelihood contribution for individual $i$ and for all three potential genotypes 1/1 (non-carriers), 1/2 (heterozygous carrier), and 2/2 (homozygous carrier) is:
+
+$$
+\text{lik}_i = 
+\begin{cases} 
+1 - \sum_{j=1}^{\text{age}_i} \text{SEER\_baseline}_{ij}, S_i, S_i & \text{if } \text{aff}_i = 0 \\
+\text{nc.pen}_i, \text{c.pen}_i, \text{c.pen}_i & \text{if } \text{aff}_i = 1
+\end{cases}
+$$
+
+The adjustments for observed genotypes, gender-specific handling, and the condition for homozygotes are given as follows.
+
+\begin{verbatim}
+if (data$geno[i] == "1/1") penet.i[-1] <- 0
+if (data$geno[i] == "1/2") penet.i[-2] <- 0
+if (data$geno[i] == "2/2") penet.i[-3] <- 0
+
+if (!homozygote) {
+    penet.i[3] <- 0
+}
+
+Based on the above a penetrance matrix is constructed for the pedigree. The `(i, k)`^th^ component `penet[i, k]` of the penetrance matrix is the conditional probability of person `i`'s observed data $x_i$, given that his or her actual genotype $g_i$ is the `k`^th^ genotype. Given a genetic model and a penetrance matrix, we then use `clipp` to calculate the loglikelihood for all pedigrees.
+
+Based on the above model we then estimate two sets of sex-specific parameters of the Weibull distribution for males and females. The resulting estimated penetrance curves including credible intervals for a) a set of uncensored families and b) censored families is shown below. 
+
+# Families Sim - Uncensored - Fixed Asymptote
+
+```{r est1, echo=TRUE, cache=TRUE}
+dat<- simFamilies_C_1000_nocen_selected300
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 900, g2 = 100),
+    threshold = list(min = 15, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_10k_simC300 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2500, 
+    prior_params = prior_params_BRCA1, af = 0.9, burn_in = 0.1, sex = "Female"
+)
+
+# print summary stats
+out_sim_10k_simC300$summary_stats
+plot_traceSingle(out_sim_10k_simC300$results[[1]])
+plot_penetrance_sim(out_sim_10k_simC300$combined_chains, prob = 0.95, max_age = 94, sex = "Female",2.5,50,20,0.9)
+
+
+# Plot the running mean 
+#runFQ<- running_mean(out_sim_10k_simC300$results[[1]]$first_quartile_msamples)
+#runMed <- running_mean(out_sim_10k_simC300$results[[1]]$median_samples)
+#runThreshold <- running_mean(out_sim_10k_simC300$results[[1]]$threshold_samples)
+#runAsy <- running_mean(out_sim_10k_simC300$results[[1]]$asymptote_samples)
+
+# Plot running mean
+#plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+#plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+#plot(runThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Threshold Samples")
+#plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+# Plot the running var 
+#runVFQ<- running_variance(out_sim_10k_simC300$results[[1]]$first_quartile_samples)
+#runVMed <- running_variance(out_sim_10k_simC300$results[[1]]$median_samples)
+#runVThreshold <- running_variance(out_sim_10k_simC300$results[[1]]$threshold_samples)
+#runVAsy <- running_variance(out_sim_10k_simC300$results[[1]]$asymptote_samples)
+
+# Plot running var
+#plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+#plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+#plot(runVThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Threshold Samples")
+#plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+
+  # Autocorrelation plots
+acf(out_sim_10k_simC300$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+acf(out_sim_10k_simC300$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+acf(out_sim_10k_simC300$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+acf(out_sim_10k_simC300$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+acf(out_sim_10k_simC300$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+acf(out_sim_10k_simC300$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+acf(out_sim_10k_simC300$results[[1]]$asymptote_male_samples, main = "ACF of Asymptote - Male")
+acf(out_sim_10k_simC300$results[[1]]$asymptote_female_samples, main = "ACF of Asymptote - Female")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_10k_simC300$combined_chains$median_male_results, out_sim_10k_simC300$combined_chains$first_quartile_male_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_10k_simC300$combined_chains$median_female_results, out_sim_10k_simC300$combined_chains$first_quartile_female_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+# Families Sim3 - Censored - Fixed Asymptote
+
+In this simulation the penetrance estimation is applied to the first set of families from sim1. The default prior settings are applied here with a uniform prior on the asymptote parameter.
+We estimate two sets of parameters of the Weibull distribution, seperately for male and female carriers. The respective non-carrier penetrance values are taken from the SEER baseline.
+
+
+```{r est2, echo=TRUE, cache=TRUE}
+dat <- simfamilies_sim3
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 900, g2 = 100),
+    threshold = list(min = 15, max = 25),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_3 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2500, 
+    prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
+)
+save(out_sim_3, file = "out_sim_3.Rdata")
+
+# print summary stats
+out_sim_3$summary_stats
+plot_traceSingle(out_sim_3$results[[1]])
+plot_penetrance_sim(out_sim_3$combined_chains, prob = 0.95, max_age = 94,"Female",2.5,50,20,0.9)
+
+# Plot the running mean 
+#runFQ<- running_mean(out_sim_3$results[[1]]$first_quartile_samples)
+#runMed <- running_mean(out_sim_3$results[[1]]$median_samples)
+#runThreshold <- running_mean(out_sim_3$results[[1]]$threshold_samples)
+#runAsy <- running_mean(out_sim_3$results[[1]]$asymptote_samples)
+
+# Plot running mean
+#plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+#plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+#plot(runThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Threshold Samples")
+#plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+# Plot the running var 
+#runVFQ<- running_variance(out_sim_3$results[[1]]$first_quartile_samples)
+#runVMed <- running_variance(out_sim_3$results[[1]]$median_samples)
+#runVThreshold <- running_variance(out_sim_3$results[[1]]$threshold_samples)
+#runVAsy <- running_variance(out_sim_3$results[[1]]$asymptote_samples)
+
+# Plot running var
+#plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+#plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+#plot(runVThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Threshold Samples")
+#plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+# Autocorrelation plots
+acf(out_sim_3$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+acf(out_sim_3$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+acf(out_sim_3$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+acf(out_sim_3$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+acf(out_sim_3$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+acf(out_sim_3$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+acf(out_sim_3$results[[1]]$asymptote_male_samples, main = "ACF of Asymptote - Male")
+acf(out_sim_3$results[[1]]$asymptote_female_samples, main = "ACF of Asymptote - Female")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_3$combined_chains$median_male_results, out_sim_3$combined_chains$first_quartile_male_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_3$combined_chains$median_female_results, out_sim_3$combined_chains$first_quartile_female_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+

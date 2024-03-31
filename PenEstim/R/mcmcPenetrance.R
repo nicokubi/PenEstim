@@ -41,56 +41,90 @@ mhChain <- function(
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", race = "All_Races", sex = sex, type = "Net", db = db)
-  midpoint_prob <- SEER_baseline$total_prob / 2
-  midpoint_index <- which(SEER_baseline$cumulative_risk >= midpoint_prob)[1]
-  baseline_mid <- as.numeric(names(SEER_baseline$cumulative_risk)[midpoint_index])
+  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, 
+  gene = "SEER", race = "All_Races", type = "Net", db = db)
+  midpoint_prob_male <- SEER_baseline$lifetime_risk$male / 2
+  midpoint_prob_female <- SEER_baseline$lifetime_risk$female / 2
+  midpoint_index_male <- which(SEER_baseline$cumulative_risk$male >= midpoint_prob_male)[1]
+  midpoint_index_female <- which(SEER_baseline$cumulative_risk$female >= midpoint_prob_female)[1]
+  baseline_mid_male <- as.numeric(names(SEER_baseline$cumulative_risk$male)[midpoint_index_male])
+  baseline_mid_female <- as.numeric(names(SEER_baseline$cumulative_risk$female)[midpoint_index_female])
 
   draw_initial_params <- function() {
-    asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
-    if (asymptote_factor > 1) {
-      asymptote_factor <- 1 - SEER_baseline$total_prob
+    asymptote_factor_male <- 2 * max_penetrance - SEER_baseline$lifetime_risk$male
+    if (asymptote_factor_male > 1) {
+      asymptote_factor_male <- 1 - SEER_baseline$lifetime_risk$male
+    }
+    asymptote_factor_female <- 2 * max_penetrance - SEER_baseline$lifetime_risk$female
+    if (asymptote_factor_female > 1) {
+      asymptote_factor_female <- 1 - SEER_baseline$lifetime_risk$female
     }
     asymptote_male <- SEER_baseline$total_prob +
-      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_male
     asymptote_female <- SEER_baseline$total_prob +
-      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_female
 
     asymptote_male <- max(0, min(1, asymptote_male))
     asymptote_female <- max(0, min(1, asymptote_female))
 
-    threshold <- do.call(prior_distributions$threshold_distribution, list(1))
-    median <- if (median_max) {
-      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - threshold) + threshold
+    threshold_male <- do.call(prior_distributions$threshold_distribution, list(1))
+    threshold_female <- do.call(prior_distributions$threshold_distribution, list(1))
+    median_male <- if (median_max) {
+      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid_male - threshold_male) + threshold_male
     } else {
-      do.call(prior_distributions$median_distribution, list(1)) * (max_age - threshold) + threshold
+      do.call(prior_distributions$median_distribution, list(1)) * (max_age - threshold_male) + threshold_male
     }
-    first_quartile <- do.call(prior_distributions$first_quartile_distribution, list(1)) * (median - threshold) + threshold
+    median_female <- if (median_max) {
+      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid_female - threshold_female) + threshold_female
+    } else {
+      do.call(prior_distributions$median_distribution, list(1)) * (max_age - threshold_female) + threshold_female
+    }
+    first_quartile_male <- do.call(
+      prior_distributions$first_quartile_distribution,
+      list(1)
+    ) * (median_male - threshold_male) + threshold_male
+
+    first_quartile_female <- do.call(
+      prior_distributions$first_quartile_distribution,
+      list(1)
+    ) * (median_female - threshold_female) + threshold_female
+
 
     return(list(
-      first_quartile = first_quartile, median = median, threshold = threshold,
+      first_quartile_male = first_quartile_male, first_quartile_female = first_quartile_female,
+      median_male = median_male, median_female = median_female, threshold_male = threshold_male,
+      threshold_female = threshold_female,
       asymptote_male = asymptote_male, asymptote_female = asymptote_female
     ))
   }
 
   initial_params <- draw_initial_params()
-  first_quartile_current <- initial_params$first_quartile
-  median_current <- initial_params$median
-  threshold_current <- initial_params$threshold
+  first_quartile_male_current <- initial_params$first_quartile_male
+  first_quartile_female_current <- initial_params$first_quartile_female
+  median_male_current <- initial_params$median_male
+  median_female_current <- initial_params$median_female
+  threshold_male_current <- initial_params$threshold_male
+  threshold_female_current <- initial_params$threshold_female
   asymptote_male_current <- initial_params$asymptote_male
   asymptote_female_current <- initial_params$asymptote_female
 
   num_rejections <- 0
 
   out <- list(
-    median_samples = numeric(n_iter),
-    threshold_samples = numeric(n_iter),
-    first_quartile_samples = numeric(n_iter),
+    median_male_samples = numeric(n_iter),
+    median_female_samples = numeric(n_iter),
+    threshold_male_samples = numeric(n_iter),
+    threshold_female_samples = numeric(n_iter),
+    first_quartile_male_samples = numeric(n_iter),
+    first_quartile_female_samples = numeric(n_iter),
     asymptote_male_samples = numeric(n_iter),
     asymptote_female_samples = numeric(n_iter),
-    median_proposals = numeric(n_iter),
-    threshold_proposals = numeric(n_iter),
-    first_quartile_proposals = numeric(n_iter),
+    median_male_proposals = numeric(n_iter),
+    median_female_proposals = numeric(n_iter),
+    threshold_male_proposals = numeric(n_iter),
+    threshold_female_proposals = numeric(n_iter),
+    first_quartile_male_proposals = numeric(n_iter),
+    first_quartile_female_proposals = numeric(n_iter),
     asymptote_male_proposals = numeric(n_iter),
     asymptote_female_proposals = numeric(n_iter),
     loglikelihood_current = numeric(n_iter),
@@ -107,44 +141,65 @@ mhChain <- function(
     # Asymptote proposal is scaled to lie between either 2 * max_penetrane (a user-defined asymptote value
     # based on prior information) or 1 as the upper bound and the total cumulative probability of
     # the SEER baseline as the lower bound
-    asymptote_factor <- 2 * max_penetrance - SEER_baseline$total_prob
-    if (asymptote_factor > 1) {
-      asymptote_factor <- 1 - SEER_baseline$total_prob
+    asymptote_factor_male <- 2 * max_penetrance - SEER_baseline$lifetime_risk$male
+    if (asymptote_factor_male > 1) {
+      asymptote_factor_male <- 1 - SEER_baseline$lifetime_risk$male
+    }
+    asymptote_factor_female <- 2 * max_penetrance - SEER_baseline$lifetime_risk$female
+    if (asymptote_factor_female > 1) {
+      asymptote_factor_female <- 1 - SEER_baseline$lifetime_risk$female
     }
     # For now assume that the the asymptotes for males and females have the same distribituion
-    asymptote_male_proposal <- SEER_baseline$total_prob +
-      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+    asymptote_male_proposal <- SEER_baseline$lifetime_risk$male +
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_male
     asymptote_male_proposal <- max(0, min(1, asymptote_male_proposal))
-    asymptote_female_proposal <- SEER_baseline$total_prob +
-      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor
+    asymptote_female_proposal <- SEER_baseline$lifetime_risk$female +
+      do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_female
     asymptote_female_proposal <- max(0, min(1, asymptote_female_proposal))
 
     # threshold proposal
-    threshold_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
+    threshold_male_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
+    threshold_female_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
     # Median proposal scaled to lie between either the median SEER age (basedline_mid), per default,
     # or the max_age as an upper bound and threshold proposal as a lower bound
-    median_proposal <- if (median_max) {
-      do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid - threshold_proposal) + threshold_proposal
+    median_male_proposal <- if (median_max) {
+      do.call(prior_distributions$median_distribution, list(1)) *
+        (baseline_mid_male - threshold_male_proposal) + threshold_male_proposal
     } else {
-      do.call(prior_distributions$median_distribution, list(1)) * (max_age - threshold_proposal) + threshold_proposal
+      do.call(prior_distributions$median_distribution, list(1)) *
+        (max_age - threshold_male_proposal) + threshold_male_proposal
+    }
+    median_female_proposal <- if (median_max) {
+      do.call(prior_distributions$median_distribution, list(1)) *
+        (baseline_mid_female - threshold_female_proposal) + threshold_female_proposal
+    } else {
+      do.call(prior_distributions$median_distribution, list(1)) *
+        (max_age - threshold_female_proposal) + threshold_female_proposal
     }
     # First Quartile proposal scaled to lie between the median proposal as an upper bound and threshold
     # proposal as a lower bound
-    first_quartile_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
-      (median_proposal - threshold_proposal) + threshold_proposal
+    first_quartile_male_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
+      (median_male_proposal - threshold_male_proposal) + threshold_male_proposal
+
+    first_quartile_female_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
+      (median_female_proposal - threshold_female_proposal) + threshold_female_proposal
 
     # Record the proposed values
-    out$median_proposals[i] <- median_proposal
-    out$threshold_proposals[i] <- threshold_proposal
-    out$first_quartile_proposals[i] <- first_quartile_proposal
+    out$median_male_proposals[i] <- median_male_proposal
+    out$median_female_proposals[i] <- median_female_proposal
+    out$threshold_male_proposals[i] <- threshold_male_proposal
+    out$threshold_female_proposals[i] <- threshold_female_proposal
+    out$first_quartile_male_proposals[i] <- first_quartile_male_proposal
+    out$first_quartile_female_proposals[i] <- first_quartile_female_proposal
     out$asymptote_male_proposals[i] <- asymptote_male_proposal
     out$asymptote_female_proposals[i] <- asymptote_female_proposal
 
     # Compute the likelihood for the current and proposed
     loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
-        median_current,
-        first_quartile_current, threshold_current,
+        median_male_current, median_female_current,
+        first_quartile_male_current, first_quartile_female_current,
+        threshold_male_current, threshold_female_current,
         asymptote_male_current, asymptote_female_current
       ), families = data,
       max_age = max_age,
@@ -159,8 +214,10 @@ mhChain <- function(
     loglikelihood_proposal <- mhLogLikelihood_clipp(
       paras =
         c(
-          median_proposal, first_quartile_proposal,
-          threshold_proposal, asymptote_male_proposal, asymptote_female_proposal
+          median_male_proposal, median_female_proposal,
+          first_quartile_male_proposal, first_quartile_female_proposal,
+          threshold_male_proposal, threshold_female_proposal,
+          asymptote_male_proposal, asymptote_female_proposal
         ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
@@ -176,9 +233,12 @@ mhChain <- function(
 
     # Accept or reject the proposal
     if (runif(1) < acceptance_ratio) {
-      median_current <- median_proposal
-      threshold_current <- threshold_proposal
-      first_quartile_current <- first_quartile_proposal
+      median_male_current <- median_male_proposal
+      median_female_current <- median_female_proposal
+      threshold_male_current <- threshold_male_proposal
+      threshold_female_current <- threshold_female_proposal
+      first_quartile_male_current <- first_quartile_male_proposal
+      first_quartile_female_current <- first_quartile_female_proposal
       asymptote_male_current <- asymptote_male_proposal
       asymptote_female_current <- asymptote_female_proposal
     } else {
@@ -186,9 +246,12 @@ mhChain <- function(
     }
 
     # Update the outputs
-    out$median_samples[i] <- median_current
-    out$threshold_samples[i] <- threshold_current
-    out$first_quartile_samples[i] <- first_quartile_current
+    out$median_male_samples[i] <- median_male_current
+    out$median_female_samples[i] <- median_female_current
+    out$threshold_male_samples[i] <- threshold_male_current
+    out$threshold_female_samples[i] <- threshold_female_current
+    out$first_quartile_male_samples[i] <- first_quartile_male_current
+    out$first_quartile_female_samples[i] <- first_quartile_female_current
     out$asymptote_male_samples[i] <- asymptote_male_current
     out$asymptote_female_samples[i] <- asymptote_female_current
     out$loglikelihood_current[i] <- loglikelihood_current
