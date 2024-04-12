@@ -37,7 +37,9 @@ mhChain <- function(
     max_age, db,
     prior_distributions, cancer_type, gene_input, af,
     median_max, max_penetrance, homozygote, SeerNC, sex) {
+  
   # Set seed
+  browser()
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
@@ -63,17 +65,20 @@ mhChain <- function(
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_male
     asymptote_female <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_female
-
-    asymptote_male <- max(0, min(1, asymptote_male))
-    asymptote_female <- max(0, min(1, asymptote_female))
-
+    
+    asymptote_male <- 1
+    asymptote_female <- 1
+    
+    # change to fix 1
     threshold_male <- do.call(prior_distributions$threshold_distribution, list(1))
     threshold_female <- do.call(prior_distributions$threshold_distribution, list(1))
+    
     median_male <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid_male - threshold_male) + threshold_male
     } else {
       do.call(prior_distributions$median_distribution, list(1)) * (max_age - threshold_male) + threshold_male
     }
+
     median_female <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) * (baseline_mid_female - threshold_female) + threshold_female
     } else {
@@ -83,7 +88,7 @@ mhChain <- function(
       prior_distributions$first_quartile_distribution,
       list(1)
     ) * (median_male - threshold_male) + threshold_male
-
+  
     first_quartile_female <- do.call(
       prior_distributions$first_quartile_distribution,
       list(1)
@@ -152,14 +157,16 @@ mhChain <- function(
     # For now assume that the the asymptotes for males and females have the same distribituion
     asymptote_male_proposal <- SEER_baseline$lifetime_risk$male +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_male
-    asymptote_male_proposal <- max(0, min(1, asymptote_male_proposal))
     asymptote_female_proposal <- SEER_baseline$lifetime_risk$female +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_female
-    asymptote_female_proposal <- max(0, min(1, asymptote_female_proposal))
-
+    
+    asymptote_male_proposal <- 1
+    asymptote_female_proposal <- 1
+    
     # threshold proposal
     threshold_male_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
     threshold_female_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
+    
     # Median proposal scaled to lie between either the median SEER age (basedline_mid), per default,
     # or the max_age as an upper bound and threshold proposal as a lower bound
     median_male_proposal <- if (median_max) {
@@ -169,6 +176,7 @@ mhChain <- function(
       do.call(prior_distributions$median_distribution, list(1)) *
         (max_age - threshold_male_proposal) + threshold_male_proposal
     }
+    
     median_female_proposal <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) *
         (baseline_mid_female - threshold_female_proposal) + threshold_female_proposal
@@ -229,10 +237,10 @@ mhChain <- function(
     )
 
     # Compute the acceptance ratio (likelihood ratio)
-    acceptance_ratio <- exp(loglikelihood_proposal - loglikelihood_current)
+    acceptance_ratio <- loglikelihood_proposal - loglikelihood_current
 
     # Accept or reject the proposal
-    if (runif(1) < acceptance_ratio) {
+    if (log(runif(1)) < acceptance_ratio) {
       median_male_current <- median_male_proposal
       median_female_current <- median_female_proposal
       threshold_male_current <- threshold_male_proposal

@@ -78,17 +78,15 @@ generate_proposal <- function(distribution_func, args_list) {
 #'
 #' @export
 
-calculate_weibull_parameters <-
-    function(given_median, given_first_quartile, delta) {
-        # Calculate alpha
-        alpha <- log(log(4 / 3) / log(2)) /
-            log((given_first_quartile - delta) / (given_median - delta))
+calculate_weibull_parameters <- function(given_median, given_first_quartile, delta) {
+    # Calculate alpha
+    alpha <- log(-log(0.5) / -log(0.75)) / log((given_median - delta) / (given_first_quartile - delta))
 
-        # Calculate beta using the median (M)
-        beta <- (given_median - delta) / (log(2)^(1 / alpha))
+    # Calculate beta using the median (M)
+    beta <- (given_median - delta) / (-log(0.5))^(1 / alpha)
 
-        return(list(alpha = alpha, beta = beta))
-    }
+    return(list(alpha = alpha, beta = beta))
+}
 
 validate_weibull_parameters <-
     function(given_first_quartile, given_median, threshold, asymptote) {

@@ -127,8 +127,11 @@ calculateNCPen <- function(SEER_baseline, alpha, beta, delta, gamma, af, max_age
 #' @return Numeric vector, containing penetrance values for unaffected and affected individuals.
 #' @export
 #'
-lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female, delta_male, delta_female, gamma_male, gamma_female, max_age, baselineRisk, homozygote, SeerNC, sex) {
-    # Map sex to row index: "Female" is 1st row and "Male" is 2nd row
+lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female, 
+                   delta_male, delta_female, gamma_male, gamma_female, max_age,
+                   baselineRisk, homozygote, SeerNC, sex) {
+   
+  # Map sex to row index: "Female" is 1st row and "Male" is 2nd row
     sex_index <- ifelse(data$sex[i] == 2, 1, 2)
 
     # Select gamma based on individual's sex
@@ -145,15 +148,15 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female, de
         age_index <- min(max_age, data$age[i])
 
         # Weibull parameters for penetrance, using sex-specific gamma
-        survival_prob <- 1 - pweibull(data$age[i] - delta, shape = alpha, scale = beta) * gamma
-        c.pen <- dweibull(data$age[i] - delta, shape = alpha, scale = beta) * gamma
+        survival_prob <- 1 - pweibull(max(1, age_index - delta), shape = alpha, scale = beta) * gamma
+        c.pen <- dweibull(max(1, age_index - delta), shape = alpha, scale = beta) * gamma
 
         # Extract the corresponding baseline risk for sex and age
         SEER_baseline_max <- baselineRisk[sex_index, 1:max_age]
         SEER_baseline_cum <- baselineRisk[sex_index, 1:age_index]
         SEER_baseline_i <- baselineRisk[sex_index, age_index]
 
-        # Calculate cumulative risk for non-carriers based on SEER data or other model
+        # Calculate cumuative risk for non-carriers based on SEER data or other model
         if (SeerNC == TRUE) {
             nc.pen <- SEER_baseline_i
             nc.pen.c <- prod(1 - SEER_baseline_cum)
@@ -209,6 +212,7 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female, de
 #' log_likelihood <- mhLogLikelihood_clipp(parameters, pedigree_data, 80, "Lung Cancer", data_object, 0.2)
 #'
 mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af, homozygote, SeerNC, sex) {
+  
     # Extract parameters
     given_median_male <- paras[1]
     given_median_female <- paras[2]
@@ -221,14 +225,14 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
 
     # Calculate Weibull parameters
     params_male <- calculate_weibull_parameters(given_median_male, given_first_quartile_male, delta_male)
-    alpha_male <- params_male$alpha
+    alpha_male <-  params_male$alpha
     beta_male <- params_male$beta
 
     params_female <- calculate_weibull_parameters(given_median_female, given_first_quartile_female, delta_female)
     alpha_female <- params_female$alpha
     beta_female <- params_female$beta
 
-    # Initialize values
+    # Initialize the model
     geno_freq <- geno_freq_monogenic(p_alleles = c(1 - af, af))
     trans <- trans_monogenic(n_alleles = 2)
     baselineRisk <- calculateBaseline(
@@ -245,11 +249,11 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     }))
 
     # Compute log-likelihood
-    loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 1)
+    loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 1) 
 
     # Handle -Inf values
     if (is.infinite(loglik) && loglik == -Inf) {
-        penalty <- 1e-28
+        penalty <- 1e-100
         loglik <- log(penalty)
     } else {
         cat(
@@ -262,3 +266,4 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
 
     return(loglik)
 }
+

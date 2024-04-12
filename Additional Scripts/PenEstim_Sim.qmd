@@ -594,7 +594,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_3 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 500, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 200, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
 save(out_sim_3, file = "out_sim_3.Rdata")

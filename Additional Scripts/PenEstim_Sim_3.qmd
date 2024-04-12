@@ -292,7 +292,7 @@ for (i in seq_along(dat)) {
 # Exploring different priors 
 prior_params_BRCA1 <- list(
     asymptote = list(g1 = 900, g2 = 100),
-    threshold = list(min = 15, max = 25),
+    threshold = list(min = 15, max = 30),
     median = list(m1 = 2, m2 = 2),
     first_quartile = list(q1 = 6, q2 = 3)
 )
@@ -301,7 +301,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_10k_simC300 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2500, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 100, 
     prior_params = prior_params_BRCA1, af = 0.9, burn_in = 0.1, sex = "Female"
 )
 
@@ -309,7 +309,8 @@ out_sim_10k_simC300 <- PenEstim(
 out_sim_10k_simC300$summary_stats
 plot_traceSingle(out_sim_10k_simC300$results[[1]])
 plot_penetrance_sim(out_sim_10k_simC300$combined_chains, prob = 0.95, max_age = 94, sex = "Female",2.5,50,20,0.9)
-
+plot(out_sim_10k_simC300$combined_chains$loglikelihood_current_results, type = "l", main = "Loglikelihood of Samples")
+plot(out_sim_10k_simC300$combined_chains$loglikelihood_proposal_results, type = "l", main = "Loglikelihood of Proposals")
 
 # Plot the running mean 
 #runFQ<- running_mean(out_sim_10k_simC300$results[[1]]$first_quartile_msamples)
@@ -337,14 +338,14 @@ plot_penetrance_sim(out_sim_10k_simC300$combined_chains, prob = 0.95, max_age = 
 
 
   # Autocorrelation plots
-acf(out_sim_10k_simC300$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
-acf(out_sim_10k_simC300$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
-acf(out_sim_10k_simC300$results[[1]]$median_male_samples, main = "ACF of Median - Male")
-acf(out_sim_10k_simC300$results[[1]]$median_female_samples, main = "ACF of Median - Female")
-acf(out_sim_10k_simC300$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
-acf(out_sim_10k_simC300$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
-acf(out_sim_10k_simC300$results[[1]]$asymptote_male_samples, main = "ACF of Asymptote - Male")
-acf(out_sim_10k_simC300$results[[1]]$asymptote_female_samples, main = "ACF of Asymptote - Female")
+#acf(out_sim_10k_simC300$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+#acf(out_sim_10k_simC300$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+#acf(out_sim_10k_simC300$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+#acf(out_sim_10k_simC300$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+#acf(out_sim_10k_simC300$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+#acf(out_sim_10k_simC300$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+#acf(out_sim_10k_simC300$results[[1]]$asymptote_male_samples, main = "ACF of Asymptote - Male")
+#acf(out_sim_10k_simC300$results[[1]]$asymptote_female_samples, main = "ACF of Asymptote - Female")
 
 # plot the scatterplot with the median and first quartile
 plot(out_sim_10k_simC300$combined_chains$median_male_results, out_sim_10k_simC300$combined_chains$first_quartile_male_results, xlim = c(1,100), ylim = c(1,100))
@@ -393,7 +394,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_3 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2500, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 100, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, sex = "Female"
 )
 save(out_sim_3, file = "out_sim_3.Rdata")
@@ -428,14 +429,106 @@ plot_penetrance_sim(out_sim_3$combined_chains, prob = 0.95, max_age = 94,"Female
 #plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
 
 # Autocorrelation plots
-acf(out_sim_3$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
-acf(out_sim_3$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
-acf(out_sim_3$results[[1]]$median_male_samples, main = "ACF of Median - Male")
-acf(out_sim_3$results[[1]]$median_female_samples, main = "ACF of Median - Female")
-acf(out_sim_3$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
-acf(out_sim_3$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
-acf(out_sim_3$results[[1]]$asymptote_male_samples, main = "ACF of Asymptote - Male")
-acf(out_sim_3$results[[1]]$asymptote_female_samples, main = "ACF of Asymptote - Female")
+#acf(out_sim_3$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+#acf(out_sim_3$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+#acf(out_sim_3$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+#acf(out_sim_3$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+#acf(out_sim_3$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+#acf(out_sim_3$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+#acf(out_sim_3$results[[1]]$asymptote_male_samples, main = "ACF of Asymptote - Male")
+#acf(out_sim_3$results[[1]]$asymptote_female_samples, main = "ACF of Asymptote - Female")
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_3$combined_chains$median_male_results, out_sim_3$combined_chains$first_quartile_male_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_3$combined_chains$median_female_results, out_sim_3$combined_chains$first_quartile_female_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+
+# Families Sim3 - Uncensored - Fixed Asymptote
+
+In this simulation the penetrance estimation is applied to the first set of families from sim1. The default prior settings are applied here with a uniform prior on the asymptote parameter.
+We estimate two sets of parameters of the Weibull distribution, seperately for male and female carriers. The respective non-carrier penetrance values are taken from the SEER baseline.
+
+
+```{r est3, echo=TRUE, cache=TRUE}
+dat <- simfamilies_sim3
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params_BRCA1 <- list(
+    asymptote = list(g1 = 9, g2 = 100),
+    threshold = list(min = 15, max = 40),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+out_sim_3 <- PenEstim(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 100, 
+    prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0
+)
+save(out_sim_3, file = "out_sim_3.Rdata")
+
+# print summary stats
+out_sim_3$summary_stats
+plot_traceSingle(out_sim_3$results[[1]])
+plot_penetrance_sim(out_sim_3$combined_chains, prob = 0.95, max_age = 94,"Female",2.5,50,20,1)
+
+# Plot the running mean 
+#runFQ<- running_mean(out_sim_3$results[[1]]$first_quartile_samples)
+#runMed <- running_mean(out_sim_3$results[[1]]$median_samples)
+#runThreshold <- running_mean(out_sim_3$results[[1]]$threshold_samples)
+#runAsy <- running_mean(out_sim_3$results[[1]]$asymptote_samples)
+
+# Plot running mean
+#plot(runFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of First Quartile Samples")
+#plot(runMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Median Samples")
+#plot(runThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Threshold Samples")
+#plot(runAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Mean of Asymptote Samples")
+
+# Plot the running var 
+#runVFQ<- running_variance(out_sim_3$results[[1]]$first_quartile_samples)
+#runVMed <- running_variance(out_sim_3$results[[1]]$median_samples)
+#runVThreshold <- running_variance(out_sim_3$results[[1]]$threshold_samples)
+#runVAsy <- running_variance(out_sim_3$results[[1]]$asymptote_samples)
+
+# Plot running var
+#plot(runVFQ, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of First Quartile Samples")
+#plot(runVMed, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Median Samples")
+#plot(runVThreshold, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Threshold Samples")
+#plot(runVAsy, type = "l", xlab = "Iteration", ylab = "Running Mean", main = "Running Var of Asymptote Samples")
+
+# Autocorrelation plots
+#acf(out_sim_3$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+#acf(out_sim_3$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+#acf(out_sim_3$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+#acf(out_sim_3$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+#acf(out_sim_3$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+#acf(out_sim_3$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+#acf(out_sim_3$results[[1]]$asymptote_male_samples, main = "ACF of Asymptote - Male")
+#acf(out_sim_3$results[[1]]$asymptote_female_samples, main = "ACF of Asymptote - Female")
 
 # plot the scatterplot with the median and first quartile
 plot(out_sim_3$combined_chains$median_male_results, out_sim_3$combined_chains$first_quartile_male_results, xlim = c(1,100), ylim = c(1,100))

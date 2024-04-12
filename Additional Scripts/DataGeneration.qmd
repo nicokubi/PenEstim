@@ -26,6 +26,13 @@ library(PedUtils)
 library(survival)
 library(MASS)
 library(profvis)
+
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/prior_elicitation.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/helpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/outputHelpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mhLoglikehood_clipp.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mcmcPenetrance.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/InternalVars.R")
 ```
 
 ```{r desc, echo=FALSE, cache=TRUE}
@@ -143,6 +150,63 @@ describeFamilies <- function(fams, cancer, gene) {
   print("Summary of Cancer Age in affected (non-proband) female individuals")
   print(summary(cancerAgesFemale))
 }
+
+# Function to plot the penetrance curves separately for males and females
+plot_penetrance_curves <- function(fams) {
+  # Define plot settings
+  plot_settings <- function(title) {
+    plot(0, 0, type = "n", xlim = c(0, 100), ylim = c(0, 1), xlab = "Age", ylab = "Penetrance", main = title)
+  }
+
+  # Initialize colors and line types
+  colors <- c("red", "blue")
+  line_types <- c(1, 2)
+
+  # Function to process and plot data for a given sex
+  process_and_plot <- function(fams, sex) {
+    # Create empty data frames to aggregate the data
+    allcarriers <- data.frame()
+    allnoncarriers <- data.frame()
+
+    # Iterate through each family and aggregate the data
+    for (f in fams) {
+      carriers <- dplyr::filter(f, BRCA1 == 1, Sex == sex)
+      noncarriers <- dplyr::filter(f, BRCA1 == 0, Sex == sex)
+
+      # Append the data to the combined data frames
+      allcarriers <- rbind(allcarriers, carriers)
+      allnoncarriers <- rbind(allnoncarriers, noncarriers)
+    }
+
+    # Convert the cancer status variable to survival objects for each genotype
+    surv_obj_1 <- Surv(time = allcarriers$AgeBC, event = allcarriers$isAffBC)
+    surv_obj_0 <- Surv(time = allnoncarriers$AgeBC, event = allnoncarriers$isAffBC)
+
+    # Estimate the Kaplan-Meier survival curves for each genotype
+    km_fit_1 <- survfit(surv_obj_1 ~ 1, data = allcarriers)
+    km_fit_0 <- survfit(surv_obj_0 ~ 1, data = allnoncarriers)
+
+    # Calculate the penetrance functions for carriers and non-carriers
+    penetrance_1 <- 1 - km_fit_1$surv
+    penetrance_0 <- 1 - km_fit_0$surv
+
+    # Plot the aggregated penetrance curves
+    lines(km_fit_1$time, penetrance_1, type = "l", col = colors[1], lty = line_types[1])
+    lines(km_fit_0$time, penetrance_0, type = "l", col = colors[2], lty = line_types[2])
+
+    # Add legend
+    legend("topright", legend = c("PV", "Non-PV"), col = colors, lty = line_types, cex = 0.8)
+  }
+
+  # Plot for females
+  plot_settings("Estimated Penetrance Curves (for females)")
+  process_and_plot(fams, 0)  # Assuming Sex = 0 represents females
+
+  # Plot for males
+  plot_settings("Estimated Penetrance Curves (for males)")
+  process_and_plot(fams, 1)  # Assuming Sex = 1 represents males
+}
+
 ```
 
 
@@ -152,7 +216,7 @@ describeFamilies <- function(fams, cancer, gene) {
 ## Sim 1
 
 Censored data
-Simulate 1000 families, out of which 91 have a proband with the mutation
+Simulate 1000 families, out of which 81 have a proband with the mutation
 
 ```{r, echo=FALSE,cache=TRUE}
 set.seed(2024)
@@ -269,6 +333,7 @@ simFamiliesGeno <- function(fams) {
 simfamilies_sim1 <- simFamiliesGeno(carrierProbandfamilies_sim1)
 save(simfamilies_sim1, file = "simfamilies_sim1.Rdata")
 print(describeFamilies(simfamilies_sim1,"Breast","BRCA1"))
+plot_penetrance_curves(carrierProbandfamilies_sim1) 
 
 ```
 
@@ -393,6 +458,7 @@ simFamiliesGeno <- function(fams) {
 simfamilies_sim2 <- simFamiliesGeno(carrierProbandfamilies_sim2)
 save(simfamilies_sim2, file = "simfamilies_sim2.Rdata")
 print(describeFamilies(simfamilies_sim2,"Breast","BRCA1"))
+plot_penetrance_curves(carrierProbandfamilies_sim2)
 ```
 
 ## Sim 3
@@ -425,7 +491,7 @@ PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
 # Given mean and variance
 alpha<- 2.5 # Replace with the value you have
 beta  <- 50 # Replace with the value you have
-gamma <- 0.9
+gamma <- 1
 delta <-  20
 
 median_true <- delta + beta * (-log((gamma-0.5)/gamma))^(1/alpha)
@@ -435,7 +501,6 @@ print(quartile_true)
 
 # Now use alpha and beta in your simulation
 penetrance.mod <- dweibull(age - delta, alpha, beta) * gamma
-
 
 # For now focus on just one vector of penetrance estimates
 gene <- "BRCA1_hetero_anyPV"
@@ -454,7 +519,7 @@ sex_index <- which(dim_names$Sex == sex)
 type_index <- which(dim_names$PenetType == type)
 
 # Overwrite the penetetrane for all races, geneders and races
-PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,]<- penetrance.mod
+PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, , ,]<- penetrance.mod
 
 for(i in 1:numberFamilies){
   # Cancers
@@ -478,7 +543,7 @@ for(i in 1:numberFamilies){
   fam = sim.runSimFam(nSibsPatern, nSibsMatern, nSibs, nChild,
                       PanelPRODatabase, genes, cancers,
                       includeGeno = TRUE, includeBiomarkers = FALSE, 
-                      censoring = TRUE)
+                      censoring = FALSE)
   
   famDF = as.data.frame(fam)
   proband = famDF %>% filter(isProband==1)
@@ -489,7 +554,7 @@ for(i in 1:numberFamilies){
   
 }
 
-save(families_sim3, file = "families_sim3.RData")
+#save(families_sim3, file = "families_sim3.RData")
 # Filter families with affected probands
 carrierProbandfamilies_sim3 <- Filter(function(fam) 
   any(fam$isProband == 1 & fam$BRCA1 == 1 & fam$Sex == 0), families_sim3)
@@ -513,68 +578,120 @@ simFamiliesGeno <- function(fams) {
 
 # Subset the family list
 simfamilies_sim3 <- simFamiliesGeno(carrierProbandfamilies_sim3)
-save(simfamilies_sim3, file = "simfamilies_sim3.Rdata")
+#save(simfamilies_sim3, file = "simfamilies_sim3.Rdata")
 print(describeFamilies(simfamilies_sim3,"Breast","BRCA1"))
+plot_penetrance_curves(carrierProbandfamilies_sim3)
 ```
 
 
+## Sim 3 - UC
 
+Censored data
+Simulated 3000 families
 
-# Penetrance Estimates from PanelPRO
+```{r, echo=FALSE,cache=TRUE}
+set.seed(2024)
 
-As a reference, I added the penetrance curves for the respective gene-cancer combinations from the PanelPRODatabase here.
+# Generate Families ----
 
-```{r, echo=TRUE, cache=TRUE}
-db <- PanelPRODatabase
-ages <- 1:94
-# Extracting penetrance data for females
-pen1_f <- cumsum(db$Penetrance["Breast", "BRCA1_hetero_anyPV", "All_Races", "Female", ,"Net"])
+families_sim3_UC = list()
+probandIDS_UC = c()
+probandBRCA1Status_UC = c()
+probandAffectionStatus_UC = c()
 
-# Assuming similar structure, extracting for males (modify according to your data structure)
-pen1_m <- cumsum(db$Penetrance["Breast", "BRCA1_hetero_anyPV", "All_Races", "Male", ,"Net"])
+# Set number of families to be generates
+numberFamilies <- 3000
+# age
+age <- seq(1, 94, 1)  # same as in the panelpro db
 
-# Plot for BRCA1 and Breast Cancer including both genders
-plot(ages, pen1_f, type="l", lwd=2, col="blue",
-     xlab="Age", ylab="Cumulative Penetrance", 
-     main="BRCA1 and Breast Cancer")
-lines(ages, pen1_m, type="l", lwd=2, col="red")
-legend("topleft", legend=c("Female", "Male"), col=c("blue", "red"), lty=1, lwd=2)
+# use same BRCA1 frequency (not estimated)
+BRCA1freq <- 0.1
+PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",1]] <- BRCA1freq
+PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",2]] <- BRCA1freq
+PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
 
-# MLH1 and Colorectal Cancer for both genders
-pen2_f <- cumsum(db$Penetrance["Colorectal", "MLH1_hetero_anyPV", "All_Races", "Female", ,"Net"])
-pen2_m <- cumsum(db$Penetrance["Colorectal", "MLH1_hetero_anyPV", "All_Races", "Male", ,"Net"])
+# Given mean and variance
+alpha <- 2.5 # Replace with the value you have
+beta  <- 50 # Replace with the value you have
+gamma <- 1
+delta <-  20
 
-# Plot for MLH1 and Colorectal Cancer
-plot(ages, pen2_f, type="l", lwd=2, col="blue",
-     xlab="Age", ylab="Cumulative Penetrance", 
-     main="MLH1 and Colorectal Cancer")
-lines(ages, pen2_m, type="l", lwd=2, col="red")
-legend("topleft", legend=c("Female", "Male"), col=c("blue", "red"), lty=1, lwd=2)
+median_true <- delta + beta * (-log((1-0.5)/1))^(1/alpha)
+quartile_true <- delta + beta * (-log((1-0.25)/1))^(1/alpha)
+print(median_true)
+print(quartile_true)
 
-# MSH6 and Colorectal Cancer for both genders
-pen3_f <- cumsum(db$Penetrance["Colorectal", "MSH6_hetero_anyPV", "All_Races", "Female", ,"Net"])
-pen3_m <- cumsum(db$Penetrance["Colorectal", "MSH6_hetero_anyPV", "All_Races", "Male", ,"Net"])
+# Now use alpha and beta in your simulation
+penetrance_mod_UC <- dweibull(age - delta, alpha, beta) * gamma
 
-# Plot for MSH6 and Colorectal Cancer
-plot(ages, pen3_f, type="l", lwd=2, col="blue",
-     xlab="Age", ylab="Cumulative Penetrance", 
-     main="MSH6 and Colorectal Cancer")
-lines(ages, pen3_m, type="l", lwd=2, col="red")
-legend("topleft", legend=c("Female", "Male"), col=c("blue", "red"), lty=1, lwd=2)
+# For now focus on just one vector of penetrance estimates
+gene <- "BRCA1_hetero_anyPV"
+cancer <- "Breast"
+race <- "All_Races"
+sex <- "Female"
+type <- "Net"
 
-plot(ages, pweibull(ages-20, 2.5, 50) * (1-0.1) , type="l", lwd=2, col="blue",
-     xlab="Age", ylab="Cumulative Penetrance", ylim = c(0,1), xlim = c(0,100), 
-     main="BRCA1 and Breast Cancer in Females")
-legend("topleft", legend=c("Female", "Male"), col=c("blue", "red"), lty=1, lwd=2)
+# Find the indices for the resp. attributes 
+dim_names <- attr(PanelPRODatabase$Penetrance, "dimnames")
+gene_index <- which(dim_names$Gene == gene)
+cancer_index <- which(dim_names$Cancer == cancer)
+race_index <- which(dim_names$Race == race)
+sex_index <- which(dim_names$Sex == sex)
+type_index <- which(dim_names$PenetType == type)
 
+# Overwrite the penetrance for all races, genders and races
+PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, , ,] <- penetrance_mod_UC
 
+for(i in 1:numberFamilies) {
+  # Cancers
+  cancers = "Breast"
+  # Genes
+  genes = "BRCA1"
+  # Family members
+  nSibsPatern = floor(rtruncnorm(n=2, mean=0, 1))
+  nSibsMatern = floor(rtruncnorm(n=2, mean=0, 1))
+  nSibs = floor(rtruncnorm(n=2, mean=1, 1))
+  nGrandchild = floor(rtruncnorm(n=2, mean=0, 1))
+  nChild = floor(rtruncnorm(n=2, mean=1, 1))
+  
+  fam_UC = sim.runSimFam(nSibsPatern, nSibsMatern, nSibs, nChild,
+                         PanelPRODatabase, genes, cancers,
+                         includeGeno = TRUE, includeBiomarkers = FALSE, 
+                         censoring = FALSE)
+  
+  famDF_UC = as.data.frame(fam_UC)
+  proband_UC = famDF_UC %>% filter(isProband==1)
+  probandIDS_UC = c(probandIDS_UC, proband_UC$ID)
+  probandBRCA1Status_UC = c(probandBRCA1Status_UC, proband_UC$BRCA1)
+  probandAffectionStatus_UC = c(probandAffectionStatus_UC, proband_UC$isAffBC)
+  families_sim3_UC[[i]] = famDF_UC
+  
+}
 
+save(families_sim3_UC, file = "families_sim3_UC.RData")
 
-plot(age, pweibull(age-delta, alpha,beta) * (1-gamma), type="l", lwd=2,
-     xlab="Age", ylab="Penetrance", 
-     main="Weibull Distribution for Carriers")
+# Filter families with affected probands
+carrierProbandfamilies_sim3_UC <- Filter(function(fam) 
+  any(fam$isProband == 1 & fam$BRCA1 == 1 & fam$Sex == 0), families_sim3_UC)
 
+# Hide genotype information for everyone but the proband
+simFamiliesGeno_UC <- function(fams) {
+  simFamilies_UC <- list()
+  for (i in 1:length(fams)) {
+    family_UC <- fams[[i]]
+    proband_UC <- family_UC %>% filter(isProband==1)
+    family_UC$BRCA1 <- ifelse(family_UC$ID == proband_UC$ID, family_UC$BRCA1, NA)
+    simFamilies_UC[[i]] <- family_UC
+  }
+  return(simFamilies_UC)
+}
 
+# Subset the family list
+simfamilies_sim3_UC <- simFamiliesGeno_UC(carrierProbandfamilies_sim3_UC)
+save(simfamilies_sim3_UC, file = "simfamilies_sim3_UC.Rdata")
+print(describeFamilies(simfamilies_sim3_UC,"Breast","BRCA1"))
+plot_penetrance_curves(carrierProbandfamilies_sim3_UC)
+  
 ```
 
 
