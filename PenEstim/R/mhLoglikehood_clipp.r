@@ -148,18 +148,18 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
         age_index <- min(max_age, data$age[i])
 
         # Weibull parameters for penetrance, using sex-specific gamma
-        survival_prob <- 1 - pweibull(max(1, age_index - delta), shape = alpha, scale = beta) * gamma
-        c.pen <- dweibull(max(1, age_index - delta), shape = alpha, scale = beta) * gamma
+        survival_prob <- 1 - pweibull(age_index - delta, shape = alpha, scale = beta) * gamma
+        c.pen <- dweibull(age_index - delta, shape = alpha, scale = beta) * gamma
 
         # Extract the corresponding baseline risk for sex and age
         SEER_baseline_max <- baselineRisk[sex_index, 1:max_age]
-        SEER_baseline_cum <- baselineRisk[sex_index, 1:age_index]
+        SEER_baseline_cum <- cumsum(baselineRisk[sex_index,])[age_index]
         SEER_baseline_i <- baselineRisk[sex_index, age_index]
 
         # Calculate cumuative risk for non-carriers based on SEER data or other model
         if (SeerNC == TRUE) {
             nc.pen <- SEER_baseline_i
-            nc.pen.c <- prod(1 - SEER_baseline_cum)
+            nc.pen.c <- exp(-SEER_baseline_cum)
         } else {
             nc.pen <- calculateNCPen(
                 SEER_baseline = SEER_baseline_max, alpha = alpha,
@@ -256,13 +256,13 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
         penalty <- 1e-100
         loglik <- log(penalty)
     } else {
-        cat(
+       cat(
             "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
             given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
             delta_female, gamma_male, gamma_female, "\n"
         )
         cat("Log Likelihood:", loglik, "\n")
-    }
+   }
 
     return(loglik)
 }

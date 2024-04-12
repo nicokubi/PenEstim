@@ -218,7 +218,7 @@ plot_penetrance_curves <- function(fams) {
 Censored data
 Simulate 1000 families, out of which 81 have a proband with the mutation
 
-```{r, echo=FALSE,cache=TRUE}
+```{r, echo=TRUE,cache=TRUE}
 set.seed(2024)
 
 # Generate Families ----
@@ -243,13 +243,8 @@ PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
 # Given mean and variance
 alpha<- 2.5 # Replace with the value you have
 beta  <- 50 # Replace with the value you have
-gamma <- 0.9
+gamma <- 1
 delta <-  20
-
-median_true <- delta + beta * (-log((gamma-0.5)/gamma))^(1/alpha)
-quartile_true= delta + beta * (-log((gamma-0.25)/gamma))^(1/alpha)
-print(median_true)
-print(quartile_true)
 
 # Now use alpha and beta in your simulation
 penetrance.mod <- dweibull(age - delta, alpha, beta) * gamma
@@ -274,7 +269,7 @@ type_index <- which(dim_names$PenetType == type)
 # Overwrite the penetetrane for all races, geneders and races
 PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,]<- penetrance.mod
 
-for(i in 1:numberFamilies){
+ suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies){
   # Cancers
   cancers = "Breast"
   # Genes
@@ -305,7 +300,7 @@ for(i in 1:numberFamilies){
   probandAffectionStatus = c(probandAffectionStatus, proband$isAffBC)
   families_sim1[[i]] = famDF
   
-}
+}))) 
 
 save(families_sim1, file = "families_sim1.RData")
 # Filter families with affected probands
@@ -343,7 +338,7 @@ plot_penetrance_curves(carrierProbandfamilies_sim1)
 Censored data
 191 families 
 
-```{r, echo=FALSE,cache=TRUE}
+```{r, echo=TRUE,cache=TRUE}
 set.seed(2024)
 
 # Generate Families ----
@@ -368,17 +363,11 @@ PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
 # Given mean and variance
 alpha<- 2.5 # Replace with the value you have
 beta  <- 50 # Replace with the value you have
-gamma <- 0.9
+gamma <- 1
 delta <-  20
-
-median_true <- delta + beta * (-log((gamma-0.5)/gamma))^(1/alpha)
-quartile_true= delta + beta * (-log((gamma-0.25)/gamma))^(1/alpha)
-print(median_true)
-print(quartile_true)
 
 # Now use alpha and beta in your simulation
 penetrance.mod <- dweibull(age - delta, alpha, beta) * gamma
-
 
 # For now focus on just one vector of penetrance estimates
 gene <- "BRCA1_hetero_anyPV"
@@ -399,7 +388,7 @@ type_index <- which(dim_names$PenetType == type)
 # Overwrite the penetetrane for all races, geneders and races
 PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,]<- penetrance.mod
 
-for(i in 1:numberFamilies){
+ suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies){
   # Cancers
   cancers = "Breast"
   # Genes
@@ -430,7 +419,7 @@ for(i in 1:numberFamilies){
   probandAffectionStatus = c(probandAffectionStatus, proband$isAffBC)
   families_sim2[[i]] = famDF
   
-}
+})))
 
 save(families_sim2, file = "families_sim2.RData")
 # Filter families with affected probands
@@ -466,7 +455,7 @@ plot_penetrance_curves(carrierProbandfamilies_sim2)
 Censored data
 Simulated 3000 families
 
-```{r, echo=FALSE,cache=TRUE}
+```{r, echo=TRUE,cache=TRUE}
 set.seed(2024)
 
 # Generate Families ----
@@ -494,11 +483,6 @@ beta  <- 50 # Replace with the value you have
 gamma <- 1
 delta <-  20
 
-median_true <- delta + beta * (-log((gamma-0.5)/gamma))^(1/alpha)
-quartile_true= delta + beta * (-log((gamma-0.25)/gamma))^(1/alpha)
-print(median_true)
-print(quartile_true)
-
 # Now use alpha and beta in your simulation
 penetrance.mod <- dweibull(age - delta, alpha, beta) * gamma
 
@@ -519,9 +503,9 @@ sex_index <- which(dim_names$Sex == sex)
 type_index <- which(dim_names$PenetType == type)
 
 # Overwrite the penetetrane for all races, geneders and races
-PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, , ,]<- penetrance.mod
+PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,] <- penetrance.mod
 
-for(i in 1:numberFamilies){
+ suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies){
   # Cancers
   cancers = "Breast"
   # Genes
@@ -543,7 +527,7 @@ for(i in 1:numberFamilies){
   fam = sim.runSimFam(nSibsPatern, nSibsMatern, nSibs, nChild,
                       PanelPRODatabase, genes, cancers,
                       includeGeno = TRUE, includeBiomarkers = FALSE, 
-                      censoring = FALSE)
+                      censoring = TRUE)
   
   famDF = as.data.frame(fam)
   proband = famDF %>% filter(isProband==1)
@@ -552,7 +536,7 @@ for(i in 1:numberFamilies){
   probandAffectionStatus = c(probandAffectionStatus, proband$isAffBC)
   families_sim3[[i]] = famDF
   
-}
+})))
 
 #save(families_sim3, file = "families_sim3.RData")
 # Filter families with affected probands
@@ -584,12 +568,11 @@ plot_penetrance_curves(carrierProbandfamilies_sim3)
 ```
 
 
-## Sim 3 - UC
+## Sim 3 - NO CENSORING
 
-Censored data
 Simulated 3000 families
 
-```{r, echo=FALSE,cache=TRUE}
+```{r, echo=TRUE,cache=TRUE}
 set.seed(2024)
 
 # Generate Families ----
@@ -640,9 +623,9 @@ sex_index <- which(dim_names$Sex == sex)
 type_index <- which(dim_names$PenetType == type)
 
 # Overwrite the penetrance for all races, genders and races
-PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, , ,] <- penetrance_mod_UC
+PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,] <- penetrance_mod_UC
 
-for(i in 1:numberFamilies) {
+ suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies) {
   # Cancers
   cancers = "Breast"
   # Genes
@@ -666,7 +649,7 @@ for(i in 1:numberFamilies) {
   probandAffectionStatus_UC = c(probandAffectionStatus_UC, proband_UC$isAffBC)
   families_sim3_UC[[i]] = famDF_UC
   
-}
+})))
 
 save(families_sim3_UC, file = "families_sim3_UC.RData")
 

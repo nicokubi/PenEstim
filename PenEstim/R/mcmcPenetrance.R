@@ -66,10 +66,6 @@ mhChain <- function(
     asymptote_female <- SEER_baseline$total_prob +
       do.call(prior_distributions$asymptote_distribution, list(1)) * asymptote_factor_female
     
-    asymptote_male <- 1
-    asymptote_female <- 1
-    
-    # change to fix 1
     threshold_male <- do.call(prior_distributions$threshold_distribution, list(1))
     threshold_female <- do.call(prior_distributions$threshold_distribution, list(1))
     
@@ -93,13 +89,12 @@ mhChain <- function(
       prior_distributions$first_quartile_distribution,
       list(1)
     ) * (median_female - threshold_female) + threshold_female
-
-
+    
     return(list(
-      first_quartile_male = first_quartile_male, first_quartile_female = first_quartile_female,
-      median_male = median_male, median_female = median_female, threshold_male = threshold_male,
+      first_quartile_male = 50, first_quartile_female = first_quartile_female,
+      median_male = 65, median_female = median_female, threshold_male = 20,
       threshold_female = threshold_female,
-      asymptote_male = asymptote_male, asymptote_female = asymptote_female
+      asymptote_male = 1, asymptote_female = 1
     ))
   }
 
@@ -164,8 +159,11 @@ mhChain <- function(
     asymptote_female_proposal <- 1
     
     # threshold proposal
-    threshold_male_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
+    #threshold_male_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
     threshold_female_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
+    
+    threshold_male_proposal <- 20
+    
     
     # Median proposal scaled to lie between either the median SEER age (basedline_mid), per default,
     # or the max_age as an upper bound and threshold proposal as a lower bound
@@ -176,6 +174,8 @@ mhChain <- function(
       do.call(prior_distributions$median_distribution, list(1)) *
         (max_age - threshold_male_proposal) + threshold_male_proposal
     }
+    
+    median_male_proposal <- 65
     
     median_female_proposal <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) *
@@ -188,6 +188,8 @@ mhChain <- function(
     # proposal as a lower bound
     first_quartile_male_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_male_proposal - threshold_male_proposal) + threshold_male_proposal
+    
+    first_quartile_male_proposal <- 50
 
     first_quartile_female_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_female_proposal - threshold_female_proposal) + threshold_female_proposal
