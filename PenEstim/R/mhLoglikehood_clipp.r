@@ -142,14 +142,14 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
     delta <- ifelse(data$sex[i] == 1, delta_male, delta_female)
 
     if (data$age[i] == 0) {
-        lik.i <- c(1, 1, 1) # Assuming people aged 0 years are all unaffected
+        lik.i <- c(1, 1) # Assuming people aged 0 years are all unaffected
     } else {
         # Ensure age is within the valid range
         age_index <- min(max_age, data$age[i])
 
         # Weibull parameters for penetrance, using sex-specific gamma
-        survival_prob <- 1 - pweibull(age_index - delta, shape = alpha, scale = beta) * gamma
-        c.pen <- dweibull(age_index - delta, shape = alpha, scale = beta) * gamma
+        survival_prob <- 1 - pweibull(max(age_index - delta,1), shape = alpha, scale = beta) * gamma
+        c.pen <- dweibull(max(age_index - delta,1),shape = alpha, scale = beta) * gamma
 
         # Extract the corresponding baseline risk for sex and age
         SEER_baseline_max <- baselineRisk[sex_index, 1:max_age]
@@ -174,14 +174,14 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
         }
 
         # Penetrance calculations based on genotype and affection status
-        lik.i <- c(nc.pen.c, survival_prob, survival_prob) # for censored observations
-        if (data$aff[i] == 1) lik.i <- c(nc.pen, c.pen, c.pen) # for affected observations
+        lik.i <- c(nc.pen.c, survival_prob) # for censored observations
+        if (data$aff[i] == 1) lik.i <- c(nc.pen, c.pen) # for affected observations
     }
 
     # Adjustment for observed genotypes
     if (data$geno[i] == "1/1") lik.i[-1] <- 0
     if (data$geno[i] == "1/2") lik.i[-2] <- 0
-    if (data$geno[i] == "2/2") lik.i[-3] <- 0
+    #if (data$geno[i] == "2/2") lik.i[-3] <- 0
 
     # Setting the third element to 0 if homozygote is FALSE
     if (!homozygote) {
@@ -233,9 +233,14 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     beta_female <- params_female$beta
 
     # Initialize the model
-    geno_freq <- geno_freq_monogenic(p_alleles = c(1 - af, af))
-    trans <- trans_monogenic(n_alleles = 2)
-    baselineRisk <- calculateBaseline(
+    geno_freq <- c(1 - af, af)
+    trans <- matrix(c(1, 0,
+                         0.5, 0.5,
+                         0.5, 0.5,
+                         1/3, 2/3), 
+                       nrow = 4, ncol = 2, byrow = TRUE)
+    
+baselineRisk <- calculateBaseline(
         cancer_type = cancer_type,
         gene = "SEER", race = "All_Races", type = "Net", db
     )
