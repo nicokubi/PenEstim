@@ -26,6 +26,8 @@ library(PedUtils)
 library(survival)
 library(MASS)
 library(profvis)
+library(survminer)
+library(ggridges)
 
 source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/prior_elicitation.R")
 source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/helpers.R")
@@ -76,7 +78,7 @@ describeFamilies <- function(fams, cancer, gene) {
     total_individuals = total_individuals + sizeOfFamily
     famSizes = c(famSizes, sizeOfFamily)
     curAges = c(curAges, f$CurAge)  
-    f = f %>% dplyr::filter(!!rlang::sym(aff_col_name) == 1, isProband == 0) 
+    f = f %>% dplyr::filter(!!rlang::sym(aff_col_name) == 1) 
     cancerAges <- c(cancerAges, f[[age_col_name]])  
     ff = fams[[i]] %>% dplyr::filter(!!rlang::sym(gene) == 1, !!rlang::sym(aff_col_name) == 1) 
     gene_individuals = gene_individuals + nrow(ff)
@@ -208,11 +210,7 @@ plot_penetrance_curves <- function(fams) {
 }
 
 ```
-
-
-
 # Data Simulation
-
 ## Sim 1
 
 Censored data
@@ -386,7 +384,8 @@ sex_index <- which(dim_names$Sex == sex)
 type_index <- which(dim_names$PenetType == type)
 
 # Overwrite the penetetrane for all races, geneders and races
-PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,]<- penetrance.mod
+PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,]<- array(penetrance.mod, dim = c(1, 1, 1, 1, 94, 1))
+
 
  suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies){
   # Cancers
@@ -456,55 +455,44 @@ Censored data
 Simulated 3000 families
 
 ```{r, echo=TRUE,cache=TRUE}
+#set seed
 set.seed(2024)
 
-# Generate Families ----
+# Generate Families
+numberFamilies <- 3000  # Set number of families to be generated
+families_sim3 <- list()  # Initialize list for families data
 
-families_sim3= list()
-probandIDS = c()
-probandBRCA1Status = c()
-probandAffectionStatus = c()
+# Set up age sequence as in the PanelPRO database
+age <- 1:94
 
+# Set up and modify PanelPRO Database
+db <- PanelPRO::PanelPRODatabase
+BRCA1freq <- 0.1  # use same BRCA1 frequency (not estimated)
+db$AlleleFrequency[["BRCA1_anyPV",1]] <- BRCA1freq
+db$AlleleFrequency[["BRCA1_anyPV",2]] <- BRCA1freq
+db$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
 
-# Set number of families to be generates
-numberFamilies <- 3000
-# age
-age <- seq(1, 94, 1)  # same as in the panelpro db
+# Function to modify penetrance in database
+modify_penetrance <- function(db, gene, cancer, race, sex, type, age_delta, alpha, beta, gamma) {
+  penetrance.mod <- dweibull(age - age_delta, alpha, beta) * gamma
+  dim_names <- attr(db$Penetrance, "dimnames")
+  
+  gene_index <- which(dim_names$Gene == gene)
+  cancer_index <- which(dim_names$Cancer == cancer)
+  race_index <- which(dim_names$Race == race)
+  sex_index <- which(dim_names$Sex == sex)
+  type_index <- which(dim_names$PenetType == type)
+  
+  # Overwrite the penetrance for all races, genders, and races
+  db$Penetrance[cancer_index, gene_index, , , , ] <- array(rep(penetrance.mod, each = 16), dim = c(1, 1, 8, 2, 94, 2))
+}
 
-# use same BRCA1 frequency (not estimated)
-BRCA1freq <- 0.1
-PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",1]] <- BRCA1freq
-PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",2]] <- BRCA1freq
-PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
+# Modify penetrance for female
+modify_penetrance(db, "BRCA1_hetero_anyPV", "Breast", "All_Races", "Female", "Net", 20, 2.5, 50, 1)
 
-# Given mean and variance
-alpha<- 2.5 # Replace with the value you have
-beta  <- 50 # Replace with the value you have
-gamma <- 1
-delta <-  20
-
-# Now use alpha and beta in your simulation
-penetrance.mod <- dweibull(age - delta, alpha, beta) * gamma
-
-# For now focus on just one vector of penetrance estimates
-gene <- "BRCA1_hetero_anyPV"
-cancer <- "Breast"
-race <- "All_Races"
-sex <- "Female"
-type <- "Net"
-
-# Find the indices for the resp. attributes 
-
-dim_names <- attr(PanelPRODatabase$Penetrance, "dimnames")
-gene_index <- which(dim_names$Gene == gene)
-cancer_index <- which(dim_names$Cancer == cancer)
-race_index <- which(dim_names$Race == race)
-sex_index <- which(dim_names$Sex == sex)
-type_index <- which(dim_names$PenetType == type)
-
-# Overwrite the penetetrane for all races, geneders and races
-PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,] <- penetrance.mod
-
+# Modify penetrance for male
+modify_penetrance(db, "BRCA1_hetero_anyPV", "Breast", "All_Races", "Male", "Net", 20, 30, 300, 1)
+# Simulation
  suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies){
   # Cancers
   cancers = "Breast"
@@ -525,7 +513,7 @@ PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,]
   
   # Simulate family using `PedUtils` code
   fam = sim.runSimFam(nSibsPatern, nSibsMatern, nSibs, nChild,
-                      PanelPRODatabase, genes, cancers,
+                      db, genes, cancers,
                       includeGeno = TRUE, includeBiomarkers = FALSE, 
                       censoring = TRUE)
   
@@ -538,10 +526,10 @@ PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,]
   
 })))
 
-#save(families_sim3, file = "families_sim3.RData")
+save(families_sim3, file = "families_sim3.RData")
 # Filter families with affected probands
 carrierProbandfamilies_sim3 <- Filter(function(fam) 
-  any(fam$isProband == 1 & fam$BRCA1 == 1 & fam$Sex == 0), families_sim3)
+  any(fam$isProband == 1 & fam$BRCA1 == 1), families_sim3)
 
 
 # hide genotype information for everyone but the proband
@@ -562,9 +550,28 @@ simFamiliesGeno <- function(fams) {
 
 # Subset the family list
 simfamilies_sim3 <- simFamiliesGeno(carrierProbandfamilies_sim3)
-#save(simfamilies_sim3, file = "simfamilies_sim3.Rdata")
+save(simfamilies_sim3, file = "simfamilies_sim3.Rdata")
 print(describeFamilies(simfamilies_sim3,"Breast","BRCA1"))
-plot_penetrance_curves(carrierProbandfamilies_sim3)
+
+# Analysis
+# Perform survival analysis stratified by gender
+data <- do.call(rbind, carrierProbandfamilies_sim3)
+str(data)
+
+fit <- survfit(Surv(AgeBC, isAffBC) ~ BRCA1 + strata(Sex), data = data)
+ggsurvplot(fit, risk.table = TRUE, data = data, palette = "Dark2")
+
+
+# Plot density ridges for affected individuals, stratified by Sex
+ggplot(data = data[data$isAffBC == 1,], aes(x = AgeBC, y = as.factor(BRCA1), fill = as.factor(BRCA1))) +
+  geom_density_ridges() +
+  facet_wrap(~ Sex, scales = "free_y")
+
+# Plot density ridges for non-affected individuals, stratified by Sex
+ggplot(data = data[data$isAffBC == 0,], aes(x = AgeBC, y = as.factor(BRCA1), fill = as.factor(BRCA1))) +
+  geom_density_ridges() +
+  facet_wrap(~ Sex, scales = "free_y")
+
 ```
 
 
@@ -589,20 +596,15 @@ age <- seq(1, 94, 1)  # same as in the panelpro db
 
 # use same BRCA1 frequency (not estimated)
 BRCA1freq <- 0.1
-PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",1]] <- BRCA1freq
-PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",2]] <- BRCA1freq
-PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
+db$AlleleFrequency[["BRCA1_anyPV",1]] <- BRCA1freq
+db$AlleleFrequency[["BRCA1_anyPV",2]] <- BRCA1freq
+db$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
 
 # Given mean and variance
 alpha <- 2.5 # Replace with the value you have
 beta  <- 50 # Replace with the value you have
 gamma <- 1
 delta <-  20
-
-median_true <- delta + beta * (-log((1-0.5)/1))^(1/alpha)
-quartile_true <- delta + beta * (-log((1-0.25)/1))^(1/alpha)
-print(median_true)
-print(quartile_true)
 
 # Now use alpha and beta in your simulation
 penetrance_mod_UC <- dweibull(age - delta, alpha, beta) * gamma
@@ -677,4 +679,178 @@ plot_penetrance_curves(carrierProbandfamilies_sim3_UC)
   
 ```
 
+## Sim 4 - Constant risk
+
+Simulated 1000 families
+
+```{r, echo=TRUE,cache=TRUE}
+set.seed(2024)
+
+# Generate Families ----
+
+families__sim4 = list()
+probandIDS_UC = c()
+probandBRCA1Status_UC = c()
+probandAffectionStatus_UC = c()
+
+# Set number of families to be generates
+numberFamilies <- 2000
+# age
+age <- seq(1, 94, 1)  # same as in the panelpro db
+
+# use same BRCA1 frequency (not estimated)
+BRCA1freq <- 0.1
+PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",1]] <- BRCA1freq
+PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",2]] <- BRCA1freq
+PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
+
+# Given mean and variance
+alpha <- 2.5 # Replace with the value you have
+beta  <- 50 # Replace with the value you have
+gamma <- 1
+delta <-  20
+
+# Now use alpha and beta in your simulation
+penetrance_mod_UC <- dweibull(age - delta, alpha, beta) * gamma
+
+# For now focus on just one vector of penetrance estimates
+gene <- "BRCA1_hetero_anyPV"
+cancer <- "Breast"
+race <- "All_Races"
+sex <- "Female"
+type <- "Net"
+
+# Find the indices for the resp. attributes 
+dim_names <- attr(PanelPRODatabase$Penetrance, "dimnames")
+gene_index <- which(dim_names$Gene == gene)
+cancer_index <- which(dim_names$Cancer == cancer)
+race_index <- which(dim_names$Race == race)
+sex_index <- which(dim_names$Sex == sex)
+type_index <- which(dim_names$PenetType == type)
+
+# Overwrite the penetrance for all races, genders and races
+PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,] <- penetrance_mod_UC
+
+sex <- "Male"
+sex_index <- which(dim_names$Sex == sex)
+PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index , ,] <- 0
+
+ suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies) {
+  # Cancers
+  cancers = "Breast"
+  # Genes
+  genes = "BRCA1"
+  # Family members
+  nSibsPatern = floor(rtruncnorm(n=2, mean=0, 1))
+  nSibsMatern = floor(rtruncnorm(n=2, mean=0, 1))
+  nSibs = floor(rtruncnorm(n=2, mean=1, 1))
+  nGrandchild = floor(rtruncnorm(n=2, mean=0, 1))
+  nChild = floor(rtruncnorm(n=2, mean=1, 1))
+  
+  fam_UC = sim.runSimFam(nSibsPatern, nSibsMatern, nSibs, nChild,
+                         PanelPRODatabase, genes, cancers,
+                         includeGeno = TRUE, includeBiomarkers = FALSE, 
+                         censoring = FALSE)
+  
+  famDF_UC = as.data.frame(fam_UC)
+  proband_UC = famDF_UC %>% filter(isProband==1)
+  probandIDS_UC = c(probandIDS_UC, proband_UC$ID)
+  probandBRCA1Status_UC = c(probandBRCA1Status_UC, proband_UC$BRCA1)
+  probandAffectionStatus_UC = c(probandAffectionStatus_UC, proband_UC$isAffBC)
+  families__sim4[[i]] = famDF_UC
+  
+})))
+
+save(families__sim4, file = "families__sim4.RData")
+
+# Filter families with affected probands
+carrierProbandfamilies__sim4 <- Filter(function(fam) 
+  any(fam$isProband == 1 & fam$BRCA1 == 1 & fam$Sex == 0), families__sim4)
+
+# Hide genotype information for everyone but the proband
+simFamiliesGeno_UC <- function(fams) {
+  simFamilies_UC <- list()
+  for (i in 1:length(fams)) {
+    family_UC <- fams[[i]]
+    proband_UC <- family_UC %>% filter(isProband==1)
+    family_UC$BRCA1 <- ifelse(family_UC$ID == proband_UC$ID, family_UC$BRCA1, NA)
+    simFamilies_UC[[i]] <- family_UC
+  }
+  return(simFamilies_UC)
+}
+
+# Subset the family list
+simfamilies__sim4 <- simFamiliesGeno_UC(carrierProbandfamilies__sim4)
+save(simfamilies__sim4, file = "simfamilies__sim4.Rdata")
+print(describeFamilies(simfamilies__sim4,"Breast","BRCA1"))
+plot_penetrance_curves(carrierProbandfamilies__sim4)
+  
+```
+
+# Analysis
+
+We consider the distribution of age of onset for carriers and non-carriers of the PV tttttt
+
+```{r, echo=TRUE,cache=TRUE}
+
+
+# For censored data 
+data <- do.call(rbind, carrierProbandfamilies_sim3)
+str(data)
+
+fit <- survfit(Surv(AgeBC, isAffBC) ~ BRCA1, data = data)
+ggsurvplot(fit, risk.table = TRUE, data = data)
+
+
+ggplot(data = data[data$isAffBC==1,], aes(x=AgeBC , y= as.factor(BRCA1),fill=as.factor(BRCA1))) +
+geom_density_ridges()
+
+
+ggplot(data = data[data$isAffBC==0,], aes(x=AgeBC , y= as.factor(BRCA1),fill=as.factor(BRCA1))) +
+geom_density_ridges()
+
+
+# Perform survival analysis stratified by gender
+fit <- survfit(Surv(AgeBC, isAffBC) ~ BRCA1 + strata(Sex), data = data)
+ggsurvplot(fit, risk.table = TRUE, data = data, palette = "Dark2")
+
+# Ensure the 'Sex' column is used correctly; replace 'Sex' if it has a different name
+fit <- survfit(Surv(AgeBC, isAffBC) ~ BRCA1 + strata(Sex), data = data)
+
+# Use ggsurvplot
+ggsurvplot(fit, data = data, risk.table = TRUE, palette = "Dark2",
+           facet.by = "strata",  # This assumes your survfit uses strata for Sex
+           ggtheme = theme_minimal())
+
+
+head(data)
+# With non-censored data
+
+data <- do.call(rbind, carrierProbandfamilies_sim3_UC)
+str(data)
+
+fit <- survfit(Surv(AgeBC, isAffBC) ~ BRCA1, data = data)
+ggsurvplot(fit, risk.table = TRUE, data = data)
+
+# Plot density ridges for affected individuals, stratified by Sex
+ggplot(data = data[data$isAffBC == 1,], aes(x = AgeBC, y = as.factor(BRCA1), fill = as.factor(BRCA1))) +
+  geom_density_ridges() +
+  facet_wrap(~ Sex, scales = "free_y")
+
+# Plot density ridges for non-affected individuals, stratified by Sex
+ggplot(data = data[data$isAffBC == 0,], aes(x = AgeBC, y = as.factor(BRCA1), fill = as.factor(BRCA1))) +
+  geom_density_ridges() +
+  facet_wrap(~ Sex, scales = "free_y")
+
+
+
+ggplot(data = data[data$isAffBC==1,], aes(x=AgeBC , y= as.factor(BRCA1),fill=as.factor(BRCA1))) +
+geom_density_ridges()
+
+
+ggplot(data = data[data$isAffBC==0,], aes(x=AgeBC , y= as.factor(BRCA1),fill=as.factor(BRCA1))) +
+geom_density_ridges()
+
+
+````
 

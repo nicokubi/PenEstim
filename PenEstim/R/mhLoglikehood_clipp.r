@@ -129,8 +129,9 @@ calculateNCPen <- function(SEER_baseline, alpha, beta, delta, gamma, af, max_age
 #'
 lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female, 
                    delta_male, delta_female, gamma_male, gamma_female, max_age,
-                   baselineRisk, homozygote, SeerNC, sex) {
+                   baselineRisk, homozygote, SeerNC) {
    
+  
   # Map sex to row index: "Female" is 1st row and "Male" is 2nd row
     sex_index <- ifelse(data$sex[i] == 2, 1, 2)
 
@@ -148,8 +149,8 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
         age_index <- min(max_age, data$age[i])
 
         # Weibull parameters for penetrance, using sex-specific gamma
-        survival_prob <- 1 - pweibull(max(age_index - delta,1), shape = alpha, scale = beta) * gamma
-        c.pen <- dweibull(max(age_index - delta,1),shape = alpha, scale = beta) * gamma
+        survival_prob <- 1 - pweibull(max(age_index - delta, 1), shape = alpha, scale = beta) * gamma
+        c.pen <- dweibull(max(age_index - delta,1), shape = alpha, scale = beta) * gamma
 
         # Extract the corresponding baseline risk for sex and age
         SEER_baseline_max <- baselineRisk[sex_index, 1:max_age]
@@ -175,7 +176,7 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
 
         # Penetrance calculations based on genotype and affection status
         lik.i <- c(nc.pen.c, survival_prob) # for censored observations
-        if (data$aff[i] == 1) lik.i <- c(nc.pen, c.pen) # for affected observations
+        if (data$aff[i] == 1) lik.i <- c(nc.pen * nc.pen, c.pen) # for affected observations
     }
 
     # Adjustment for observed genotypes
@@ -184,9 +185,9 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
     #if (data$geno[i] == "2/2") lik.i[-3] <- 0
 
     # Setting the third element to 0 if homozygote is FALSE
-    if (!homozygote) {
-        lik.i[3] <- 0
-    }
+    #if (!homozygote) {
+       # lik.i[3] <- 0
+   # }
 
     return(lik.i)
 }
@@ -210,8 +211,10 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
 #' @examples
 #' # Calculate log likelihood
 #' log_likelihood <- mhLogLikelihood_clipp(parameters, pedigree_data, 80, "Lung Cancer", data_object, 0.2)
-#'
-mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af, homozygote, SeerNC, sex) {
+#' 
+#' ¨
+
+mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af, homozygote, SeerNC) {
   
     # Extract parameters
     given_median_male <- paras[1]
@@ -233,14 +236,21 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     beta_female <- params_female$beta
 
     # Initialize the model
+    
+    if (homozygote) {
     geno_freq <- c(1 - af, af)
     trans <- matrix(c(1, 0,
                          0.5, 0.5,
                          0.5, 0.5,
                          1/3, 2/3), 
                        nrow = 4, ncol = 2, byrow = TRUE)
+    } else {
+      geno_freq <- geno_freq_monogenic(p_alleles = c(1 - af, af))
+      trans <- trans_monogenic(n_alleles = 2)
+      
+    }
     
-baselineRisk <- calculateBaseline(
+    baselineRisk <- calculateBaseline(
         cancer_type = cancer_type,
         gene = "SEER", race = "All_Races", type = "Net", db
     )
@@ -249,7 +259,7 @@ baselineRisk <- calculateBaseline(
     lik <- t(sapply(1:nrow(families), function(i) {
         lik.fn(i, families, alpha_male, alpha_female, beta_male, beta_female, delta_male, delta_female, gamma_male, gamma_female,
             max_age, baselineRisk,
-            homozygote = homozygote, SeerNC = SeerNC, sex = sex
+            homozygote = homozygote, SeerNC = SeerNC
         )
     }))
 

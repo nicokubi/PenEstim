@@ -32,14 +32,14 @@
 #' )
 #' @export
 # Main mhChain function
+
 mhChain <- function(
     seed, n_iter, chain_id, data,
     max_age, db,
     prior_distributions, cancer_type, gene_input, af,
-    median_max, max_penetrance, homozygote, SeerNC, sex) {
+    median_max, max_penetrance, homozygote, SeerNC) {
   
   # Set seed
-  browser()
   set.seed(seed)
 
   # Calculate SEER baseline and midpoint
@@ -91,8 +91,8 @@ mhChain <- function(
     ) * (median_female - threshold_female) + threshold_female
     
     return(list(
-      first_quartile_male = 50, first_quartile_female = first_quartile_female,
-      median_male = 65, median_female = median_female, threshold_male = 20,
+      first_quartile_male = 178, first_quartile_female = first_quartile_female,
+      median_male = 245, median_female = median_female, threshold_male = 20,
       threshold_female = threshold_female,
       asymptote_male = 1, asymptote_female = 1
     ))
@@ -164,7 +164,6 @@ mhChain <- function(
     
     threshold_male_proposal <- 20
     
-    
     # Median proposal scaled to lie between either the median SEER age (basedline_mid), per default,
     # or the max_age as an upper bound and threshold proposal as a lower bound
     median_male_proposal <- if (median_max) {
@@ -175,7 +174,7 @@ mhChain <- function(
         (max_age - threshold_male_proposal) + threshold_male_proposal
     }
     
-    median_male_proposal <- 65
+    median_male_proposal <- 245
     
     median_female_proposal <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) *
@@ -189,7 +188,7 @@ mhChain <- function(
     first_quartile_male_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_male_proposal - threshold_male_proposal) + threshold_male_proposal
     
-    first_quartile_male_proposal <- 50
+    first_quartile_male_proposal <- 178
 
     first_quartile_female_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_female_proposal - threshold_female_proposal) + threshold_female_proposal
@@ -217,8 +216,7 @@ mhChain <- function(
       db = db,
       af = af,
       homozygote = homozygote,
-      SeerNC = SeerNC,
-      sex = sex
+      SeerNC = SeerNC
     )
 
     loglikelihood_proposal <- mhLogLikelihood_clipp(
@@ -234,8 +232,7 @@ mhChain <- function(
       db = db,
       af = af,
       homozygote = homozygote,
-      SeerNC = SeerNC,
-      sex = sex
+      SeerNC = SeerNC
     )
 
     # Compute the acceptance ratio (likelihood ratio)
@@ -481,8 +478,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 4,
       max_penetrance = max_penetrance,
       median_max = median_max,
       homozygote = homozygote,
-      SeerNC = SeerNC,
-      sex = sex
+      SeerNC = SeerNC
     )
   })
 
