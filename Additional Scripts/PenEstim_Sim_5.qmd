@@ -166,77 +166,6 @@ describeFamilies <- function(fams, cancer, gene) {
 
 
 ```
-
-# Likelihood
-
-The likelihood model in `penet.fn` is based on the Weibull distribution for carriers and, per default, the SEER peentrance data for non-carriers. For an individual $i$, the model considers the following parameters:
-
--   $\alpha$: Shape parameter of the Weibull distribution
--   $\beta$: Scale parameter of the Weibull distribution
--   $\delta$: Shift parameter for the age in the Weibull function
--   $\gamma$: Asymptote parameter to adjust the scale of the Weibull function
--   $\text{age}_i$: Age of the individual $i$
--   $\text{aff}_i$: Affection status (1 if affected, 0 otherwise)
-
-An indiviudal that develops cancer at $\text{age}_i$ contributes a term $f$ to the likelihood, which is just the density of the Weibull in our model. The contribution from an individual whose survival time is censored at is the survival probability $S_i = 1 - F$ where $F$ is corresponding cumulative distribution function of the Weibull. 
-
-For the function \( f(x; \alpha, \beta, \delta, \gamma) \) we define:
-
-$$
-f(x; \alpha, \beta, \delta, \gamma) = 
-\begin{cases} 
-\gamma \left( \frac{\alpha}{\beta} \left( \frac{x - \delta}{\beta} \right)^{\alpha - 1} e^{-\left( \frac{x - \delta}{\beta} \right)^\alpha } \right), & x \geq \delta \\
-0, & x < \delta
-\end{cases}
-$$
-
-And for the cumulative distribution function \( F(x; \alpha, \beta, \delta, \gamma) \):
-
-$$
-F(x; \alpha, \beta, \delta, \gamma) =
-\begin{cases} 
-\gamma \left( 1 - e^{-\left( \frac{x - \delta}{\beta} \right)^\alpha } \right), & x \geq \delta \\
-0, & x < \delta
-\end{cases}
-$$
-
-The survival probability for individual $i$ is calculated as: $$S_i = 1 - pweibull(\text{age}_i - \delta, \alpha, \beta) \times \gamma$$ where pweibull is the CDF of the Weibull.
-
-The density (for affected individuals) is calculated as:
-
-$$ c.pen = dweibull(\text{age}_i - \delta, \alpha, \beta) \times \gamma $$. This gives:
-
-$$
-\text{carrierLik}_i = 
-\begin{cases} 
-\text{S}_i & \text{aff}_i = 0 \\
-\text{c.pen} & \text{aff}_i = 1
-\end{cases}
-$$
-
-
-
-
-The baseline risk $\text{SEER\_baseline}_i$ is derived from SEER data. 
-The Data in DevCan provides the age-conditional probability of developing cancer. In the Net form it assumes no competing risk.
-Hence a non-censored observation (i.e. i develops cancer) contributes just the SEER entry at the specific age.
-
-$$
-\text{noncarrierLik}_i = 
-\begin{cases} 
-\exp\left(-\text{cumsum}(\text{SEER\_baseline}_i)\right) & \text{if } \text{aff}_i = 0 \\
-\text{SEER\_baseline}_i & \text{if } \text{aff}_i = 1
-\end{cases}
-$$
-
-
-For censored observations, the likelihood contribution for each individual is considered as the cumulative probability of being cancer-free, while for affected observations, it is based on the calculated density at their age of diagnosis.
-
-Based on the above a penetrance matrix is constructed for the pedigree. The `(i, k)`^th^ component `penet[i, k]` of the penetrance matrix is the conditional probability of person `i`'s observed data $x_i$, given that his or her actual genotype $g_i$ is the `k`^th^ genotype. Given a genetic model and a penetrance matrix, we then use `clipp` to calculate the loglikelihood for all pedigrees.
-
-Based on the above model we then estimate two sets of sex-specific parameters of the Weibull distribution for males and females. The resulting estimated penetrance curves including credible intervals for a) a set of uncensored families and b) censored families is shown below. 
-
-
 # Families 4
 
 We simulated three different sizes of families. For each simulation run we subsetted the families to only include those families where the proband was a carrier of the PV. The simulation was done using the PedUtils package. The penetrance for non-carriers is based on the SEER penetrances in the PanelPRO Database. For carriers we specify a Weibull penetrance with the following parameters:
@@ -466,7 +395,7 @@ prior_params_BRCA1 <- list(
 # Main Estimation for Female
 out_sim_4 <- PenEstim(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2000, 
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 4, n_iter_per_chain = 2500, 
     prior_params = prior_params_BRCA1, af = 0.1, burn_in = 0.1, median_max = FALSE
 )
 save(out_sim_4, file = "out_sim_4.Rdata")

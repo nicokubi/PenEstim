@@ -153,14 +153,18 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
         c.pen <- dweibull(max(age_index - delta,1), shape = alpha, scale = beta) * gamma
 
         # Extract the corresponding baseline risk for sex and age
-        SEER_baseline_max <- baselineRisk[sex_index, 1:max_age]
+        SEER_baseline_max <- baselineRisk[sex_index, 1:age_index]
         SEER_baseline_cum <- cumsum(baselineRisk[sex_index,])[age_index]
         SEER_baseline_i <- baselineRisk[sex_index, age_index]
+        
+        SEER_baseline_max <- baselineRisk[1, 1:80]
+        SEER_baseline_cum <- cumsum(baselineRisk[1,])[80]
+        SEER_baseline_i <- baselineRisk[1, 80]
 
         # Calculate cumuative risk for non-carriers based on SEER data or other model
         if (SeerNC == TRUE) {
             nc.pen <- SEER_baseline_i
-            nc.pen.c <- exp(-SEER_baseline_cum)
+            nc.pen.c <- prod(1- SEER_baseline_i)
         } else {
             nc.pen <- calculateNCPen(
                 SEER_baseline = SEER_baseline_max, alpha = alpha,
@@ -176,7 +180,7 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
 
         # Penetrance calculations based on genotype and affection status
         lik.i <- c(nc.pen.c, survival_prob) # for censored observations
-        if (data$aff[i] == 1) lik.i <- c(nc.pen * nc.pen, c.pen) # for affected observations
+        if (data$aff[i] == 1) lik.i <- c(nc.pen * nc.pen.c, c.pen) # for affected observations
     }
 
     # Adjustment for observed genotypes
@@ -267,17 +271,17 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 1) 
 
     # Handle -Inf values
-    if (is.infinite(loglik) && loglik == -Inf) {
-        penalty <- 1e-100
-        loglik <- log(penalty)
-    } else {
-       cat(
-            "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
-            given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
-            delta_female, gamma_male, gamma_female, "\n"
-        )
-        cat("Log Likelihood:", loglik, "\n")
-   }
+   # if (is.infinite(loglik) && loglik == -Inf) {
+    #    penalty <- 1e-100
+      #  loglik <- log(penalty)
+    #} else {
+     #  cat(
+      #      "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
+       #     given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
+       #     delta_female, gamma_male, gamma_female, "\n"
+        #)
+      #  cat("Log Likelihood:", loglik, "\n")
+   #}
 
     return(loglik)
 }

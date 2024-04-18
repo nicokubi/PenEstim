@@ -91,9 +91,9 @@ mhChain <- function(
     ) * (median_female - threshold_female) + threshold_female
     
     return(list(
-      first_quartile_male = 178, first_quartile_female = first_quartile_female,
-      median_male = 245, median_female = median_female, threshold_male = 20,
-      threshold_female = threshold_female,
+      first_quartile_male = first_quartile_male, first_quartile_female = first_quartile_female,
+      median_male = median_male, median_female = median_female, threshold_male = 0,
+      threshold_female = 0,
       asymptote_male = 1, asymptote_female = 1
     ))
   }
@@ -160,9 +160,10 @@ mhChain <- function(
     
     # threshold proposal
     #threshold_male_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
-    threshold_female_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
+    #threshold_female_proposal <- do.call(prior_distributions$threshold_distribution, list(1))
     
-    threshold_male_proposal <- 20
+    threshold_male_proposal <- 0
+    threshold_female_proposal <- 0
     
     # Median proposal scaled to lie between either the median SEER age (basedline_mid), per default,
     # or the max_age as an upper bound and threshold proposal as a lower bound
@@ -173,8 +174,6 @@ mhChain <- function(
       do.call(prior_distributions$median_distribution, list(1)) *
         (max_age - threshold_male_proposal) + threshold_male_proposal
     }
-    
-    median_male_proposal <- 245
     
     median_female_proposal <- if (median_max) {
       do.call(prior_distributions$median_distribution, list(1)) *
@@ -187,8 +186,6 @@ mhChain <- function(
     # proposal as a lower bound
     first_quartile_male_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_male_proposal - threshold_male_proposal) + threshold_male_proposal
-    
-    first_quartile_male_proposal <- 178
 
     first_quartile_female_proposal <- do.call(prior_distributions$first_quartile_distribution, list(1)) *
       (median_female_proposal - threshold_female_proposal) + threshold_female_proposal
