@@ -150,7 +150,8 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
 
         # Weibull parameters for penetrance, using sex-specific gamma
         survival_prob <- 1 - pweibull(max(age_index - delta, 1), shape = alpha, scale = beta) * gamma
-        c.pen <- dweibull(max(age_index - delta,1), shape = alpha, scale = beta) * gamma
+        c.pen <- (pweibull(max(age_index - delta, 1), shape = alpha, scale = beta)
+        - pweibull(max(age_index - 1 - delta, 1), shape = alpha, scale = beta)) * gamma
 
         # Extract the corresponding baseline risk for sex and age
         SEER_baseline_max <- baselineRisk[sex_index, 1:age_index]
@@ -220,15 +221,18 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
 
 mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af, homozygote, SeerNC) {
   
+  paras<- unlist(paras)
     # Extract parameters
-    given_median_male <- paras[1]
-    given_median_female <- paras[2]
-    given_first_quartile_male <- paras[3]
-    given_first_quartile_female <- paras[4]
-    delta_male <- paras[5]
-    delta_female <- paras[6]
-    gamma_male <- paras[7]
-    gamma_female <- paras[8]
+  gamma_male <- paras[1]
+  gamma_female <- paras[2]
+  delta_male <- paras[3]
+  delta_female <- paras[4]
+    given_median_male <- paras[5]
+    given_median_female <- paras[6]
+    given_first_quartile_male <- paras[7]
+    given_first_quartile_female <- paras[8]
+    
+    
 
     # Calculate Weibull parameters
     params_male <- calculate_weibull_parameters(given_median_male, given_first_quartile_male, delta_male)
@@ -271,16 +275,15 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 1) 
 
     # Handle -Inf values
-   # if (is.infinite(loglik) && loglik == -Inf) {
-    #    penalty <- 1e-100
-      #  loglik <- log(penalty)
-    #} else {
-     #  cat(
-      #      "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
-       #     given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
+   #if (is.infinite(loglik) && loglik == -Inf) {
+        #    loglik <- -50000
+  #  } else {
+    #   cat(
+     #       "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
+      #      given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
        #     delta_female, gamma_male, gamma_female, "\n"
-        #)
-      #  cat("Log Likelihood:", loglik, "\n")
+      #  )
+      # cat("Log Likelihood:", loglik, "\n")
    #}
 
     return(loglik)

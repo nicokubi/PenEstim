@@ -91,10 +91,14 @@ mhChain <- function(
     ) * (median_female - threshold_female) + threshold_female
     
     return(list(
-      first_quartile_male = first_quartile_male, first_quartile_female = first_quartile_female,
-      median_male = median_male, median_female = median_female, threshold_male = 0,
+      asymptote_male = 1, 
+      asymptote_female = 1,
+      threshold_male = 0,
       threshold_female = 0,
-      asymptote_male = 1, asymptote_female = 1
+      median_male = 60, 
+      median_female = 50, 
+      first_quartile_male = 44, 
+      first_quartile_female = 45
     ))
   }
 
@@ -201,12 +205,13 @@ mhChain <- function(
     out$asymptote_female_proposals[i] <- asymptote_female_proposal
 
     # Compute the likelihood for the current and proposed
+    # Example of correctly ordering parameters when calling the likelihood function
     loglikelihood_current <- mhLogLikelihood_clipp(
       paras = c(
-        median_male_current, median_female_current,
-        first_quartile_male_current, first_quartile_female_current,
+        asymptote_male_current, asymptote_female_current,
         threshold_male_current, threshold_female_current,
-        asymptote_male_current, asymptote_female_current
+        median_male_current, median_female_current,
+        first_quartile_male_current, first_quartile_female_current
       ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
@@ -215,15 +220,14 @@ mhChain <- function(
       homozygote = homozygote,
       SeerNC = SeerNC
     )
-
+    
     loglikelihood_proposal <- mhLogLikelihood_clipp(
-      paras =
-        c(
-          median_male_proposal, median_female_proposal,
-          first_quartile_male_proposal, first_quartile_female_proposal,
-          threshold_male_proposal, threshold_female_proposal,
-          asymptote_male_proposal, asymptote_female_proposal
-        ), families = data,
+      paras = c(
+        asymptote_male_proposal, asymptote_female_proposal,
+        threshold_male_proposal, threshold_female_proposal,
+        median_male_proposal, median_female_proposal,
+        first_quartile_male_proposal, first_quartile_female_proposal
+      ), families = data,
       max_age = max_age,
       cancer_type = cancer_type,
       db = db,
