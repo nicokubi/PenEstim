@@ -32,10 +32,11 @@
 #' )
 #' @export
 # Main mhChain_v2 function
-mhChain_v3 <- function(seed, n_iter, chain_id, data, max_age, db,
+mhChain_v3 <- function(seed, n_iter,burn_in, chain_id, data, max_age, db,
                        prior_distributions, cancer_type, gene_input, af,
                        median_max, max_penetrance, homozygote, SeerNC, priors) {
   
+  browser()
   # Set seed
   set.seed(seed)
   
@@ -71,7 +72,7 @@ mhChain_v3 <- function(seed, n_iter, chain_id, data, max_age, db,
   initial_params <- draw_initial_params()
   params_current <- initial_params
   # Initialize storage for accepted proposals
-  accepted_proposals <- list() 
+  current_states <- list() 
   
   # Initialize cov matrix
   num_pars <- 8
@@ -159,19 +160,27 @@ mhChain_v3 <- function(seed, n_iter, chain_id, data, max_age, db,
     
     if (log(runif(1)) < log_acceptance_ratio) {
       params_current <- params_proposal
-      # Store the accepted proposal vector for covariance update
-      accepted_proposals[[length(accepted_proposals) + 1]] <- proposal_vector
+    
     } else {
       num_rejections <- num_rejections + 1
     }
     
+    current_states[[i]] <- c(params_current$asymptote_male, params_current$asymptote_female,
+                             params_current$threshold_male, params_current$threshold_female,
+                             params_current$median_male, params_current$median_female,
+                             params_current$first_quartile_male, params_current$first_quartile_female)
+    
+    
   # Periodically update the proposal covariance matrix
-  if (length(accepted_proposals) > 0 && length(accepted_proposals) %% 10 == 0) {
+  if (length(current_states) > (burn_in * n_iter) && length(current_states) %% 2 == 0) {
     # Use do.call to bind all vectors into a matrix and then compute covariance
-    proposal_cov <- cov(do.call(rbind, accepted_proposals)) + diag(num_pars) * 0.001  # Regularization term
+    #As a basic choice for the scaling parameter we have adopted the value sd  (2:4)2=d from Gelman et al. (1996)
+    sd <- 2.38^2 / num_pars 
+    eps <- 0.001 # for numerical stability
+    proposal_cov <- sd * cov(do.call(rbind, current_states)) + eps  * sd * diag(num_pars)  # Regularization term
   }
     
-    # Update the current state outputs
+    # Update the current state output
     out$asymptote_male_samples[i] <- params_vector[1]
     out$asymptote_female_samples[i] <- params_vector[2]
     out$threshold_male_samples[i] <- params_vector[3]
@@ -193,7 +202,6 @@ mhChain_v3 <- function(seed, n_iter, chain_id, data, max_age, db,
   
   return(out)
 }
-
 
 # Function to calculate the log-prior probability based on specific prior distributions
 calculate_log_prior <- function(params, priors, max_age) {
@@ -432,7 +440,7 @@ PenEstim_v3 <- function(data, cancer_type, gene_input, n_chains = 4,
     "mhChain_v3", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen", "calculate_log_prior",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
     "transformDF", "makePriors", "lik.fn", "mvrnorm",
-    "seeds", "n_iter_per_chain", "sex",
+    "seeds", "n_iter_per_chain", "sex", "burn_in",
     "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
     "GENE_TYPES", "CANCER_NAME_MAP"
@@ -440,7 +448,9 @@ PenEstim_v3 <- function(data, cancer_type, gene_input, n_chains = 4,
 
   results <- parallel::parLapply(cl, 1:n_chains, function(i) {
     mhChain_v3(seeds[i],
-      n_iter = n_iter_per_chain, chain_id = i,
+      n_iter = n_iter_per_chain,
+      burn_in = burn_in,
+      chain_id = i,
       data = data,
       db = db,
       prior_distributions = prop,

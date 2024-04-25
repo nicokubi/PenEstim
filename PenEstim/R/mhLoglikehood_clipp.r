@@ -272,7 +272,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     }))
 
     # Compute log-likelihood
-    loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 1) 
+    loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 4) 
 
     # Handle -Inf values
    #if (is.infinite(loglik) && loglik == -Inf) {
