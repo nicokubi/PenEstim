@@ -32,57 +32,76 @@
 #' )
 #' @export
 # Main mhChain_v2 function
-mhChain_v3 <- function(seed, n_iter,burn_in, chain_id, data, max_age, db,
+mhChain_v4 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
                        prior_distributions, cancer_type, gene_input, af,
                        median_max, max_penetrance, homozygote, SeerNC, priors) {
-  
-  browser()
   # Set seed
   set.seed(seed)
-  
+
   # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(cancer = cancer_type, gene = "SEER", 
-                                           race = "All_Races", type = "Net", db = db)
+  SEER_baseline <- calculate_lifetime_risk(
+    cancer = cancer_type, gene = "SEER",
+    race = "All_Races", type = "Net", db = db
+  )
   midpoint_prob_male <- SEER_baseline$lifetime_risk$male / 2
   midpoint_prob_female <- SEER_baseline$lifetime_risk$female / 2
-  midpoint_index_male <- which(SEER_baseline$cumulative_risk$male >= midpoint_prob_male)[1]
-  midpoint_index_female <- which(SEER_baseline$cumulative_risk$female >= midpoint_prob_female)[1]
-  baseline_mid_male <- as.numeric(names(SEER_baseline$cumulative_risk$male)[midpoint_index_male])
-  baseline_mid_female <- as.numeric(names(SEER_baseline$cumulative_risk$female)[midpoint_index_female])
-  
-  draw_initial_params <- function() {
-    asymptote_factor_male <- 2 * max_penetrance - SEER_baseline$lifetime_risk$male
-    asymptote_factor_male <- if (asymptote_factor_male > 1) 1 - SEER_baseline$lifetime_risk$male else asymptote_factor_male
-    asymptote_factor_female <- 2 * max_penetrance - SEER_baseline$lifetime_risk$female
-    asymptote_factor_female <- if (asymptote_factor_female > 1) 1 - SEER_baseline$lifetime_risk$female else asymptote_factor_female
-    
+  midpoint_index_male <- 
+  which(SEER_baseline$cumulative_risk$male >= midpoint_prob_male)[1]
+  midpoint_index_female <- 
+  which(SEER_baseline$cumulative_risk$female >= midpoint_prob_female)[1]
+  baseline_mid_male <- 
+  as.numeric(names(SEER_baseline$cumulative_risk$male)[midpoint_index_male])
+  baseline_mid_female <- 
+  as.numeric(names(SEER_baseline$cumulative_risk$female)[midpoint_index_female])
+
+  draw_initial_params <- function(data) {
+    # Filter data by sex and affected status
+    data_male_affected <- data[data$sex == 1 & data$aff == 1, ]
+    data_female_affected <- data[data$sex == 2 & data$aff == 1, ]
+
+    # Calculate threshold (minimum age), median, and first quartile by sex among affected individuals
+    threshold_male <- ifelse(length(data_male_affected$age) > 0, 
+    min(data_male_affected$age, na.rm = TRUE), NA)
+    threshold_female <- ifelse(length(data_female_affected$age) > 0, 
+    min(data_female_affected$age, na.rm = TRUE), NA)
+
+    median_male <- ifelse(length(data_male_affected$age) > 0, 
+    median(data_male_affected$age, na.rm = TRUE), NA)
+    median_female <- ifelse(length(data_female_affected$age) > 0, 
+    median(data_female_affected$age, na.rm = TRUE), NA)
+
+    first_quartile_male <- ifelse(length(data_male_affected$age) > 0, 
+    quantile(data_male_affected$age, probs = 0.25, na.rm = TRUE), NA)
+    first_quartile_female <- ifelse(length(data_female_affected$age) > 0, 
+    quantile(data_female_affected$age, probs = 0.25, na.rm = TRUE), NA)
+
     return(list(
-      asymptote_male = 1, 
+      asymptote_male = 1,
       asymptote_female = 1,
-      threshold_male = 10,
-      threshold_female = 10,
-      median_male = 60, 
-      median_female = 50, 
-      first_quartile_male = 44, 
-      first_quartile_female = 45
+      threshold_male = threshold_male,
+      threshold_female = threshold_female,
+      median_male = median_male,
+      median_female = median_female,
+      first_quartile_male = first_quartile_male,
+      first_quartile_female = first_quartile_female
     ))
   }
-  
+
   # Initialize Parameters
-  initial_params <- draw_initial_params()
+  initial_params <- draw_initial_params(data)
   params_current <- initial_params
   # Initialize storage for accepted proposals
-  current_states <- list() 
-  
-  # Initialize cov matrix
+  current_states <- list()
+
+  #  Initialize cov matrix
   num_pars <- 8
-  initial_variances <- rep(0.1, num_pars)  # Example variances, adjust these based on your knowledge
+  initial_variances <- rep(0.1, num_pars) # Example variances, adjust these based on your knowledge
   # Set variances for parameters 1-4 to 0
   # initial_variances[1:4] <- 0
   # Create initial covariance matrix as diagonal
   proposal_cov <- diag(initial_variances)
-  
-  # Intitalize output list
+
+  #  Intitalize output list
   out <- list(
     asymptote_male_samples = numeric(n_iter),
     asymptote_female_samples = numeric(n_iter),
@@ -106,21 +125,22 @@ mhChain_v3 <- function(seed, n_iter,burn_in, chain_id, data, max_age, db,
     rejection_rate = numeric(n_iter),
     proposal_cov = vector("list", n_iter)
   )
-  
+
   num_rejections <- 0
   cat("Starting Chain", chain_id, "\n")
-  
+
   for (i in 1:n_iter) {
-    
     # Update params_vector before using it
-    params_vector <- c(params_current$asymptote_male, params_current$asymptote_female,
-                       params_current$threshold_male, params_current$threshold_female,
-                       params_current$median_male, params_current$median_female,
-                       params_current$first_quartile_male, params_current$first_quartile_female)
-    
+    params_vector <- c(
+      params_current$asymptote_male, params_current$asymptote_female,
+      params_current$threshold_male, params_current$threshold_female,
+      params_current$median_male, params_current$median_female,
+      params_current$first_quartile_male, params_current$first_quartile_female
+    )
+
     # Generate proposals using the adaptive covariance matrix
     proposal_vector <- mvrnorm(1, mu = params_vector, Sigma = proposal_cov)
-    
+
     # Update the proposal state outputs
     out$asymptote_male_proposals[i] <- proposal_vector[1]
     out$asymptote_female_proposals[i] <- proposal_vector[2]
@@ -130,7 +150,7 @@ mhChain_v3 <- function(seed, n_iter,burn_in, chain_id, data, max_age, db,
     out$median_female_proposals[i] <- proposal_vector[6]
     out$first_quartile_male_proposals[i] <- proposal_vector[7]
     out$first_quartile_female_proposals[i] <- proposal_vector[8]
-    
+
     # Update the params_proposal to use the generated proposal_vector correctly:
     params_proposal <- list(
       asymptote_male = max(SEER_baseline$lifetime_risk$male, min(proposal_vector[1], 1)),
@@ -139,47 +159,60 @@ mhChain_v3 <- function(seed, n_iter,burn_in, chain_id, data, max_age, db,
       threshold_female = proposal_vector[4],
       median_male = max(proposal_vector[5], proposal_vector[3]),
       median_female = max(proposal_vector[6], proposal_vector[4]),
-      first_quartile_male = max(proposal_vector[3], min(proposal_vector[5], 
-                                                        rnorm(1, mean = params_current$first_quartile_male, 
-                                                              sd = sqrt(proposal_cov[7, 7])))),  # Adjusted SD using covariance matrix
-      first_quartile_female = max(proposal_vector[4], min(proposal_vector[6], 
-                                                          rnorm(1, mean = params_current$first_quartile_female, 
-                                                                sd = sqrt(proposal_cov[8, 8]))))  # Adjusted SD using covariance matrix
-      )
-    
+      first_quartile_male = max(proposal_vector[3], min(
+        proposal_vector[5],
+        rnorm(1,
+          mean = params_current$first_quartile_male,
+          sd = sqrt(proposal_cov[7, 7])
+        )
+      )), # Adjusted SD using covariance matrix
+      first_quartile_female = max(proposal_vector[4], min(
+        proposal_vector[6],
+        rnorm(1,
+          mean = params_current$first_quartile_female,
+          sd = sqrt(proposal_cov[8, 8])
+        )
+      )) # Adjusted SD using covariance matrix
+    )
+
     # Compute the likelihood for the current and proposed
-    loglikelihood_current <- mhLogLikelihood_clipp(params_current, data, max_age,
-                                                   cancer_type, db, af, homozygote, SeerNC)
-    loglikelihood_proposal <- mhLogLikelihood_clipp(params_proposal, data, max_age,
-                                                    cancer_type, db, af, homozygote, SeerNC)
-    
+    loglikelihood_current <- mhLogLikelihood_clipp(
+      params_current, data, max_age,
+      cancer_type, db, af, homozygote, SeerNC
+    )
+    loglikelihood_proposal <- mhLogLikelihood_clipp(
+      params_proposal, data, max_age,
+      cancer_type, db, af, homozygote, SeerNC
+    )
+
     # Calculate the acceptance ratio
     logprior_current <- calculate_log_prior(params_current, priors, max_age = max_age)
     logprior_proposal <- calculate_log_prior(params_proposal, priors, max_age = max_age)
     log_acceptance_ratio <- (loglikelihood_proposal + logprior_proposal) - (loglikelihood_current + logprior_current)
-    
+
     if (log(runif(1)) < log_acceptance_ratio) {
       params_current <- params_proposal
-    
     } else {
       num_rejections <- num_rejections + 1
     }
-    
-    current_states[[i]] <- c(params_current$asymptote_male, params_current$asymptote_female,
-                             params_current$threshold_male, params_current$threshold_female,
-                             params_current$median_male, params_current$median_female,
-                             params_current$first_quartile_male, params_current$first_quartile_female)
-    
-    
-  # Periodically update the proposal covariance matrix
-  if (length(current_states) > (burn_in * n_iter) && length(current_states) %% 2 == 0) {
-    # Use do.call to bind all vectors into a matrix and then compute covariance
-    #As a basic choice for the scaling parameter we have adopted the value sd  (2:4)2=d from Gelman et al. (1996)
-    sd <- 2.38^2 / num_pars 
-    eps <- 0.001 # for numerical stability
-    proposal_cov <- sd * cov(do.call(rbind, current_states)) + eps  * sd * diag(num_pars)  # Regularization term
-  }
-    
+
+    current_states[[i]] <- c(
+      params_current$asymptote_male, params_current$asymptote_female,
+      params_current$threshold_male, params_current$threshold_female,
+      params_current$median_male, params_current$median_female,
+      params_current$first_quartile_male, params_current$first_quartile_female
+    )
+
+
+    # Periodically update the proposal covariance matrix
+    if (length(current_states) > (burn_in * n_iter) && length(current_states) %% 2 == 0) {
+      # Use do.call to bind all vectors into a matrix and then compute covariance
+      # As a basic choice for the scaling parameter we have adopted the value sd  (2:4)2=d from Gelman et al. (1996)
+      sd <- 2.38^2 / num_pars
+      eps <- 0.001 #  for numerical stability
+      proposal_cov <- sd * cov(do.call(rbind, current_states)) + eps * sd * diag(num_pars) # Regularization term
+    }
+
     # Update the current state output
     out$asymptote_male_samples[i] <- params_vector[1]
     out$asymptote_female_samples[i] <- params_vector[2]
@@ -189,64 +222,63 @@ mhChain_v3 <- function(seed, n_iter,burn_in, chain_id, data, max_age, db,
     out$median_female_samples[i] <- params_vector[6]
     out$first_quartile_male_samples[i] <- params_vector[7]
     out$first_quartile_female_samples[i] <- params_vector[8]
-    
-    
+
+
     # These were already correctly set up
     out$loglikelihood_current[i] <- loglikelihood_current
     out$loglikelihood_proposal[i] <- loglikelihood_proposal
     out$acceptance_ratio[i] <- log_acceptance_ratio
     out$proposal_cov[[i]] <- proposal_cov
   }
-  
+
   out$rejection_rate <- num_rejections / n_iter
-  
+
   return(out)
 }
 
 # Function to calculate the log-prior probability based on specific prior distributions
 calculate_log_prior <- function(params, priors, max_age) {
-  
   # Adjustments for potential scaling - examples below may need modification to match actual scaling
   # Scale asymptote parameters (assuming they should be in range [0,1] for the beta distribution)
-  scaled_asymptote_male = params$asymptote_male
-  scaled_asymptote_female = params$asymptote_female
-  
+  scaled_asymptote_male <- params$asymptote_male
+  scaled_asymptote_female <- params$asymptote_female
+
   # No scaling needed for thresholds if already within bounds
-  scaled_threshold_male = params$threshold_male
-  scaled_threshold_female = params$threshold_female
-  
+  scaled_threshold_male <- params$threshold_male
+  scaled_threshold_female <- params$threshold_female
+
   # Scale median and first quartile (example: also assuming beta distribution within [0,1])
-  scaled_median_male = (params$median_male - params$threshold_male) / (max_age - params$threshold_male)
-  scaled_median_female = (params$median_female - params$threshold_female) / (max_age - params$threshold_female)
-  
-  scaled_first_quartile_male = (params$first_quartile_male - params$threshold_male) / 
-    (params$median_male  - params$threshold_male)
-  scaled_first_quartile_female = (params$first_quartile_female - params$threshold_female) / 
-    (params$median_female  - params$threshold_female)
-  
+  scaled_median_male <- (params$median_male - params$threshold_male) / (max_age - params$threshold_male)
+  scaled_median_female <- (params$median_female - params$threshold_female) / (max_age - params$threshold_female)
+
+  scaled_first_quartile_male <- (params$first_quartile_male - params$threshold_male) /
+    (params$median_male - params$threshold_male)
+  scaled_first_quartile_female <- (params$first_quartile_female - params$threshold_female) /
+    (params$median_female - params$threshold_female)
+
   # Calculate log priors using scaled values
-  #log_prior_asymptote_male = dbeta(scaled_asymptote_male, prior_params$asymptote$g1, prior_params$asymptote$g2, log = TRUE)
-  #log_prior_asymptote_female = dbeta(scaled_asymptote_female, prior_params$asymptote$g1, prior_params$asymptote$g2, log = TRUE)
-  log_prior_asymptote_male = 0
-  log_prior_asymptote_female = 0
-  
-  #log_prior_threshold_male = dunif(scaled_threshold_male, prior_params$threshold$min, prior_params$threshold$max, log = TRUE)
-  #log_prior_threshold_female = dunif(scaled_threshold_female, prior_params$threshold$min, prior_params$threshold$max, log = TRUE)
-  log_prior_threshold_male = 0
-  log_prior_threshold_female = 0
-  
-  log_prior_median_male = dbeta(scaled_median_male, priors$median$m1, priors$median$m2, log = TRUE)
-  log_prior_median_female = dbeta(scaled_median_female, priors$median$m1, priors$median$m2, log = TRUE)
-  
-  log_prior_first_quartile_male = dbeta(scaled_first_quartile_male, priors$first_quartile$q1, priors$first_quartile$q2, log = TRUE)
-  log_prior_first_quartile_female = dbeta(scaled_first_quartile_female, priors$first_quartile$q1, priors$first_quartile$q2, log = TRUE)
-  
+  # log_prior_asymptote_male = dbeta(scaled_asymptote_male, prior_params$asymptote$g1, prior_params$asymptote$g2, log = TRUE)
+  # log_prior_asymptote_female = dbeta(scaled_asymptote_female, prior_params$asymptote$g1, prior_params$asymptote$g2, log = TRUE)
+  log_prior_asymptote_male <- 0
+  log_prior_asymptote_female <- 0
+
+  # log_prior_threshold_male = dunif(scaled_threshold_male, prior_params$threshold$min, prior_params$threshold$max, log = TRUE)
+  # log_prior_threshold_female = dunif(scaled_threshold_female, prior_params$threshold$min, prior_params$threshold$max, log = TRUE)
+  log_prior_threshold_male <- 0
+  log_prior_threshold_female <- 0
+
+  log_prior_median_male <- dbeta(scaled_median_male, priors$median$m1, priors$median$m2, log = TRUE)
+  log_prior_median_female <- dbeta(scaled_median_female, priors$median$m1, priors$median$m2, log = TRUE)
+
+  log_prior_first_quartile_male <- dbeta(scaled_first_quartile_male, priors$first_quartile$q1, priors$first_quartile$q2, log = TRUE)
+  log_prior_first_quartile_female <- dbeta(scaled_first_quartile_female, priors$first_quartile$q1, priors$first_quartile$q2, log = TRUE)
+
   # Sum all the log priors to get the total log prior for the parameter set
-  log_prior_total = log_prior_asymptote_male + log_prior_asymptote_female +
+  log_prior_total <- log_prior_asymptote_male + log_prior_asymptote_female +
     log_prior_threshold_male + log_prior_threshold_female +
     log_prior_median_male + log_prior_median_female +
     log_prior_first_quartile_male + log_prior_first_quartile_female
-  
+
   return(log_prior_total)
 }
 
@@ -357,28 +389,28 @@ calculate_log_prior <- function(params, priors, max_age) {
 #' @export
 
 PenEstim_v4 <- function(data, cancer_type, gene_input, n_chains = 4,
-                     n_iter_per_chain = 200,
-                     db = PPP::PanelPRODatabase,
-                     sex = "NA",
-                     max_age = 94,
-                     removeProband = FALSE,
-                     median_max = TRUE,
-                     homozygote = TRUE,
-                     SeerNC = TRUE,
-                     burn_in = 0,
-                     thinning_factor = 1,
-                     distribution_data = distribution_data_default,
-                     af = 0.0001,
-                     max_penetrance = 1,
-                     sample_size = NULL,
-                     ratio = NULL,
-                     prior_params = prior_params_default,
-                     risk_proportion = risk_proportion_default,
-                     summary_stats = TRUE,
-                     rejection_rates = TRUE,
-                     density_plots = TRUE,
-                     penetrance_plot = TRUE,
-                     probCI = 0.95) {
+                        n_iter_per_chain = 200,
+                        db = PPP::PanelPRODatabase,
+                        sex = "NA",
+                        max_age = 94,
+                        removeProband = FALSE,
+                        median_max = TRUE,
+                        homozygote = TRUE,
+                        SeerNC = TRUE,
+                        burn_in = 0,
+                        thinning_factor = 1,
+                        distribution_data = distribution_data_default,
+                        af = 0.0001,
+                        max_penetrance = 1,
+                        sample_size = NULL,
+                        ratio = NULL,
+                        prior_params = prior_params_default,
+                        risk_proportion = risk_proportion_default,
+                        summary_stats = TRUE,
+                        rejection_rates = TRUE,
+                        density_plots = TRUE,
+                        penetrance_plot = TRUE,
+                        probCI = 0.95) {
   # Validate inputs
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
@@ -437,7 +469,7 @@ PenEstim_v4 <- function(data, cancer_type, gene_input, n_chains = 4,
   })
 
   parallel::clusterExport(cl, c(
-    "mhChain_v3", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen", "calculate_log_prior",
+    "mhChain_v4", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen", "calculate_log_prior",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
     "transformDF", "makePriors", "lik.fn", "mvrnorm",
     "seeds", "n_iter_per_chain", "sex", "burn_in",
@@ -447,7 +479,7 @@ PenEstim_v4 <- function(data, cancer_type, gene_input, n_chains = 4,
   ), envir = environment())
 
   results <- parallel::parLapply(cl, 1:n_chains, function(i) {
-    mhChain_v3(seeds[i],
+    mhChain_v4(seeds[i],
       n_iter = n_iter_per_chain,
       burn_in = burn_in,
       chain_id = i,
