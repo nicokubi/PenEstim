@@ -275,16 +275,16 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 4) 
 
     # Handle -Inf values
-   #if (is.infinite(loglik) && loglik == -Inf) {
-        #    loglik <- -50000
-  #  } else {
-    #   cat(
-     #       "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
-      #      given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
-       #     delta_female, gamma_male, gamma_female, "\n"
-      #  )
-      # cat("Log Likelihood:", loglik, "\n")
-   #}
+   if (is.infinite(loglik) && loglik == -Inf) {
+            loglik <- -50000
+    } else {
+       cat(
+            "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
+            given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
+            delta_female, gamma_male, gamma_female, "\n"
+        )
+       cat("Log Likelihood:", loglik, "\n")
+   }
 
     return(loglik)
 }

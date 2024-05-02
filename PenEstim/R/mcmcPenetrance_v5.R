@@ -35,7 +35,6 @@
 mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
                        prior_distributions, cancer_type, gene_input, af,
                        median_max, max_penetrance, homozygote, SeerNC, priors) {
-  
   browser()
   # Set seed
   set.seed(seed)
@@ -47,14 +46,14 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
   )
   midpoint_prob_male <- SEER_baseline$lifetime_risk$male / 2
   midpoint_prob_female <- SEER_baseline$lifetime_risk$female / 2
-  midpoint_index_male <- 
-  which(SEER_baseline$cumulative_risk$male >= midpoint_prob_male)[1]
-  midpoint_index_female <- 
-  which(SEER_baseline$cumulative_risk$female >= midpoint_prob_female)[1]
-  baseline_mid_male <- 
-  as.numeric(names(SEER_baseline$cumulative_risk$male)[midpoint_index_male])
-  baseline_mid_female <- 
-  as.numeric(names(SEER_baseline$cumulative_risk$female)[midpoint_index_female])
+  midpoint_index_male <-
+    which(SEER_baseline$cumulative_risk$male >= midpoint_prob_male)[1]
+  midpoint_index_female <-
+    which(SEER_baseline$cumulative_risk$female >= midpoint_prob_female)[1]
+  baseline_mid_male <-
+    as.numeric(names(SEER_baseline$cumulative_risk$male)[midpoint_index_male])
+  baseline_mid_female <-
+    as.numeric(names(SEER_baseline$cumulative_risk$female)[midpoint_index_female])
 
   draw_initial_params <- function(data) {
     # Filter data by sex and affected status
@@ -78,19 +77,23 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     threshold_male <- pmax(pmin(threshold_male, upper_bound, na.rm = TRUE), lower_bound, na.rm = TRUE)
     threshold_female <- pmax(pmin(threshold_female, upper_bound, na.rm = TRUE), lower_bound, na.rm = TRUE)
 
-    median_male <- ifelse(length(data_male_affected$age) > 0, 
-    median(data_male_affected$age, na.rm = TRUE), NA)
-    median_female <- ifelse(length(data_female_affected$age) > 0, 
-    median(data_female_affected$age, na.rm = TRUE), NA)
+    median_male <- ifelse(length(data_male_affected$age) > 0,
+      median(data_male_affected$age, na.rm = TRUE), NA
+    )
+    median_female <- ifelse(length(data_female_affected$age) > 0,
+      median(data_female_affected$age, na.rm = TRUE), NA
+    )
 
-    first_quartile_male <- ifelse(length(data_male_affected$age) > 0, 
-    quantile(data_male_affected$age, probs = 0.25, na.rm = TRUE), NA)
-    first_quartile_female <- ifelse(length(data_female_affected$age) > 0, 
-    quantile(data_female_affected$age, probs = 0.25, na.rm = TRUE), NA)
+    first_quartile_male <- ifelse(length(data_male_affected$age) > 0,
+      quantile(data_male_affected$age, probs = 0.25, na.rm = TRUE), NA
+    )
+    first_quartile_female <- ifelse(length(data_female_affected$age) > 0,
+      quantile(data_female_affected$age, probs = 0.25, na.rm = TRUE), NA
+    )
 
     return(list(
-      asymptote_male = 1,
-      asymptote_female = 1,
+      asymptote_male = runif(1),
+      asymptote_female = runif(1),
       threshold_male = threshold_male,
       threshold_female = threshold_female,
       median_male = median_male,
@@ -108,15 +111,19 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
 
   #  Initialize cov matrix
   num_pars <- 8
-  initial_variances <- rep(0.1, num_pars) # Example variances, adjust these based on your knowledge
+  #initial_variances <- rep(1, num_pars) # Example variances, adjust these based on your knowledge
   # Set variances for parameters 1-4 to 0
   # initial_variances[1:4] <- 0
   # Create initial covariance matrix as diagonal
-  C <- diag(initial_variances)
+ # C <- diag(initial_variances)
   
+  std_devs <- c(0.1, 0.1, 2, 2,5,5,5,5)  # Example standard deviations for four parameters
+  C <- diag(std_devs)
+  
+
   # Initiatlize the mean vector
-  mu <- rep(0, num_pars)  
-  
+  mu <- rep(0, num_pars)
+
   # As a basic choice for the scaling parameter we have adopted the value sd  (2:4)2=d from Gelman et al. (1996)
   sd <- 2.38^2 / num_pars
   eps <- 0.001 #  for numerical stability
@@ -169,11 +176,11 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
       (params$median_female - params$threshold_female)
 
     # Calculate log priors using scaled values
-    log_prior_asymptote_male = dbeta(scaled_asymptote_male, priors$asymptote$g1, priors$asymptote$g2, log = TRUE)
-    log_prior_asymptote_female = dbeta(scaled_asymptote_female, priors$asymptote$g1, priors$asymptote$g2, log = TRUE)
+    log_prior_asymptote_male <- dbeta(scaled_asymptote_male, priors$asymptote$g1, priors$asymptote$g2, log = TRUE)
+    log_prior_asymptote_female <- dbeta(scaled_asymptote_female, priors$asymptote$g1, priors$asymptote$g2, log = TRUE)
 
-    log_prior_threshold_male = dunif(scaled_threshold_male, priors$threshold$min, priors$threshold$max, log = TRUE)
-    log_prior_threshold_female = dunif(scaled_threshold_female, priors$threshold$min, priors$threshold$max, log = TRUE)
+    log_prior_threshold_male <- dunif(scaled_threshold_male, priors$threshold$min, priors$threshold$max, log = TRUE)
+    log_prior_threshold_female <- dunif(scaled_threshold_female, priors$threshold$min, priors$threshold$max, log = TRUE)
 
     log_prior_median_male <- dbeta(scaled_median_male, priors$median$m1, priors$median$m2, log = TRUE)
     log_prior_median_female <- dbeta(scaled_median_female, priors$median$m1, priors$median$m2, log = TRUE)
@@ -191,9 +198,8 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
   }
 
   # Run the iterations of the adaptive MCMC algorithm
-  # Based on Adaptive MCMC tutorial from Stanford, Algorithm 2 from Horario et al. (2001)
+  #  Based on Adaptive MCMC tutorial from Stanford, Algorithm 2 from Horario et al. (2001)
   for (i in 1:n_iter) {
-  
     # Update params_vector before using it
     params_vector <- c(
       params_current$asymptote_male, params_current$asymptote_female,
@@ -240,16 +246,16 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     # Calculate the acceptance ratio
     logprior_current <- calculate_log_prior(params_current, priors, max_age = max_age)
     logprior_proposal <- calculate_log_prior(params_proposal, priors, max_age = max_age)
-    log_acceptance_ratio <- (loglikelihood_proposal + logprior_proposal) - (loglikelihood_current + logprior_current)
-    
-    # Acceptance step
+    log_acceptance_ratio <- (loglikelihood_proposal + logprior_proposal) 
+    - (loglikelihood_current + logprior_current)
+
+    #  Acceptance step
     if (log(runif(1)) < log_acceptance_ratio) {
       params_current <- params_proposal
-      
     } else {
       num_rejections <- num_rejections + 1
     }
-     
+
     # Update the proposal distribution variance if we have moved past the burn-in period
     current_states[[i]] <- c(
       params_current$asymptote_male, params_current$asymptote_female,
@@ -257,14 +263,12 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
       params_current$median_male, params_current$median_female,
       params_current$first_quartile_male, params_current$first_quartile_female
     )
-
+    
+    
     # Periodically update the proposal covariance matrix
-    if (length(current_states) > (burn_in * n_iter)) {
-      # mean update
-      delta <- current_states[[i]] - mu
-      mu <- mu + (1 / i) * delta
-      # cov update
-       C <- (i - 1) / i * C + (sd / i) * (delta %*% t(delta)) + sd * eps * diag(num_pars)
+    if (i > max(burn_in * n_iter, 3)) {
+       # Update Sigma
+      C <- sd * cov(do.call(rbind, current_states)) + eps * sd * diag(num_pars)
     }
 
     # Update the current state output
@@ -476,7 +480,7 @@ PenEstim_v5 <- function(data, cancer_type, gene_input, n_chains = 4,
   })
 
   parallel::clusterExport(cl, c(
-    "mhChain_v5", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen", 
+    "mhChain_v5", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
     "transformDF", "makePriors", "lik.fn", "mvrnorm",
     "seeds", "n_iter_per_chain", "sex", "burn_in",
