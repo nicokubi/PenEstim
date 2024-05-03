@@ -111,18 +111,10 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
 
   #  Initialize cov matrix
   num_pars <- 8
-  #initial_variances <- rep(1, num_pars) # Example variances, adjust these based on your knowledge
-  # Set variances for parameters 1-4 to 0
-  # initial_variances[1:4] <- 0
-  # Create initial covariance matrix as diagonal
- # C <- diag(initial_variances)
-  
-  std_devs <- c(0.1, 0.1, 2, 2,5,5,5,5)  # Example standard deviations for four parameters
-  C <- diag(std_devs)
-  
 
-  # Initiatlize the mean vector
-  mu <- rep(0, num_pars)
+  # Create initial covariance matrix as diagonal
+  var <- c(1, 1, 2, 2,5,5,5,5)  # Example standard deviations for four parameters
+  C <- diag(var)
 
   # As a basic choice for the scaling parameter we have adopted the value sd  (2:4)2=d from Gelman et al. (1996)
   sd <- 2.38^2 / num_pars
