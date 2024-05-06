@@ -92,7 +92,7 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     )
 
     # Initialize with the same asymptote for both sexes
-    asymptote <- runif(1, min = 0, max = 1)
+    asymptote <- runif(1)
 
     return(list(
       asymptote_male = asymptote,
@@ -120,7 +120,7 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
 
   # As a basic choice for the scaling parameter we have adopted the value from Gelman et al. (1996)
   sd <- 2.38^2 / num_pars
-  eps <- 0.001 #  for numerical stability
+  eps <- 0.01 #  for numerical stability
 
   #  Intitalize output list
   out <- list(

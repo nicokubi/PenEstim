@@ -131,7 +131,6 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
                    delta_male, delta_female, gamma_male, gamma_female, max_age,
                    baselineRisk, homozygote, SeerNC) {
    
-  
   # Map sex to row index: "Female" is 1st row and "Male" is 2nd row
     sex_index <- ifelse(data$sex[i] == 2, 1, 2)
 
@@ -220,7 +219,7 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
 #' ¨
 
 mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af, homozygote, SeerNC) {
-  
+
   paras<- unlist(paras)
     # Extract parameters
   gamma_male <- paras[1]
@@ -231,8 +230,6 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     given_median_female <- paras[6]
     given_first_quartile_male <- paras[7]
     given_first_quartile_female <- paras[8]
-    
-    
 
     # Calculate Weibull parameters
     params_male <- calculate_weibull_parameters(given_median_male, given_first_quartile_male, delta_male)

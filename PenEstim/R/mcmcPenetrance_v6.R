@@ -448,7 +448,7 @@ PenEstim_v6 <- function(data, cancer_type, gene_input, n_chains = 4,
   parallel::clusterExport(cl, c(
     "mhChain_v6", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
-    "transformDF", "makePriors", "lik.fn", "mvrnorm", "ncores",
+    "transformDF", "makePriors", "lik.fn", "mvrnorm", "ncores", "detectCores",
     "seeds", "n_iter_per_chain", "sex", "burn_in",
     "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",

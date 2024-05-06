@@ -377,7 +377,7 @@ For carriers we specify a Weibull penetrance with the following parameters:
 
 -   Delta = 10
 
--   Gamma = 1
+-   Gamma = 0.8
 
 For men: 
 
@@ -387,7 +387,7 @@ For men:
 
 -   Delta = 10
 
--   Gamma = 1
+-   Gamma = 0.8
 
 ```{r fam4.2, echo=FALSE, cache=TRUE}
 #set seed
@@ -419,7 +419,7 @@ db_sim$AlleleFrequency[["BRCA1_anyPV", 3]] <- BRCA1freq
 
   alpha <- 2.5
   beta <- 40
-  gamma <- 1
+  gamma <- 0.8
   delta <- 10
   penetrance.mod <- dweibull(age - delta, alpha, beta) * gamma
   
@@ -447,7 +447,7 @@ db_sim$AlleleFrequency[["BRCA1_anyPV", 3]] <- BRCA1freq
   
   alpha <- 2
   beta <- 50
-  gamma <- 1
+  gamma <- 0.8
   delta <- 10
   penetrance.mod <- dweibull(age - delta, alpha, beta) * gamma
   
@@ -793,7 +793,9 @@ The Adaptive Metropolis-Hastings (MH) algorithm improves the efficiency of the s
 
 They choose the proposal density $N(X(t), \Sigma(t))$. Since $X(t)$ is multivariate, we have a multivariate proposal distribution. In the Adaptive Metropolis (AM) sampler, at each iteration of the chain, a candidate value $X^*$ is sampled from a proposal distribution $N(X(t), s_d* \Sigma(t))$, aiming to tune the covariance matrix $\Sigma(t)$ to improve the acceptance rate.
 
-The crucial aspect of the adaptation is how the covariance of the proposal distribution depends on the chain's history. In the AM algorithm, this is addressed by setting $\Sigma(t) \approx s_d \text{cov}(X_0, ..., X_{t-1}) + s_d \epsilon_0 I_d$ after an initial period, where $s_d$ is a parameter that depends only on dimension $d$ and $\epsilon_0$ is a small constant relative to the size of $S$. Here, $I_d$ denotes the $d$-dimensional identity matrix. To begin, we select an arbitrary, strictly positive definite initial covariance $\Sigma_0$, based on our best prior knowledge (which may be quite poor). We select an index $t_0 > 0$ for the length of an initial period and define:
+The crucial aspect of the adaptation is how the covariance of the proposal distribution depends on the chain's history. In the AM algorithm, this is addressed by setting $\Sigma(t) \approx s_d \text{cov}(X_0, ..., X_{t-1}) + s_d \epsilon_0 I_d$ after an initial period, where $s_d$ is a parameter that depends only on dimension $d$ and $\epsilon_0$ is a small constant relative to the size of $S$. Here, $I_d$ denotes the $d$-dimensional identity matrix. To begin, we select an arbitrary, strictly positive definite initial covariance $\Sigma_0$, based on our best prior knowledge (which may be quite poor). 
+We set $\epsilon_0 = 0.01$ and $s_d = 2.38^2 / d$.
+We select an index $t_0 > 0$ for the length of an initial period and define:
 
 
 $$
@@ -819,7 +821,7 @@ $$
 \end{bmatrix}
 $$
 
-The role of the parameter $\epsilon_0$ is just to ensure that $\Sigma_t$ will not become singular. 
+The role of the parameter $\epsilon_0$ is just to ensure that $\Sigma_t$ will not become singular.
 As a basic choice for the scaling parameter, we have adopted the value $s_d = \left(\frac{2.4}{\sqrt{d}}\right)^2$ from Gelman et al. (1996), where it was shown that in a certain sense this choice optimizes the mixing properties of the Metropolis search in the case of Gaussian targets and Gaussian proposals
 
 ## MCMC with Adaptive MH - Families 1 with 4 Parameter Weibull
@@ -890,6 +892,75 @@ acf(out_sim_5.4$results[[1]]$threshold_male_samples, main = "ACF of Threshold - 
 acf(out_sim_5.4$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
 ```
 
+## MCMC with Adaptive MH - Families 2 with 4 Parameter Weibull
+
+
+```{r est6, echo=TRUE, cache=TRUE}
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional Scripts/simFamilies_sim4.2.RData")
+
+dat <- simfamilies_sim4.2
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+
+# Exploring different priors 
+prior_params <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    threshold = list(min = 5, max = 30),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+system.time(out_sim_5.6 <- PenEstim_v7(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 1, n_iter_per_chain = 7000, 
+    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max = TRUE
+))
+save(out_sim_5.6, file = "out_sim_5.6.Rdata")
+
+# print summary stats
+out_sim_5.6$summary_stats
+plot_traceSingle(out_sim_5.6$results[[1]])
+plot_penetrance_sim(out_sim_5.6$combined_chains, prob = 0.95, max_age = 94,"Female",2.5,50,25,1)
+plot_penetrance_sim(out_sim_5.6$combined_chains, prob = 0.95, max_age = 94,"Male",2.5,40,25,1)
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_5.6$combined_chains$median_male_results, out_sim_5.6$combined_chains$first_quartile_male_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_5.6$combined_chains$median_female_results, out_sim_5.6$combined_chains$first_quartile_female_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+```
+
+```{r acf2, echo=TRUE, cache=TRUE}
+## ACF Plots 
+acf(out_sim_5.6$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+acf(out_sim_5.6$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+acf(out_sim_5.6$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+acf(out_sim_5.6$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+acf(out_sim_5.6$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+acf(out_sim_5.6$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+```
+
+
 
 ## MCMC with Adaptive MH - Families 3 with 4 Parameter Weibull
 
@@ -930,10 +1001,10 @@ prior_params <- list(
 # Main Estimation for Female
 system.time(out_sim_5.7 <- PenEstim_v7(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 1, n_iter_per_chain = 5000, 
-    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max = FALSE
-))
-#save(out_sim_5.7, file = "out_sim_5.7.Rdata")
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 1, n_iter_per_chain = 7000, 
+    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max= TRUE))
+
+    save(out_sim_5.7, file = "out_sim_5.7.Rdata")
 
 # print summary stats
 out_sim_5.7$summary_stats

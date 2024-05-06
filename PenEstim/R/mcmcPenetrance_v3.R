@@ -34,7 +34,7 @@
 # Main mhChain_v2 function
 mhChain_v3 <- function(seed, n_iter,burn_in, chain_id, data, max_age, db,
                        prior_distributions, cancer_type, gene_input, af,
-                       median_max, max_penetrance, homozygote, SeerNC, priors) {
+                       median_max, max_penetrance, homozygote, SeerNC, priors, window) {
   
   browser()
   # Set seed
@@ -172,7 +172,7 @@ mhChain_v3 <- function(seed, n_iter,burn_in, chain_id, data, max_age, db,
     
     
   # Periodically update the proposal covariance matrix
-  if (length(current_states) > (burn_in * n_iter) && length(current_states) %% 2 == 0) {
+  if (length(current_states) > (burn_in * n_iter) && length(current_states) %% window == 0) {
     # Use do.call to bind all vectors into a matrix and then compute covariance
     #As a basic choice for the scaling parameter we have adopted the value sd  (2:4)2=d from Gelman et al. (1996)
     sd <- 2.38^2 / num_pars 
@@ -366,6 +366,7 @@ PenEstim_v3 <- function(data, cancer_type, gene_input, n_chains = 4,
                      homozygote = TRUE,
                      SeerNC = TRUE,
                      burn_in = 0,
+                     window = 100,
                      thinning_factor = 1,
                      distribution_data = distribution_data_default,
                      af = 0.0001,
@@ -440,7 +441,7 @@ PenEstim_v3 <- function(data, cancer_type, gene_input, n_chains = 4,
     "mhChain_v3", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen", "calculate_log_prior",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
     "transformDF", "makePriors", "lik.fn", "mvrnorm",
-    "seeds", "n_iter_per_chain", "sex", "burn_in",
+    "seeds", "n_iter_per_chain", "sex", "burn_in", "window",
     "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
     "GENE_TYPES", "CANCER_NAME_MAP"
@@ -450,6 +451,7 @@ PenEstim_v3 <- function(data, cancer_type, gene_input, n_chains = 4,
     mhChain_v3(seeds[i],
       n_iter = n_iter_per_chain,
       burn_in = burn_in,
+      window = window,
       chain_id = i,
       data = data,
       db = db,

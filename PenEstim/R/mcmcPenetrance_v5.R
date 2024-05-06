@@ -238,8 +238,7 @@ mhChain_v5 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     # Calculate the acceptance ratio
     logprior_current <- calculate_log_prior(params_current, priors, max_age = max_age)
     logprior_proposal <- calculate_log_prior(params_proposal, priors, max_age = max_age)
-    log_acceptance_ratio <- (loglikelihood_proposal + logprior_proposal) 
-    - (loglikelihood_current + logprior_current)
+    log_acceptance_ratio <- (loglikelihood_proposal + logprior_proposal) - (loglikelihood_current + logprior_current)
 
     #  Acceptance step
     if (log(runif(1)) < log_acceptance_ratio) {

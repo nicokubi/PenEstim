@@ -1213,12 +1213,12 @@ prior_params <- list(
 )
 # Run Estimation procedure with default prior setting 
 # Main Estimation for Female
-system.time(out_sim_5.7 <- PenEstim_v5(
+system.time(out_sim_5.7 <- PenEstim_v7(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 1, n_iter_per_chain = 3000, 
-    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max = FALSE
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 1, n_iter_per_chain =, 
+    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max = FALSE, priors = prior_params
 ))
-save(out_sim_5.7, file = "out_sim_5.7.Rdata")
+#save(out_sim_5.7, file = "out_sim_5.7.Rdata")
 
 # print summary stats
 out_sim_5.7$summary_stats

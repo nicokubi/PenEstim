@@ -212,8 +212,8 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
   
   paras<- unlist(paras)
     # Extract parameters
-  given_threshold_male <- paras[1]
-  given_threshold_female <- paras[2]
+  delta_male <- paras[1]
+  delta_female <- paras[2]
     given_median_male <- paras[3]
     given_median_female <- paras[4]
     given_first_quartile_male <- paras[5]
@@ -223,12 +223,12 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
 
     # Calculate Weibull parameters
     params_male <- calculate_weibull_parameters(given_median_male, 
-    given_first_quartile_male, given_threshold_male)
+    given_first_quartile_male, delta_male)
     alpha_male <-  params_male$alpha
     beta_male <- params_male$beta
 
     params_female <- calculate_weibull_parameters(given_median_female, 
-    given_first_quartile_female, given_threshold_female)
+    given_first_quartile_female, delta_female)
     alpha_female <- params_female$alpha
     beta_female <- params_female$beta
 
@@ -254,7 +254,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
 
     # Calculate penetrance
     lik <- t(sapply(1:nrow(families), function(i) {
-        lik.fn(i, families, alpha_male, alpha_female, beta_male, beta_female, given_threshold_male, given_threshold_female,
+        lik.fn(i, families, alpha_male, alpha_female, beta_male, beta_female, delta_male, delta_female,
             max_age, baselineRisk,
             homozygote = homozygote, SeerNC = SeerNC
         )
@@ -276,7 +276,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
        cat(
             "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
             given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
-            delta_female, gamma_male, gamma_female, "\n"
+            delta_female, "\n"
         )
        cat("Log Likelihood:", loglik, "\n")
    }
