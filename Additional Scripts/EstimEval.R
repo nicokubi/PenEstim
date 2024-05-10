@@ -48,7 +48,7 @@ plot_penetrance_sim <- function(data, prob, max_age, sex, data_gen_alpha, data_g
            type = "l", col = color,
            ylim = c(min(ci_lower, na.rm = TRUE), max(ci_upper, na.rm = TRUE)),
            xlab = "Age", ylab = "Cumulative Penetrance", main = "Penetrance Curve with Credible Interval")
-           lines(x_values, data_generating_curve, col = "black", lty = 1)
+      lines(x_values, data_generating_curve, col = "black", lty = 1)
       
     } else {
       lines(x_values, mean_density, col = color)
@@ -91,56 +91,56 @@ plot_penetrance_sim <- function(data, prob, max_age, sex, data_gen_alpha, data_g
 # Calculating the required penetrance data 
 
 calculate_penetrance_data <- function(data, prob, max_age, data_gen_alpha, data_gen_beta, data_gen_threshold, data_gen_asymptote) {
-    if (prob <= 0 || prob >= 1) {
-        stop("prob must be between 0 and 1")
-    }
-
-    params <- calculate_weibull_parameters(
-        data$median_results,
-        data$first_quartile_results,
-        data$threshold_results,
-        data$asymptote_results
-    )
-
-    alphas <- params$alpha
-    betas <- params$beta
-    thresholds <- data$threshold_results
-    asymptotes <- data$asymptote_results
-
-    x_values <- seq(0, max_age, length.out = max_age + 1)
-    distributions <- vector("list", length(alphas))
-
-    for (i in seq_along(alphas)) {
-        distributions[[i]] <- pweibull(x_values - thresholds[i], shape = alphas[i], scale = betas[i]) * asymptotes[i]
-    }
-
-    distributions_matrix <- do.call(cbind, distributions)
-    mean_density <- rowMeans(distributions_matrix, na.rm = TRUE)
-
-    ci_lower <- apply(distributions_matrix, 1, function(x) quantile(x, probs = (1 - prob) / 2, na.rm = TRUE))
-    ci_upper <- apply(distributions_matrix, 1, function(x) quantile(x, probs = 1 - (1 - prob) / 2, na.rm = TRUE))
-
-    data_generating_curve <- pweibull(x_values - data_gen_threshold, shape = data_gen_alpha, scale = data_gen_beta) * data_gen_asymptote
-
-    return(list(
-        mean_density = mean_density,
-        data_generating_curve = data_generating_curve,
-        ci_lower = ci_lower,
-        ci_upper = ci_upper,
-        x_values = x_values
-    ))
+  if (prob <= 0 || prob >= 1) {
+    stop("prob must be between 0 and 1")
+  }
+  
+  params <- calculate_weibull_parameters(
+    data$median_results,
+    data$first_quartile_results,
+    data$threshold_results,
+    data$asymptote_results
+  )
+  
+  alphas <- params$alpha
+  betas <- params$beta
+  thresholds <- data$threshold_results
+  asymptotes <- data$asymptote_results
+  
+  x_values <- seq(0, max_age, length.out = max_age + 1)
+  distributions <- vector("list", length(alphas))
+  
+  for (i in seq_along(alphas)) {
+    distributions[[i]] <- pweibull(x_values - thresholds[i], shape = alphas[i], scale = betas[i]) * asymptotes[i]
+  }
+  
+  distributions_matrix <- do.call(cbind, distributions)
+  mean_density <- rowMeans(distributions_matrix, na.rm = TRUE)
+  
+  ci_lower <- apply(distributions_matrix, 1, function(x) quantile(x, probs = (1 - prob) / 2, na.rm = TRUE))
+  ci_upper <- apply(distributions_matrix, 1, function(x) quantile(x, probs = 1 - (1 - prob) / 2, na.rm = TRUE))
+  
+  data_generating_curve <- pweibull(x_values - data_gen_threshold, shape = data_gen_alpha, scale = data_gen_beta) * data_gen_asymptote
+  
+  return(list(
+    mean_density = mean_density,
+    data_generating_curve = data_generating_curve,
+    ci_lower = ci_lower,
+    ci_upper = ci_upper,
+    x_values = x_values
+  ))
 }
 
 # Calculating MSE for evaluation
 calculate_mse <- function(estimated_curve, true_curve) {
-    mse <- mean((estimated_curve - true_curve)^2)
-    return(mse)
+  mse <- mean((estimated_curve - true_curve)^2)
+  return(mse)
 }
 
 # Calculate 95% Credible Interval Coverage
 calculate_ci_coverage <- function(true_curve, ci_lower, ci_upper) {
-    coverage <- mean(true_curve >= ci_lower & true_curve <= ci_upper)
-    return(coverage)
+  coverage <- mean(true_curve >= ci_lower & true_curve <= ci_upper)
+  return(coverage)
 }
 
 plot_penetrance_sim_female <- function(data, prob, max_age, data_gen_alpha, data_gen_beta, data_gen_threshold, data_gen_asymptote) {
@@ -228,4 +228,3 @@ plot_penetrance_sim_male <- function(data, prob, max_age, data_gen_alpha, data_g
          lty = c(1),
          cex = 0.8)
 }
-

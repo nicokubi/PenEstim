@@ -948,6 +948,10 @@ plot(out_sim_5.6$combined_chains$median_male_results, out_sim_5.6$combined_chain
 abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
 plot(out_sim_5.6$combined_chains$median_female_results, out_sim_5.6$combined_chains$first_quartile_female_results, xlim = c(1,100), ylim = c(1,100))
 abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_5.6$combined_chains$median_male_results, out_sim_5.6$combined_chains$asymptote_male_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_5.6$combined_chains$median_female_results, out_sim_5.6$combined_chains$asymptote_female_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
 ```
 
 ```{r acf2, echo=TRUE, cache=TRUE}
@@ -1001,10 +1005,10 @@ prior_params <- list(
 # Main Estimation for Female
 system.time(out_sim_5.7 <- PenEstim_v7(
     data = dat,
-    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 1, n_iter_per_chain = 7000, 
-    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max= TRUE))
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 1, n_iter_per_chain = 500, 
+    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max= TRUE, priors = prior_params))
 
-    save(out_sim_5.7, file = "out_sim_5.7.Rdata")
+#save(out_sim_5.7, file = "out_sim_5.7.Rdata")
 
 # print summary stats
 out_sim_5.7$summary_stats
@@ -1017,9 +1021,35 @@ plot(out_sim_5.7$combined_chains$median_male_results, out_sim_5.7$combined_chain
 abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
 plot(out_sim_5.7$combined_chains$median_female_results, out_sim_5.7$combined_chains$first_quartile_female_results, xlim = c(1,100), ylim = c(1,100))
 abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_5.7$combined_chains$median_male_results, out_sim_5.7$combined_chains$asymptote_male_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_5.7$combined_chains$median_female_results, out_sim_5.7$combined_chains$asymptote_female_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+
+# Adjust the plot for male data
+plot(out_sim_5.7$combined_chains$median_male_results, 
+     100 * out_sim_5.7$combined_chains$asymptote_male_results, 
+     xlim = c(1, 100), 
+     ylim = c(1, 100),
+     xlab = "Median Age", 
+     ylab = "Asymptote (Scaled)")
+abline(a=0, b=1, col="red")  # This draws a red line with slope 1 passing through the origin
+
+# Adjust the plot for female data
+plot(out_sim_5.7$combined_chains$median_female_results, 
+     100 * out_sim_5.7$combined_chains$asymptote_female_results, 
+     xlim = c(58, 70), 
+     ylim = c(20, 70),
+     xlab = "Median Age", 
+     ylab = "Asymptote (Scaled)")
+abline(a=0, b=1, col="red")  # This draws a red line with slope 1 passing through the origin
+
+cor(out_sim_5.7$combined_chains$first_quartile_female_results, 
+     100 * out_sim_5.7$combined_chains$asymptote_female_results)
+
 ```
 
-```{r ac2, echo=TRUE, cache=TRUE}
+```{r ac5, echo=TRUE, cache=TRUE}
 ## ACF Plots 
 acf(out_sim_5.7$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
 acf(out_sim_5.7$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
@@ -1028,3 +1058,99 @@ acf(out_sim_5.7$results[[1]]$median_female_samples, main = "ACF of Median - Fema
 acf(out_sim_5.7$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
 acf(out_sim_5.7$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
 ```
+
+
+
+## MCMC - MH within Gibbs
+
+Family 3 was generated with a Weibull penetrance that had an asymptote set at $\gamma = 0.5$. 
+
+```{r est10, echo=TRUE, cache=TRUE}
+
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional Scripts/simFamilies_sim4.3.RData")
+dat <- simfamilies_sim4.3
+
+# Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
+    }
+}
+
+#  Data Prep
+for (i in seq_along(dat)) {
+    if ("ID" %in% colnames(dat[[i]])) {
+        colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
+    }
+}
+
+for (i in seq_along(dat)) {
+    # Add a new column "PedigreeID" with the list number
+    dat[[i]]$PedigreeID <- i
+}
+
+# Exploring different priors 
+prior_params <- list(
+    asymptote = list(g1 = 1, g2 = 1),
+    threshold = list(min = 5, max = 30),
+    median = list(m1 = 2, m2 = 2),
+    first_quartile = list(q1 = 6, q2 = 3)
+)
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+system.time(out_sim_6.0 <- PenEstim_vMWG(
+    data = dat,
+    cancer_type = "Breast", gene_input = "BRCA1", n_chains = 1, n_iter_per_chain = 10000, 
+    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max= TRUE, priors = prior_params))
+
+#save(out_sim_6.0, file = "out_sim_6.0.Rdata")
+
+# print summary stats
+out_sim_6.0$summary_stats
+plot_traceSingle(out_sim_6.0$results[[1]])
+plot_penetrance_sim(out_sim_6.0$combined_chains, prob = 0.95, max_age = 94,"Female",2.5,60,10,0.5)
+plot_penetrance_sim(out_sim_6.0$combined_chains, prob = 0.95, max_age = 94,"Male",2.5,60,10,0.5)
+
+# plot the scatterplot with the median and first quartile
+plot(out_sim_6.0$combined_chains$median_male_results, out_sim_6.0$combined_chains$first_quartile_male_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_6.0$combined_chains$median_female_results, out_sim_6.0$combined_chains$first_quartile_female_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_6.0$combined_chains$median_male_results, out_sim_6.0$combined_chains$asymptote_male_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+plot(out_sim_6.0$combined_chains$median_female_results, out_sim_6.0$combined_chains$asymptote_female_results, xlim = c(1,100), ylim = c(1,100))
+abline(a=0, b=1, col="red") # This draws a red line with slope 1 passing through the origin
+
+# Adjust the plot for male data
+plot(out_sim_6.0$combined_chains$median_male_results, 
+     100 * out_sim_6.0$combined_chains$asymptote_male_results, 
+     xlim = c(1, 100), 
+     ylim = c(1, 100),
+     xlab = "Median Age", 
+     ylab = "Asymptote (Scaled)")
+abline(a=0, b=1, col="red")  # This draws a red line with slope 1 passing through the origin
+
+# Adjust the plot for female data
+plot(out_sim_6.0$combined_chains$median_female_results, 
+     100 * out_sim_6.0$combined_chains$asymptote_female_results, 
+     xlim = c(58, 70), 
+     ylim = c(20, 70),
+     xlab = "Median Age", 
+     ylab = "Asymptote (Scaled)")
+abline(a=0, b=1, col="red")  # This draws a red line with slope 1 passing through the origin
+
+cor(out_sim_6.0$combined_chains$first_quartile_female_results, 
+     100 * out_sim_6.0$combined_chains$asymptote_female_results)
+
+```
+
+```{r ac2, echo=TRUE, cache=TRUE}
+## ACF Plots 
+acf(out_sim_6.0$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+acf(out_sim_6.0$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+acf(out_sim_6.0$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+acf(out_sim_6.0$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+acf(out_sim_6.0$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+acf(out_sim_6.0$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+```
+

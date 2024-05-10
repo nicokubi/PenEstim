@@ -34,7 +34,7 @@
 # Main mhChain_v2 function
 mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
                        prior_distributions, cancer_type, gene_input, af,
-                       median_max, max_penetrance, homozygote, SeerNC, priors, var) {
+                       median_max, max_penetrance, homozygote, SeerNC, priors, var, ncores) {
   # Set seed
   set.seed(seed)
 
@@ -55,7 +55,7 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     as.numeric(names(SEER_baseline$cumulative_risk$female)[midpoint_index_female])
 
   # Function to intialize the Weibull parameters using empirical data
-  draw_initial_params <- function(data) {
+  draw_initial_params <- function(data, priors) {
     # Filter data by sex and affected status
     data_male_affected <- data[data$sex == 1 & data$aff == 1, ]
     data_female_affected <- data[data$sex == 2 & data$aff == 1, ]
@@ -92,8 +92,8 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     )
 
     # Initialize with the same asymptote for both sexes
-    asymptote <- runif(1)
-
+    asymptote <- 0.6
+    
     return(list(
       asymptote_male = asymptote,
       asymptote_female = asymptote,
@@ -107,7 +107,7 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
   }
 
   # Initialize Parameters
-  initial_params <- draw_initial_params(data)
+  initial_params <- draw_initial_params(data = data, priors = priors)
   params_current <- initial_params
   # Initialize storage for accepted proposals
   current_states <- list()
@@ -195,6 +195,7 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
 
   # Run the iterations of the adaptive MCMC algorithm
   #  Based on Adaptive MCMC tutorial from Stanford, Algorithm 2 from Horario et al. (2001)
+  # Run the iterations of the adaptive MCMC algorithm
   for (i in 1:n_iter) {
     # Update params_vector before using it
     params_vector <- c(
@@ -203,10 +204,10 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
       params_current$median_male, params_current$median_female,
       params_current$first_quartile_male, params_current$first_quartile_female
     )
-
+    
     # Generate proposals using the adaptive covariance matrix
     proposal_vector <- mvrnorm(1, mu = params_vector, Sigma = C)
-
+    
     # Update the proposal state outputs
     out$asymptote_male_proposals[i] <- proposal_vector[1]
     out$asymptote_female_proposals[i] <- proposal_vector[2]
@@ -216,21 +217,40 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     out$median_female_proposals[i] <- proposal_vector[6]
     out$first_quartile_male_proposals[i] <- proposal_vector[7]
     out$first_quartile_female_proposals[i] <- proposal_vector[8]
-
-    # Initialize likelihoods and priors to NA for this iteration
-    out$loglikelihood_current[i] <- NA
+    
+    # Create proposal parameters list from the proposal vector
+    params_proposal <- list(
+      asymptote_male = proposal_vector[1],
+      asymptote_female = proposal_vector[2],
+      threshold_male = proposal_vector[3],
+      threshold_female = proposal_vector[4],
+      median_male = proposal_vector[5],
+      median_female = proposal_vector[6],
+      first_quartile_male = proposal_vector[7],
+      first_quartile_female = proposal_vector[8]
+    )
+    
+    # Calculate the loglikelihood for the current set of parameters
+    loglikelihood_current <- mhLogLikelihood_clipp(
+      params_current, data, max_age,
+      cancer_type, db, af, homozygote, SeerNC, ncores
+    )
+    
+    # Calculate the current log prior
+    logprior_current <- calculate_log_prior(params_current, priors, max_age)
+    
+    out$loglikelihood_current[i] <- loglikelihood_current
+    out$logprior_current[i] <- logprior_current
+    
+    # Initialize likelihoods and priors for proposals to NA for this iteration
     out$loglikelihood_proposal[i] <- NA
-    out$logprior_current[i] <- NA
     out$logprior_proposal[i] <- NA
     out$acceptance_ratio[i] <- NA
-
-    # Initialize rejection flag 
-    is_rejected <- FALSE
-
+    
     # Check if any proposal is out of bounds and mark as rejected if so
-
+    is_rejected <- FALSE
     if (
-      proposal_vector[1] < 0 || proposal_vector[1] > 1 || 
+      proposal_vector[1] < 0 || proposal_vector[1] > 1 ||
       proposal_vector[2] < 0 || proposal_vector[2] > 1 ||
       proposal_vector[3] < 0 || proposal_vector[3] > 100 ||
       proposal_vector[4] < 0 || proposal_vector[4] > 100 ||
@@ -238,75 +258,51 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
       (median_max && proposal_vector[5] > baseline_mid_male) || # using median_max condition for male, median of SEER baseline should be higher 
       (!median_max && proposal_vector[5] > max_age) || # alternative bound for male
       proposal_vector[6] < proposal_vector[8] || # same for female
-      (median_max && proposal_vector[6] > baseline_mid_female) || # using median_max condition for female, , median of SEER baseline should be higher 
+      (median_max && proposal_vector[6] > baseline_mid_female) || # using median_max condition for female, median of SEER baseline should be higher 
       (!median_max && proposal_vector[6] > max_age) || # alternative bound for female
       proposal_vector[7] < proposal_vector[3] || proposal_vector[7] > proposal_vector[5] ||
       proposal_vector[8] < proposal_vector[4] || proposal_vector[8] > proposal_vector[6]) {
       is_rejected <- TRUE
       num_rejections <- num_rejections + 1
-    }
-
-    # If the proposal is within the bounds, calculate the loglikelihood for the current set of parameters
-    # and the proposed parameters
-    if (is_rejected == FALSE) {
-      # Update the proposal state if not rejected
-      params_proposal <- list(
-        asymptote_male = proposal_vector[1],
-        asymptote_female = proposal_vector[2],
-        threshold_male = proposal_vector[3],
-        threshold_female = proposal_vector[4],
-        median_male = proposal_vector[5],
-        median_female = proposal_vector[6],
-        first_quartile_male = proposal_vector[7],
-        first_quartile_female = proposal_vector[8]
-      )
-
-      loglikelihood_current <- mhLogLikelihood_clipp(
-        params_current, data, max_age,
-        cancer_type, db, af, homozygote, SeerNC
-      )
-
+    } else {
+      # Calculate the loglikelihood and logprior for the proposal
       loglikelihood_proposal <- mhLogLikelihood_clipp(
         params_proposal, data, max_age,
-        cancer_type, db, af, homozygote, SeerNC
+        cancer_type, db, af, homozygote, SeerNC, ncores
       )
-
+      logprior_proposal <- calculate_log_prior(params_proposal, priors, max_age)
+      
       # Calculate the acceptance ratio
-      logprior_current <- calculate_log_prior(params_current, priors, max_age = max_age)
-      logprior_proposal <- calculate_log_prior(params_proposal, priors, max_age = max_age)
       log_acceptance_ratio <- (loglikelihood_proposal + logprior_proposal) - (loglikelihood_current + logprior_current)
-
-      #  Acceptance step 
+      
+      # Acceptance step
       if (log(runif(1)) < log_acceptance_ratio) {
         params_current <- params_proposal
       } else {
         num_rejections <- num_rejections + 1
       }
-
-      # Update likelihoods and priors that were calculated
-      out$loglikelihood_current[i] <- loglikelihood_current
+      
+      # Update outputs for proposals that were evaluated
       out$loglikelihood_proposal[i] <- loglikelihood_proposal
-      out$logprior_current[i] <- logprior_current
       out$logprior_proposal[i] <- logprior_proposal
       out$acceptance_ratio[i] <- log_acceptance_ratio
     }
-
-    # Record the state of the parameters in the current itteration
+    
+    # Record the state of the parameters in the current iteration
     current_states[[i]] <- c(
       params_current$asymptote_male, params_current$asymptote_female,
       params_current$threshold_male, params_current$threshold_female,
       params_current$median_male, params_current$median_female,
       params_current$first_quartile_male, params_current$first_quartile_female
     )
-
+    
     # Update the proposal distribution variance if we have moved past the burn-in period
-    # Periodically update the proposal covariance matrix
     if (i > max(burn_in * n_iter, 3)) {
       # Update Sigma
       C <- sd * cov(do.call(rbind, current_states)) + eps * sd * diag(num_pars)
     }
-
-    # Record the state of the parameters at the end of the the itteration
+    
+    # Record the state of the parameters at the end of the iteration
     out$asymptote_male_samples[i] <- params_current$asymptote_male
     out$asymptote_female_samples[i] <- params_current$asymptote_female
     out$threshold_male_samples[i] <- params_current$threshold_male
@@ -317,10 +313,10 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     out$first_quartile_female_samples[i] <- params_current$first_quartile_female
     out$C[[i]] <- C
   }
-
+  
   # Update the rejection rate
   out$rejection_rate <- num_rejections / n_iter
-
+  
   return(out)
 }
 
@@ -429,7 +425,7 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
 #' )
 #' @export
 
-PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 4,
+PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 1,
                         n_iter_per_chain = 200,
                         db = PPP::PanelPRODatabase,
                         sex = "NA",
@@ -439,6 +435,7 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 4,
                         homozygote = TRUE,
                         SeerNC = TRUE,
                         var = c(0.1, 0.1, 2, 2, 5, 5, 5, 5),
+                        ncores = 4,
                         burn_in = 0,
                         thinning_factor = 1,
                         distribution_data = distribution_data_default,
@@ -509,13 +506,14 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 4,
     library(stats4)
     library(MASS)
     library(dplyr)
+    library(parallel)
   })
 
   parallel::clusterExport(cl, c(
     "mhChain_v7", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
     "transformDF", "makePriors", "lik.fn", "mvrnorm", "priors", "var",
-    "seeds", "n_iter_per_chain", "sex", "burn_in",
+    "seeds", "n_iter_per_chain", "sex", "burn_in", "ncores",
     "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
     "GENE_TYPES", "CANCER_NAME_MAP"
@@ -538,7 +536,8 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 4,
       median_max = median_max,
       homozygote = homozygote,
       SeerNC = SeerNC,
-      var = var
+      var = var,
+      ncores = ncores
     )
   })
 

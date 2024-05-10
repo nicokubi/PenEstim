@@ -218,7 +218,7 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
 #' 
 #' ¨
 
-mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af, homozygote, SeerNC) {
+mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af, homozygote, SeerNC, ncores) {
 
   paras<- unlist(paras)
     # Extract parameters
@@ -269,7 +269,7 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     }))
 
     # Compute log-likelihood
-    loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = 4) 
+    loglik <- pedigree_loglikelihood(families, geno_freq, trans, lik, ncores = ncores) 
 
     # Handle -Inf values
    if (is.infinite(loglik) && loglik == -Inf) {
@@ -285,4 +285,3 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
 
     return(loglik)
 }
-
