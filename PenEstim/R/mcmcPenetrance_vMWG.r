@@ -35,6 +35,7 @@
 mhChain_vMWG <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
                        prior_distributions, cancer_type, gene_input, af,
                        median_max, max_penetrance, homozygote, SeerNC, priors, var) {
+  
     # Set seed
     set.seed(seed)
 
@@ -92,7 +93,7 @@ mhChain_vMWG <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
         )
 
         #  Initialize with the same asymptote for both sexes
-        asymptote <- 0.6
+        asymptote <- 0.5
 
         return(list(
             asymptote_male = asymptote,
@@ -219,10 +220,9 @@ mhChain_vMWG <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
           out$first_quartile_male_proposals[i] <- proposal_vector[7]
           out$first_quartile_female_proposals[i] <- proposal_vector[8]
        
-       # Block 1 Updates - Asymptotes
+       # Block 1 Updates - Asymptotes Male 
         params_proposal <- params_current
         params_proposal$asymptote_male <- proposal_vector[1]
-        params_proposal$asymptote_female <- proposal_vector[2]
         
          # Calculate the loglikelihood for the current set of parameters
          loglikelihood_current <- mhLogLikelihood_clipp(
@@ -282,13 +282,14 @@ mhChain_vMWG <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
               out$acceptance_ratio[i] <- log_acceptance_ratio
           }
 
-        # Block 2 - Other Parameters
+        # Block 2 - Other Parameters Male 
+        # Keeping the Asymptote parameters constant
+            params_proposal <- params_current
+            
+        # Sample the other parameters from the normal 
             params_proposal$threshold_male <- proposal_vector[3]
-            params_proposal$threshold_female <- proposal_vector[4]
             params_proposal$median_male <- proposal_vector[5]
-            params_proposal$median_female <- proposal_vector[6]
             params_proposal$first_quartile_male <- proposal_vector[7]
-            params_proposal$first_quartile_female <- proposal_vector[8]
 
             # Calculate the loglikelihood for the current set of parameters
             loglikelihood_current <- mhLogLikelihood_clipp(
@@ -339,6 +340,127 @@ mhChain_vMWG <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
                 out$logprior_proposal[i] <- logprior_proposal
                 out$acceptance_ratio[i] <- log_acceptance_ratio
             }
+            
+            # Block 3 Updates - Asymptotes Female 
+            params_proposal <- params_current
+            params_proposal$asymptote_female <- proposal_vector[2]
+            
+            # Calculate the loglikelihood for the current set of parameters
+            loglikelihood_current <- mhLogLikelihood_clipp(
+              params_current, data, max_age,
+              cancer_type, db, af, homozygote, SeerNC
+            )
+            
+            # Calculate the current log prior
+            logprior_current <- calculate_log_prior(params_current, priors, max_age)
+            
+            out$loglikelihood_current[i] <- loglikelihood_current
+            out$logprior_current[i] <- logprior_current
+            
+            # Initialize likelihoods and priors for proposals to NA for this iteration
+            out$loglikelihood_proposal[i] <- NA
+            out$logprior_proposal[i] <- NA
+            out$acceptance_ratio[i] <- NA
+            
+            # Check if any proposal is out of bounds and mark as rejected if so
+            is_rejected <- FALSE
+            if (
+              proposal_vector[1] < 0 || proposal_vector[1] > 1 ||
+              proposal_vector[2] < 0 || proposal_vector[2] > 1 ||
+              proposal_vector[3] < 0 || proposal_vector[3] > 100 ||
+              proposal_vector[4] < 0 || proposal_vector[4] > 100 ||
+              proposal_vector[5] < proposal_vector[7] || # median should be greater than first quartile
+              (median_max && proposal_vector[5] > baseline_mid_male) || # using median_max condition for male, median of SEER baseline should be higher
+              (!median_max && proposal_vector[5] > max_age) || # alternative bound for male
+              proposal_vector[6] < proposal_vector[8] || # same for female
+              (median_max && proposal_vector[6] > baseline_mid_female) || # using median_max condition for female, median of SEER baseline should be higher
+              (!median_max && proposal_vector[6] > max_age) || # alternative bound for female
+              proposal_vector[7] < proposal_vector[3] || proposal_vector[7] > proposal_vector[5] ||
+              proposal_vector[8] < proposal_vector[4] || proposal_vector[8] > proposal_vector[6]) {
+              is_rejected <- TRUE
+              num_rejections <- num_rejections + 1
+            } else {
+              # Calculate the loglikelihood and logprior for the proposal
+              loglikelihood_proposal <- mhLogLikelihood_clipp(
+                params_proposal, data, max_age,
+                cancer_type, db, af, homozygote, SeerNC
+              )
+              logprior_proposal <- calculate_log_prior(params_proposal, priors, max_age)
+              
+              # Calculate the acceptance ratio
+              log_acceptance_ratio <- (loglikelihood_proposal + logprior_proposal) - (loglikelihood_current + logprior_current)
+              
+              # Acceptance step
+              if (log(runif(1)) < log_acceptance_ratio) {
+                params_current <- params_proposal
+              } else {
+                num_rejections <- num_rejections + 1
+              }
+              
+              # Update outputs for proposals that were evaluated
+              out$loglikelihood_proposal[i] <- loglikelihood_proposal
+              out$logprior_proposal[i] <- logprior_proposal
+              out$acceptance_ratio[i] <- log_acceptance_ratio
+            }
+        
+            # Block 4 - Other Parameters Female 
+            # Keeping the Asymptote parameters constant
+            params_proposal <- params_current
+            
+            # Sample the other parameters from the normal 
+            params_proposal$threshold_female <- proposal_vector[4]
+            params_proposal$median_female <- proposal_vector[6]
+            params_proposal$first_quartile_female <- proposal_vector[8]
+            
+            # Calculate the loglikelihood for the current set of parameters
+            loglikelihood_current <- mhLogLikelihood_clipp(
+              params_current, data, max_age,
+              cancer_type, db, af, homozygote, SeerNC
+            )
+            
+            # Calculate the current log prior
+            logprior_current <- calculate_log_prior(params_current, priors, max_age)
+            
+            # Check if any proposal is out of bounds and mark as rejected if so
+            is_rejected <- FALSE
+            if (
+              proposal_vector[1] < 0 || proposal_vector[1] > 1 ||
+              proposal_vector[2] < 0 || proposal_vector[2] > 1 ||
+              proposal_vector[3] < 0 || proposal_vector[3] > 100 ||
+              proposal_vector[4] < 0 || proposal_vector[4] > 100 ||
+              proposal_vector[5] < proposal_vector[7] || # median should be greater than first quartile
+              (median_max && proposal_vector[5] > baseline_mid_male) || # using median_max condition for male, median of SEER baseline should be higher
+              (!median_max && proposal_vector[5] > max_age) || # alternative bound for male
+              proposal_vector[6] < proposal_vector[8] || # same for female
+              (median_max && proposal_vector[6] > baseline_mid_female) || # using median_max condition for female, median of SEER baseline should be higher
+              (!median_max && proposal_vector[6] > max_age) || # alternative bound for female
+              proposal_vector[7] < proposal_vector[3] || proposal_vector[7] > proposal_vector[5] ||
+              proposal_vector[8] < proposal_vector[4] || proposal_vector[8] > proposal_vector[6]) {
+              is_rejected <- TRUE
+              num_rejections <- num_rejections + 1
+            } else {
+              # Calculate the loglikelihood and logprior for the proposal
+              loglikelihood_proposal <- mhLogLikelihood_clipp(
+                params_proposal, data, max_age,
+                cancer_type, db, af, homozygote, SeerNC
+              )
+              logprior_proposal <- calculate_log_prior(params_proposal, priors, max_age)
+              
+              # Calculate the acceptance ratio
+              log_acceptance_ratio <- (loglikelihood_proposal + logprior_proposal) - (loglikelihood_current + logprior_current)
+              
+              # Acceptance step
+              if (log(runif(1)) < log_acceptance_ratio) {
+                params_current <- params_proposal
+              } else {
+                num_rejections <- num_rejections + 1
+              }
+              
+              # Update outputs for proposals that were evaluated
+              out$loglikelihood_proposal[i] <- loglikelihood_proposal
+              out$logprior_proposal[i] <- logprior_proposal
+              out$acceptance_ratio[i] <- log_acceptance_ratio
+            }
 
         # Record the state of the parameters in the current iteration
         current_states[[i]] <- c(
@@ -349,10 +471,10 @@ mhChain_vMWG <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
         )
 
         # Update the proposal distribution variance if we have moved past the burn-in period
-        if (i > max(burn_in * n_iter, 3)) {
+        #if (i > max(burn_in * n_iter, 3)) {
             # Update Sigma
-            C <- sd * cov(do.call(rbind, current_states)) + eps * sd * diag(num_pars)
-        }
+            #C <- sd * cov(do.call(rbind, current_states)) + eps * sd * diag(num_pars)
+        #}
 
         # Record the state of the parameters at the end of the iteration
         out$asymptote_male_samples[i] <- params_current$asymptote_male
