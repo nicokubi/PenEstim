@@ -34,10 +34,10 @@
 # Main mhChain_v2 function
 mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
                        prior_distributions, cancer_type, gene_input, af,
-                       median_max, max_penetrance, homozygote, SeerNC, priors, var, ncores) {
+                       median_max, max_penetrance, homozygote, SeerNC, priors, var) {
   # Set seed
   set.seed(seed)
-
+  
   # Calculate SEER baseline and midpoint 
   SEER_baseline <- calculate_lifetime_risk(
     cancer = cancer_type, gene = "SEER",
@@ -53,46 +53,46 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     as.numeric(names(SEER_baseline$cumulative_risk$male)[midpoint_index_male])
   baseline_mid_female <-
     as.numeric(names(SEER_baseline$cumulative_risk$female)[midpoint_index_female])
-
+  
   # Function to intialize the Weibull parameters using empirical data
   draw_initial_params <- function(data, priors) {
     # Filter data by sex and affected status
     data_male_affected <- data[data$sex == 1 & data$aff == 1, ]
     data_female_affected <- data[data$sex == 2 & data$aff == 1, ]
-
+    
     # Calculate threshold (minimum age), median, and first quartile by sex among affected individuals
     # Assuming lower_bound and upper_bound are defined for your threshold distribution
     lower_bound <- priors$threshold$min
     upper_bound <- priors$threshold$max
-
+    
     # Calculate initial thresholds based on data
     threshold_male <- ifelse(length(data_male_affected$age) > 0,
-      min(data_male_affected$age, na.rm = TRUE), NA
+                             min(data_male_affected$age, na.rm = TRUE), NA
     )
     threshold_female <- ifelse(length(data_female_affected$age) > 0,
-      min(data_female_affected$age, na.rm = TRUE), NA
+                               min(data_female_affected$age, na.rm = TRUE), NA
     )
-
+    
     # Ensure thresholds are within the bounds of the prior distribution
     threshold_male <- pmax(pmin(threshold_male, upper_bound, na.rm = TRUE), lower_bound, na.rm = TRUE)
     threshold_female <- pmax(pmin(threshold_female, upper_bound, na.rm = TRUE), lower_bound, na.rm = TRUE)
-
+    
     median_male <- ifelse(length(data_male_affected$age) > 0,
-      median(data_male_affected$age, na.rm = TRUE), NA
+                          median(data_male_affected$age, na.rm = TRUE), NA
     )
     median_female <- ifelse(length(data_female_affected$age) > 0,
-      median(data_female_affected$age, na.rm = TRUE), NA
+                            median(data_female_affected$age, na.rm = TRUE), NA
     )
-
+    
     first_quartile_male <- ifelse(length(data_male_affected$age) > 0,
-      quantile(data_male_affected$age, probs = 0.25, na.rm = TRUE), NA
+                                  quantile(data_male_affected$age, probs = 0.25, na.rm = TRUE), NA
     )
     first_quartile_female <- ifelse(length(data_female_affected$age) > 0,
-      quantile(data_female_affected$age, probs = 0.25, na.rm = TRUE), NA
+                                    quantile(data_female_affected$age, probs = 0.25, na.rm = TRUE), NA
     )
-
+    
     # Initialize with the same asymptote for both sexes
-    asymptote <- 0.6
+    asymptote <- 0.5
     
     return(list(
       asymptote_male = asymptote,
@@ -105,23 +105,23 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
       first_quartile_female = first_quartile_female
     ))
   }
-
+  
   # Initialize Parameters
   initial_params <- draw_initial_params(data = data, priors = priors)
   params_current <- initial_params
   # Initialize storage for accepted proposals
   current_states <- list()
-
+  
   #  Initialize cov matrix
   num_pars <- 8
-
+  
   # Create initial covariance matrix as diagonal matrix
   C <- diag(var)
-
+  
   # As a basic choice for the scaling parameter we have adopted the value from Gelman et al. (1996)
   sd <- 2.38^2 / num_pars
   eps <- 0.01 #  for numerical stability
-
+  
   #  Intitalize output list
   out <- list(
     asymptote_male_samples = numeric(n_iter),
@@ -148,51 +148,51 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     rejection_rate = numeric(n_iter),
     C = vector("list", n_iter)
   )
-
+  
   num_rejections <- 0
   cat("Starting Chain", chain_id, "\n")
-
+  
   # Function to calculate the log-prior probability based on specific prior distributions
   calculate_log_prior <- function(params, priors, max_age) {
     # Adjustments for potential scaling - examples below may need modification to match actual scaling
     scaled_asymptote_male <- params$asymptote_male
     scaled_asymptote_female <- params$asymptote_female
-
+    
     # No scaling needed for thresholds if already within bounds
     scaled_threshold_male <- params$threshold_male
     scaled_threshold_female <- params$threshold_female
-
+    
     # Scale median and first quartile (example: also assuming beta distribution within [0,1])
     scaled_median_male <- (params$median_male - params$threshold_male) / (max_age - params$threshold_male)
     scaled_median_female <- (params$median_female - params$threshold_female) / (max_age - params$threshold_female)
-
+    
     scaled_first_quartile_male <- (params$first_quartile_male - params$threshold_male) /
       (params$median_male - params$threshold_male)
     scaled_first_quartile_female <- (params$first_quartile_female - params$threshold_female) /
       (params$median_female - params$threshold_female)
-
+    
     # Calculate log priors using scaled values
     log_prior_asymptote_male <- dbeta(scaled_asymptote_male, priors$asymptote$g1, priors$asymptote$g2, log = TRUE)
     log_prior_asymptote_female <- dbeta(scaled_asymptote_female, priors$asymptote$g1, priors$asymptote$g2, log = TRUE)
-
+    
     log_prior_threshold_male <- dunif(scaled_threshold_male, priors$threshold$min, priors$threshold$max, log = TRUE)
     log_prior_threshold_female <- dunif(scaled_threshold_female, priors$threshold$min, priors$threshold$max, log = TRUE)
-
+    
     log_prior_median_male <- dbeta(scaled_median_male, priors$median$m1, priors$median$m2, log = TRUE)
     log_prior_median_female <- dbeta(scaled_median_female, priors$median$m1, priors$median$m2, log = TRUE)
-
+    
     log_prior_first_quartile_male <- dbeta(scaled_first_quartile_male, priors$first_quartile$q1, priors$first_quartile$q2, log = TRUE)
     log_prior_first_quartile_female <- dbeta(scaled_first_quartile_female, priors$first_quartile$q1, priors$first_quartile$q2, log = TRUE)
-
+    
     # Sum all the log priors to get the total log prior for the parameter set
     log_prior_total <- log_prior_asymptote_male + log_prior_asymptote_female +
       log_prior_threshold_male + log_prior_threshold_female +
       log_prior_median_male + log_prior_median_female +
       log_prior_first_quartile_male + log_prior_first_quartile_female
-
+    
     return(log_prior_total)
   }
-
+  
   # Run the iterations of the adaptive MCMC algorithm
   #  Based on Adaptive MCMC tutorial from Stanford, Algorithm 2 from Horario et al. (2001)
   # Run the iterations of the adaptive MCMC algorithm
@@ -233,7 +233,7 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     # Calculate the loglikelihood for the current set of parameters
     loglikelihood_current <- mhLogLikelihood_clipp(
       params_current, data, max_age,
-      cancer_type, db, af, homozygote, SeerNC, ncores
+      cancer_type, db, af, homozygote, SeerNC
     )
     
     # Calculate the current log prior
@@ -268,7 +268,7 @@ mhChain_v7 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
       # Calculate the loglikelihood and logprior for the proposal
       loglikelihood_proposal <- mhLogLikelihood_clipp(
         params_proposal, data, max_age,
-        cancer_type, db, af, homozygote, SeerNC, ncores
+        cancer_type, db, af, homozygote, SeerNC
       )
       logprior_proposal <- calculate_log_prior(params_proposal, priors, max_age)
       
@@ -435,11 +435,10 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 1,
                         homozygote = TRUE,
                         SeerNC = TRUE,
                         var = c(0.1, 0.1, 2, 2, 5, 5, 5, 5),
-                        ncores = 4,
                         burn_in = 0,
                         thinning_factor = 1,
                         distribution_data = distribution_data_default,
-                        af = 0.0001,
+                        af = PPP::PanelPRODatabase$AlleleFrequency[paste0(gene_input, "_anyPV"), "nonAJ"],
                         max_penetrance = 1,
                         sample_size = NULL,
                         ratio = NULL,
@@ -470,19 +469,19 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 1,
   if (n_chains > parallel::detectCores()) {
     stop("Error: 'n_chains' exceeds the number of available CPU cores.")
   }
-
+  
   # create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
-
+  
   # Apply the prepAges function to treat missing data
   data <- prepAges(data, removeProband)
-
+  
   # Apply the transformation to adjust the format for the clipp package
   data <- do.call(rbind, lapply(data, transformDF,
-    cancer_type = cancer_type,
-    gene = gene_input
+                                cancer_type = cancer_type,
+                                gene = gene_input
   ))
-
+  
   #  Create the prior distributions
   prop <- makePriors(
     data = distribution_data,
@@ -493,12 +492,12 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 1,
     risk_proportion = risk_proportion
   )
   cores <- parallel::detectCores()
-
+  
   if (n_chains > cores) {
     stop("Error: 'n_chains exceeds the number of available CPU cores.")
   }
   cl <- parallel::makeCluster(n_chains)
-
+  
   # Load required packages to the clusters
   parallel::clusterEvalQ(cl, {
     library(PPP)
@@ -508,47 +507,46 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 1,
     library(dplyr)
     library(parallel)
   })
-
+  
   parallel::clusterExport(cl, c(
     "mhChain_v7", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
     "transformDF", "makePriors", "lik.fn", "mvrnorm", "priors", "var",
-    "seeds", "n_iter_per_chain", "sex", "burn_in", "ncores",
+    "seeds", "n_iter_per_chain", "sex", "burn_in",
     "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
     "GENE_TYPES", "CANCER_NAME_MAP"
   ), envir = environment())
-
+  
   results <- parallel::parLapply(cl, 1:n_chains, function(i) {
     mhChain_v7(seeds[i],
-      n_iter = n_iter_per_chain,
-      burn_in = burn_in,
-      chain_id = i,
-      data = data,
-      db = db,
-      prior_distributions = prop,
-      priors = priors,
-      max_age = max_age,
-      cancer_type = cancer_type,
-      gene_input = gene_input,
-      af = af,
-      max_penetrance = max_penetrance,
-      median_max = median_max,
-      homozygote = homozygote,
-      SeerNC = SeerNC,
-      var = var,
-      ncores = ncores
+               n_iter = n_iter_per_chain,
+               burn_in = burn_in,
+               chain_id = i,
+               data = data,
+               db = db,
+               prior_distributions = prop,
+               priors = priors,
+               max_age = max_age,
+               cancer_type = cancer_type,
+               gene_input = gene_input,
+               af = af,
+               max_penetrance = max_penetrance,
+               median_max = median_max,
+               homozygote = homozygote,
+               SeerNC = SeerNC,
+               var = var
     )
   })
-
+  
   parallel::stopCluster(cl)
-
+  
   # Check rejection rates and issue a warning if they are all above 90%
   all_high_rejections <- all(sapply(results, function(x) x$rejection_rate > 0.9))
   if (all_high_rejections) {
     warning("Low acceptance rate. Please consider running the chain longer.")
   }
-
+  
   # Apply burn-in and thinning
   if (burn_in > 0) {
     results <- apply_burn_in(results, burn_in)
@@ -556,30 +554,30 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 1,
   if (thinning_factor > 1) {
     results <- apply_thinning(results, thinning_factor)
   }
-
+  
   # Extract samples from the chains
   combined_chains <- combine_chains(results)
-
+  
   # Initialize variables
   output <- list()
-
+  
   tryCatch(
     {
       if (rejection_rates) {
         # Generate rejection rates
         output$rejection_rates <- printRejectionRates(results)
       }
-
+      
       if (summary_stats) {
         # Generate summary statistics
         output$summary_stats <- generate_summary(combined_chains)
       }
-
+      
       if (density_plots) {
         # Generate density plots
         output$density_plots <- generate_density_plots(combined_chains)
       }
-
+      
       if (penetrance_plot) {
         # Generate penetrance plot
         output$penetrance_plot <- plot_penetrance(combined_chains, prob = probCI, max_age = max_age)
@@ -590,10 +588,10 @@ PenEstim_v7 <- function(data, cancer_type, gene_input, n_chains = 1,
       cat("An error occurred in the output display: ", e$message, "\n")
     }
   )
-
+  
   output$combined_chains <- combined_chains
   output$results <- results
   output$data <- data
-
+  
   return(output)
 }

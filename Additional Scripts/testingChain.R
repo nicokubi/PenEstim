@@ -1,5 +1,22 @@
+library(clipp)
+library(survival)
+library(plyr) # need to load plyr before dplyr
+library(truncnorm)
+library(PanelPRO)
+library(tidyverse)
+library(stringr)
+library(PedUtils)
+library(survival)
+library(MASS)
+library(profvis)
+library(survminer)
+library(ggridges)
+library(ggplot2)
+library(dplyr)
+
 # Data
-dat <- simfamilies_sim4.3
+dat <- load("/Users/nicolaskubista/Dropbox (Partners HealthCare)/CCGCRN Hispanic Cohort Data/PenEstim/Data/carrierProbandFamilies_cohPedigree_MLH1_ages.RData")
+dat <- carrierProbandFamilies_cohPedigree_MLH1_ages
 
 # Data Prep
 for (i in seq_along(dat)) {
@@ -27,6 +44,29 @@ data <- do.call(rbind, lapply(dat, transformDF,
 
 head(data)
 data
+
+# Exploring different priors
+prior_params <- list(
+  asymptote = list(g1 = 1, g2 = 1),
+  threshold = list(min = 5, max = 30),
+  median = list(m1 = 2, m2 = 2),
+  first_quartile = list(q1 = 6, q2 = 3)
+)
+
+
+# Run Estimation procedure with default prior setting 
+# Main Estimation for Female
+system.time(out_sim_COL <- PenEstim_v7(
+    data = dat,
+    cancer_type = "Colorectal", gene_input = "MLH1", n_chains = 1, n_iter_per_chain = 10, 
+    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max = TRUE, priors = prior_params
+))
+
+system.time(out_sim_COL <- PenEstim_v10(
+  data = dat,
+  cancer_type = "Colorectal", gene_input = "MLH1", ncores = 2, n_iter_per_chain = 5,
+  prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max = TRUE, priors = prior_params
+))
 
 # Prop 
 prop <- makePriors(

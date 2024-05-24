@@ -141,7 +141,7 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
     gamma <- ifelse(data$sex[i] == 1, gamma_male, gamma_female)
     delta <- ifelse(data$sex[i] == 1, delta_male, delta_female)
 
-    if (data$age[i] == 0) {
+    if (data$age[i] == 0 || data$age[i] == 1)  {
         lik.i <- c(1, 1) # Assuming people aged 0 years are all unaffected
     } else {
         # Ensure age is within the valid range
