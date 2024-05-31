@@ -1,0 +1,1147 @@
+---
+title: "PenEstim"
+subtitle: "Simulation Study - PanelPRO Database"
+format: 
+  html:
+    toc: true
+    toc-location: body
+date: 5-14-2024
+theme: lightly
+author:
+  - name: "Nicolas Kubista"
+    affiliations: "Harvard University"
+embed-resources: true
+toc: true
+toc-expand: 2
+toc-title: Contents
+page-layout: full
+code-fold: true
+editor: visual
+---
+
+```{r, echo=FALSE, include=FALSE}
+library(clipp)
+library(survival)
+library(plyr) #need to load plyr before dplyr
+library(truncnorm)
+library(PanelPRO)
+library(tidyverse)
+library(stringr)
+library(PedUtils)
+library(survival)
+library(MASS)
+library(profvis)
+library(survminer)
+library(ggridges)
+library(ggplot2)
+library(dplyr)
+
+
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/prior_elicitation.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/helpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/outputHelpers.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mhLoglikehood_clipp.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mcmcPenetrance_vMWG.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/mcmcPenetrance_v7.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/PenEstim/R/InternalVars.R")
+source("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional Scripts/EstimEval.R")
+
+set.seed(2024)
+```
+
+# Family Simulation
+
+## Family Simulation 1 - BRCA1 and BC 
+
+We simulate 3000 families, our of which we subset the families to only include those families where the proband was a carrier of the PV. The simulation was done using the PedUtils package. The penetrance for non-carriers is based on the SEER penetrances in the PanelPRO Database. Censoring is based on a $$N(85,10)$$. The simulated age of death is centered at 85 with a standard deviation of 10, but values above ageMax (default = 94) are re-simulated to be centered around ageMax - 15.
+
+```{r desc fams, echo=TRUE, cache=TRUE}
+
+# Function to describe the families
+describeFamilies <- function(fams, cancer, gene) {
+  # Validate and translate cancer type
+  if (!cancer %in% CANCER_NAME_MAP$long) {
+    stop("Cancer type '", cancer, "' is not supported. Please choose from the supported list.")
+  }
+  
+  # Get the abbreviation for the cancer type
+  cancer_index <- which(CANCER_NAME_MAP$long == cancer)
+  cancer_short <- CANCER_NAME_MAP$short[cancer_index]
+  
+  # Construct column names based on cancer type and gene input
+  aff_col_name <- paste0("isAff", cancer_short)
+  age_col_name <- paste0("Age", cancer_short)
+  
+  # Initialize counters and vectors for storing data
+  affectedFamilies = 0 
+  affectedProbands = 0
+  famSizes = c()
+  geneFamilies = 0
+  geneProbands = 0 
+  curAges = c()
+  cancerAges = c()
+  pbCancerAges = c()
+  pbCurAges = c()
+  pbCancerAgesFemale = c()
+  affectedFemaleProbands = 0
+  geneFemaleProbands = 0 
+  cancerAgesFemale = c()
+  total_individuals = 0
+  gene_individuals = 0
+  
+  # Process each family
+  for(i in 1:length(fams)){
+    f = fams[[i]]
+    sizeOfFamily = nrow(f)
+    total_individuals = total_individuals + sizeOfFamily
+    famSizes = c(famSizes, sizeOfFamily)
+    curAges = c(curAges, f$CurAge)  
+    f = f %>% dplyr::filter(!!rlang::sym(aff_col_name) == 1, isProband == 0) 
+    cancerAges <- c(cancerAges, f[[age_col_name]])  
+    ff = fams[[i]] %>% dplyr::filter(!!rlang::sym(gene) == 1, !!rlang::sym(aff_col_name) == 1) 
+    gene_individuals = gene_individuals + nrow(ff)
+    cancerAgesFemale <- c(cancerAgesFemale, ff[[age_col_name]])  
+
+    if(nrow(f)>0){
+      affectedFamilies = affectedFamilies + 1
+    }
+    geneFams = fams[[i]] %>% dplyr::filter(isProband == 0, !!rlang::sym(gene) == 1)
+    if(nrow(geneFams) > 0){
+     geneFamilies = geneFamilies + 1
+    }
+    
+    pb <- fams[[i]] %>% dplyr::filter(isProband == 1)
+    pbfemale <- fams[[i]] %>% dplyr::filter(isProband == 1, Sex == 0)
+    
+    if (nrow(pbfemale) > 0) {
+      pbCancerAgesFemale <- c(pbCancerAgesFemale, pbfemale[[age_col_name]])
+      if (any(pbfemale[[aff_col_name]] == 1)){
+        affectedFemaleProbands <- affectedFemaleProbands + 1
+      }
+      if (!is.na(pbfemale[[gene]])){
+        if (any(pbfemale[[gene]] == 1)){
+          geneFemaleProbands <- geneFemaleProbands + 1
+        }
+      }
+    }
+  
+    pbCancerAges <- c(pbCancerAges, pb[[age_col_name]])
+    pbCurAges <- c(pbCurAges, pb$CurAge)  
+    
+    if (any(pb[[aff_col_name]] == 1)){
+      affectedProbands <- affectedProbands + 1
+    }
+    
+    if (!is.na(pb[[gene]])){
+      if (any(pb[[gene]] == 1)){
+        geneProbands <- geneProbands + 1
+      }
+    }
+  }
+
+  print(paste0("Number of families: ", length(fams)))
+  print(paste0("Total Individuals: ", total_individuals))
+  print(paste0("Average family size: ", mean(famSizes)))
+  print("Summary of family sizes")
+  print(summary(famSizes))
+  print("Summary of Current Age for all family members")
+  print(summary(curAges))
+  print("Summary of Current Age for probands")
+  print(summary(pbCurAges))
+  
+  print(paste0("Number of families with affected individuals (", cancer, "): ", 
+               affectedFamilies))
+  print(paste0("Number of families with affected probands (", cancer, "): ", 
+               affectedProbands))
+  print(paste0("Number of families with affected female probands (", cancer, "): ", 
+               affectedFemaleProbands))
+  print(paste0("Number of families with relatives with PV (and not the proband) (", gene, "): ", geneFamilies))
+  print(paste0("Number of probands with PV (", gene, "): ", geneProbands))
+  print(paste0("Number of female probands with PV (", gene, "): ", 
+               geneFemaleProbands))
+  print(paste0("Number of individuals with PV (", gene, "): ", gene_individuals))
+  
+  print("Summary of Cancer Age of (female) probands")
+  print(summary(pbCancerAgesFemale))
+
+  print("Summary of Cancer Age in affected (non-proband) individuals")
+  print(summary(cancerAges))
+}
+
+
+```
+
+```{r fam4, echo=FALSE, cache=TRUE}
+#set seed
+set.seed(2024)
+
+# Generate Families
+numberFamilies <- 3000  # Set number of families to be generated
+families_BRCA1 <- list()  # Initialize list for families data
+probandIDS = c()
+probandBRCA1Status = c()
+probandAffectionStatus = c()
+
+# Set up age sequence as in the PanelPRO database
+age <- 1:94
+
+# Function to deeply clone a database
+deep_clone <- function(x) {
+  rapply(x, function(y) if(is.list(y)) return(deep_clone(y)) else return(y), how = "replace")
+}
+
+# Clone the original database to create a new simulation database using base R
+db_sim <- deep_clone(PanelPRO::PanelPRODatabase)
+
+# Set up allele frequencies
+BRCA1freq <- 0.1  # use same BRCA1 frequency (not estimated)
+db_sim$AlleleFrequency[["BRCA1_anyPV", 1]] <- BRCA1freq
+db_sim$AlleleFrequency[["BRCA1_anyPV", 2]] <- BRCA1freq
+db_sim$AlleleFrequency[["BRCA1_anyPV", 3]] <- BRCA1freq
+  
+# Simulation
+ suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies){
+  # Cancers
+  cancers = "Breast"
+  # Genes
+  genes = "BRCA1"
+  #family members
+  # Paternal aunts, paternal uncles
+  nSibsPatern =floor(rtruncnorm(n=2, mean=0, 1))
+  # Maternal aunts, maternal uncles
+  nSibsMatern = floor(rtruncnorm(n=2, mean=0, 1))
+  # Sisters and brothers
+  nSibs = floor(rtruncnorm(n=2, mean=1, 1))
+  # We make the assumption that the number of sons and daughters for the
+  # proband and all siblings, is the same. Nieces and nephews of the proband
+  # are not sampled separately1
+  nGrandchild = floor(rtruncnorm(n=2, mean=0, 1))
+  nChild = floor(rtruncnorm(n=2, mean=1, 1))
+  
+  # Simulate family using `PedUtils` code
+  fam = sim.runSimFam(nSibsPatern, nSibsMatern, nSibs, nChild,
+                      db_sim, genes, cancers,
+                      includeGeno = TRUE, includeBiomarkers = FALSE, 
+                      censoring = TRUE)
+  
+  famDF = as.data.frame(fam)
+  proband = famDF %>% filter(isProband==1)
+  probandIDS = c(probandIDS, proband$ID)
+  probandBRCA1Status = c(probandBRCA1Status, proband$BRCA1)
+  probandAffectionStatus = c(probandAffectionStatus, proband$isAffBC)
+  families_BRCA1[[i]] = famDF
+  
+})))
+
+save(families_BRCA1, file = "families_BRCA1.RData")
+# Filter families with affected probands
+carrierProbandfamilies_BRCA1 <- Filter(function(fam) 
+  any(fam$isProband == 1 & fam$BRCA1 == 1), families_BRCA1)
+
+
+# hide genotype information for everyone but the proband
+simFamiliesGeno <- function(fams) {
+  
+  simFamilies <- list()
+  # Assuming you have the original list of families stored as `original_families`
+  # and a vector of proband IDs called `proband_ids`
+  for (i in 1:length(fams)) {
+    family <- fams[[i]]
+    proband <-  family %>% filter(isProband==1)
+    family$BRCA1 <- ifelse(family$ID == proband$ID, family$BRCA1, NA)
+    simFamilies[[i]] <- family
+  }
+  return(simFamilies)
+  
+}
+
+# Subset the family list
+simfamilies_BRCA1 <- simFamiliesGeno(carrierProbandfamilies_BRCA1)
+save(simfamilies_BRCA1, file = "simfamilies_BRCA1.Rdata")
+print(describeFamilies(simfamilies_BRCA1,"Breast","BRCA1"))
+
+# Analysis
+# Perform survival analysis stratified by gender
+data <- do.call(rbind, carrierProbandfamilies_BRCA1)
+fit <- survfit(Surv(AgeBC, isAffBC) ~ BRCA1 + strata(Sex), data = data)
+ggsurvplot(fit, risk.table = TRUE, data = data, palette = "Dark2")
+
+# Modify the 'Sex' column to be a factor with names
+data$Sex <- factor(data$Sex, levels = c(0, 1), labels = c("Female", "Male"))
+
+# Plot density ridges for affected individuals, stratified by Sex
+  ggplot(data = data[data$isAffBC == 1,], aes(x = AgeBC, y = as.factor(BRCA1), fill = as.factor(BRCA1))) +
+  geom_density_ridges() +
+  facet_wrap(~ Sex, scales = "free_y") +
+   ggtitle("Distribution of AgeBC for Affected Individuals")
+
+# Plot density ridges for non-affected individuals, stratified by Sex
+
+ggplot(data = data[data$isAffBC == 0,], aes(x = AgeBC, y = as.factor(BRCA1), fill = as.factor(BRCA1))) +
+geom_density_ridges() +
+facet_wrap(~ Sex, scales = "free_y") +
+ggtitle("Distribution of AgeBC for Unaffected Individuals")
+
+```
+
+The data-generating cumulative penetrances curves for males and females for carriers of the PV and the population (SEER) are given below.
+
+```{r pendesc, echo=TRUE, cache=TRUE}
+# Define a function to plot cumulative density
+plot_baseline <- function(cancer_type, gene, gender) {
+  # Extract cumulative data
+  cumulative_density_gene <- cumsum(PanelPRODatabase$Penetrance[cancer_type, paste0(gene, "_hetero_anyPV"), "All_Races", gender, , "Net"])
+  cumulative_density_SEER <- cumsum(PanelPRODatabase$Penetrance[cancer_type, "SEER", "All_Races", gender, , "Net"])
+  
+  # Create data frame for plotting
+  age_values <- seq_along(cumulative_density_gene)
+  plot_df <- data.frame(
+    age = age_values,
+    cumulative_density_gene = cumulative_density_gene,
+    cumulative_density_SEER = cumulative_density_SEER
+  )
+  
+  # Plot cumulative density
+  plot <- ggplot(plot_df, aes(x = age)) +
+    geom_line(aes(y = cumulative_density_gene, color = "Carrier Cumulative Density"), linewidth = 1, linetype = "solid", na.rm = TRUE) +
+    geom_line(aes(y = cumulative_density_SEER, color = "SEER Cumulative Density"), linewidth = 1, linetype = "dotted", na.rm = TRUE) +
+    labs(title = paste("Cumulative Density Comparison for", gender, "with", cancer_type),
+         x = "Age",
+         y = "Cumulative Density") +
+    theme_minimal() +
+    scale_color_manual(values = c("Carrier Cumulative Density" = "red", 
+                                "SEER Cumulative Density" = "blue")) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(legend.title = element_blank())
+  
+  return(plot)
+}
+
+# Plot for Males with Breast Cancer and BRCA1 gene
+plot_male_breast_BRCA1 <- plot_baseline("Breast", "BRCA1", "Male")
+print(plot_male_breast_BRCA1)
+
+# Plot for Females with Breast Cancer and BRCA1 gene
+plot_female_breast_BRCA1 <- plot_baseline("Breast", "BRCA1", "Female")
+print(plot_female_breast_BRCA1)
+```
+
+
+## Family Simulation 2 - MLH1 and CRC 
+
+Analogously to the simulation above for the families in 1. Here we use the Penetrance from the PanelPRODatabase for Colorectal Cancer and MLH1. 
+
+```{r fam4.2, echo=FALSE, cache=TRUE}
+#set seed
+set.seed(2024)
+
+# Generate Families
+numberFamilies <- 3000  # Set number of families to be generated
+families_MLH1 <- list()  # Initialize list for families data
+probandIDS = c()
+probandMLH1Status = c()
+probandAffectionStatus = c()
+
+# Set up age sequence as in the PanelPRO database
+age <- 1:94
+
+# Function to deeply clone a database
+deep_clone <- function(x) {
+  rapply(x, function(y) if(is.list(y)) return(deep_clone(y)) else return(y), how = "replace")
+}
+
+# Clone the original database to create a new simulation database using base R
+db_sim <- deep_clone(PanelPRO::PanelPRODatabase)
+
+# Set up allele frequencies
+BRCA1freq <- 0.1  # use same BRCA1 frequency (not estimated)
+db_sim$AlleleFrequency[["MLH1_anyPV", 1]] <- BRCA1freq
+db_sim$AlleleFrequency[["MLH1_anyPV", 2]] <- BRCA1freq
+db_sim$AlleleFrequency[["MLH1_anyPV", 3]] <- BRCA1freq
+  
+# Simulation
+ suppressMessages(suppressWarnings(capture.output(for(i in 1:numberFamilies){
+  # Cancers
+  cancers = "Colorectal"
+  # Genes
+  genes = "MLH1"
+  #family members
+  # Paternal aunts, paternal uncles
+  nSibsPatern =floor(rtruncnorm(n=2, mean=0, 1))
+  # Maternal aunts, maternal uncles
+  nSibsMatern = floor(rtruncnorm(n=2, mean=0, 1))
+  # Sisters and brothers
+  nSibs = floor(rtruncnorm(n=2, mean=1, 1))
+  # We make the assumption that the number of sons and daughters for the
+  # proband and all siblings, is the same. Nieces and nephews of the proband
+  # are not sampled separately1
+  nGrandchild = floor(rtruncnorm(n=2, mean=0, 1))
+  nChild = floor(rtruncnorm(n=2, mean=1, 1))
+  
+  # Simulate family using `PedUtils` code
+  fam = sim.runSimFam(nSibsPatern, nSibsMatern, nSibs, nChild,
+                      db_sim, genes, cancers,
+                      includeGeno = TRUE, includeBiomarkers = FALSE, 
+                      censoring = TRUE)
+  
+  famDF = as.data.frame(fam)
+  proband = famDF %>% filter(isProband==1)
+  probandIDS = c(probandIDS, proband$ID)
+  probandMLH1Status = c(probandMLH1Status, proband$MLH1)
+  probandAffectionStatus = c(probandAffectionStatus, proband$isAffCOL)
+  families_MLH1[[i]] = famDF
+  
+})))
+
+save(families_MLH1, file = "families_MLH1.RData")
+# Filter families with affected probands
+carrierProbandfamilies_MLH1 <- Filter(function(fam) 
+  any(fam$isProband == 1 & fam$MLH1 == 1), families_MLH1)
+
+
+# hide genotype information for everyone but the proband
+simFamiliesGeno <- function(fams) {
+  
+  simFamilies <- list()
+  # Assuming you have the original list of families stored as `original_families`
+  # and a vector of proband IDs called `proband_ids`
+  for (i in 1:length(fams)) {
+    family <- fams[[i]]
+    proband <-  family %>% filter(isProband==1)
+    family$MLH1 <- ifelse(family$ID == proband$ID, family$MLH1, NA)
+    simFamilies[[i]] <- family
+  }
+  return(simFamilies)
+  
+}
+
+# Subset the family list
+simfamilies_MLH1 <- simFamiliesGeno(carrierProbandfamilies_MLH1)
+save(simfamilies_MLH1, file = "simfamilies_MLH1.Rdata")
+print(describeFamilies(simfamilies_MLH1,"Colorectal","MLH1"))
+
+# Analysis
+# Perform survival analysis stratified by gender
+data <- do.call(rbind, carrierProbandfamilies_MLH1)
+fit <- survfit(Surv(AgeCOL, isAffCOL) ~ MLH1 + strata(Sex), data = data)
+ggsurvplot(fit, risk.table = TRUE, data = data, palette = "Dark2")
+
+# Modify the 'Sex' column to be a factor with names
+data$Sex <- factor(data$Sex, levels = c(0, 1), labels = c("Female", "Male"))
+
+# Plot density ridges for affected individuals, stratified by Sex
+  ggplot(data = data[data$isAffCOL == 1,], aes(x = AgeCOL, y = as.factor(MLH1), fill = as.factor(MLH1))) +
+  geom_density_ridges() +
+  facet_wrap(~ Sex, scales = "free_y") +
+   ggtitle("Distribution of AgeCOL for Affected Individuals")
+
+# Plot density ridges for non-affected individuals, stratified by Sex
+
+ggplot(data = data[data$isAffCOL == 0,], aes(x = AgeCOL, y = as.factor(MLH1), fill = as.factor(MLH1))) +
+geom_density_ridges() +
+facet_wrap(~ Sex, scales = "free_y") +
+ggtitle("Distribution of AgeCOL for Unaffected Individuals")
+
+```
+
+Analogously, the corresponding plots for Colorectal cancer from the PanlePRODatabase.
+
+```{r pendesc2, echo=FALSE, cache=TRUE}
+# Plot for Males with Colorectal Cancer and MLH1 gene
+plot_male_colorectal_MLH1 <- plot_baseline("Colorectal", "MLH1", "Male")
+print(plot_male_colorectal_MLH1)
+
+# Plot for Females with Colorectal Cancer and MLH1 gene
+plot_female_colorectal_MLH1 <- plot_baseline("Colorectal", "MLH1", "Female")
+print(plot_female_colorectal_MLH1)
+```
+
+# Estimation Methods
+
+The likelihood model in `penet.fn` is based on the Weibull distribution for carriers and, per default, the SEER peentrance data for non-carriers. For an individual $i$, the model considers the following parameters:
+
+-   $\alpha$: Shape parameter of the Weibull distribution
+-   $\beta$: Scale parameter of the Weibull distribution
+-   $\delta$: Shift parameter for the age in the Weibull function 
+-   $\gamma$: Asymptote parameter to adjust the scale of the Weibull function 
+-   $\text{age}_i$: Age of the individual $i$
+-   $\text{aff}_i$: Affection status (1 if affected, 0 otherwise)
+
+An indiviudal that develops cancer at $\text{age}_i$ contributes a term $f$ to the likelihood, which is just the density of the Weibull in our model. The contribution from an individual whose survival time is censored at is the survival probability $S_i = 1 - F$ where $F$ is corresponding cumulative distribution function of the Weibull. 
+
+For the function \( f(x; \alpha, \beta, \delta, \gamma) \) we define:
+
+$$
+f(x; \alpha, \beta, \delta, \gamma) = 
+\begin{cases} 
+\gamma \left( \frac{\alpha}{\beta} \left( \frac{x - \delta}{\beta} \right)^{\alpha - 1} e^{-\left( \frac{x - \delta}{\beta} \right)^\alpha } \right), & x \geq \delta \\
+0, & x < \delta
+\end{cases}
+$$
+
+And for the cumulative distribution function \( F(x; \alpha, \beta, \delta, \gamma) \):
+
+$$
+F(x; \alpha, \beta, \delta, \gamma) =
+\begin{cases} 
+\gamma \left( 1 - e^{-\left( \frac{x - \delta}{\beta} \right)^\alpha } \right), & x \geq \delta \\
+0, & x < \delta
+\end{cases}
+$$
+
+The survival probability for individual $i$ is calculated as: $$S_i = 1 - pweibull(\text{age}_i - \delta, \alpha, \beta) \times \gamma$$ where pweibull is the CDF of the Weibull.
+
+To simpflify the estimation we fix $\gamma = 1$ and $\delta = 0$.
+
+The density (for affected individuals) is calculated as:
+
+$$ c.pen = dweibull(\text{age}_i - \delta, \alpha, \beta) \times \gamma $$. This gives:
+
+$$
+\text{carrierLik}_i = 
+\begin{cases} 
+\text{S}_i & \text{aff}_i = 0 \\
+\text{c.pen} & \text{aff}_i = 1
+\end{cases}
+$$
+
+The baseline risk $\text{SEER\_baseline}_i$ is derived from SEER data. For more details see seperate documentation. 
+
+## Adaptive MH
+
+The Adaptive Metropolis-Hastings (MH) algorithm improves the efficiency of the standard Metropolis-Hastings algorithm by adapting the proposal distribution based on the history of the accepted samples. This adaptation involves updating the covariance matrix according to a specific rule based on the chain's history. The algorithm we implemented is based on Haario et al. (2001).
+
+They choose the proposal density $N(X(t), \Sigma(t))$. Since $X(t)$ is multivariate, we have a multivariate proposal distribution. In the Adaptive Metropolis (AM) sampler, at each iteration of the chain, a candidate value $X^*$ is sampled from a proposal distribution $N(X(t), s_d* \Sigma(t))$, aiming to tune the covariance matrix $\Sigma(t)$ to improve the acceptance rate.
+
+The crucial aspect of the adaptation is how the covariance of the proposal distribution depends on the chain's history. In the AM algorithm, this is addressed by setting $\Sigma(t) \approx s_d \text{cov}(X_0, ..., X_{t-1}) + s_d \epsilon_0 I_d$ after an initial period, where $s_d$ is a parameter that depends only on dimension $d$ and $\epsilon_0$ is a small constant relative to the size of $S$. Here, $I_d$ denotes the $d$-dimensional identity matrix. To begin, we select an arbitrary, strictly positive definite initial covariance $\Sigma_0$, based on our best prior knowledge (which may be quite poor). 
+We set $\epsilon_0 = 0.01$ and $s_d = 2.38^2 / d$.
+We select an index $t_0 > 0$ for the length of an initial period and define:
+
+
+$$
+\Sigma_t = 
+\begin{cases} 
+\Sigma_0 & \text{for } t < t_0, \\
+s_d \text{cov}(X_0, ..., X_{t-1}) + s_d \epsilon_0 I_d & \text{for } t \geq t_0.
+\end{cases}
+$$
+
+The choice for the length of the initial segment $t_0 > 0$ is free, but the bigger it is chosen, the more slowly the effect of the adaptation is felt. In a sense, the size of $t_0$ reflects our trust in the initial covariance $\Sigma_0$.
+Here we choose $t_0 = \text{burn-in}$ and a for the initial covariance matrix with the variances for the male/female asymptotes (=0), first quartile (=2), median (=5), and threshold (=5):
+$$
+\Sigma_0=  \begin{bmatrix}
+    0.1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0.1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 2 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 2 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 5 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 5 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 5 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 5
+\end{bmatrix}
+$$
+
+The role of the parameter $\epsilon_0$ is just to ensure that $\Sigma_t$ will not become singular.
+As a basic choice for the scaling parameter, we have adopted the value $s_d = \left(\frac{2.4}{\sqrt{d}}\right)^2$ from Gelman et al. (1996), where it was shown that in a certain sense this choice optimizes the mixing properties of the Metropolis search in the case of Gaussian targets and Gaussian proposals
+
+## Metropolis within Gibbs (Sequential Estimation)
+
+The Metropolis-within-Gibbs algorithm is a hybrid Markov Chain Monte Carlo (MCMC) technique that combines the Gibbs sampler and the Metropolis-Hastings algorithm.This method iteratively updates each parameter block using Metropolis-Hastings steps within a Gibbs sampling framework.
+
+section{Metropolis-within-Gibbs Algorithm Explanation}
+
+The Metropolis-within-Gibbs algorithm is a hybrid Markov Chain Monte Carlo (MCMC) technique that combines the Gibbs sampler with the Metropolis-Hastings algorithm. This approach is useful for sampling from complex posterior distributions where the full conditional distributions are not available in closed form. The algorithm works by iteratively updating parameters in blocks using Metropolis-Hastings steps within a Gibbs sampling framework.
+
+\subsection{Initialization}
+\begin{itemize}
+    \item The parameters are initialized, and the adaptive covariance matrix is set.
+\end{itemize}
+
+\subsection{Iterations}
+
+For each iteration, the following steps are performed:
+
+\begin{enumerate}
+    \item The current parameter vector is updated.
+    \item New proposals for the parameters are generated using a multivariate normal distribution.
+    \item The parameters are updated in blocks using the Metropolis-Hastings algorithm. Each block involves:
+    \begin{itemize}
+        \item Proposing new values
+        \item Calculating the log-likelihood and log-prior
+        \item Computing the acceptance ratio
+        \item Deciding whether to accept or reject the proposal
+    \end{itemize}
+    \item The parameter updates are done in a specific sequence:
+    \begin{enumerate}
+        \item First, the asymptotes for males
+        \item Then, the other parameters for males
+        \item Followed by the asymptotes for females
+        \item Finally, the other parameters for females
+    \end{enumerate}
+\end{enumerate}
+
+
+This process is repeated for all iterations, allowing the algorithm to explore the parameter space and generate samples from the posterior distribution.
+
+
+# Results
+
+## MCMC with Adpative MH - Family 1 with 4 Parameter Weibull
+
+### Estimation and Trace Plots
+```{r est1, echo=TRUE, cache=TRUE}
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional Scripts/out_sim_5.41_A.Rdata")
+
+out_sim_5.41_A <- out_sim_5.41
+str(out_sim_5.41_A$combined_chains)
+# print summary stats
+out_sim_5.41_A$summary_stats
+plot_traceSingle(out_sim_5.41_A$results[[1]])
+```
+
+### Comparison vs. Data-Generating Penetrance
+
+```{r comp1, echo=TRUE, cache=TRUE}
+# Function to calculate Weibull parameters
+calculate_weibull_parameters <- function(given_median, given_first_quartile, delta) {
+    # Calculate alpha
+    alpha <- log(-log(0.5) / -log(0.75)) / log((given_median - delta) / (given_first_quartile - delta))
+
+    # Calculate beta using the median (M)
+    beta <- (given_median - delta) / (-log(0.5))^(1 / alpha)
+
+    return(list(alpha = alpha, beta = beta))
+}
+
+
+# Function to calculate Weibull cumulative density
+weibull_cumulative <- function(x, alpha, beta, threshold, asymptote) {
+  pweibull(x - threshold, shape = alpha, scale = beta) * asymptote
+}
+
+
+# Function to plot the penetrance and compare with Panelpro Database
+plot_penetrance_comparison <- function(data, db_sim, prob, max_age, cancer, gene, sex, race, type) {
+  if (prob <= 0 || prob >= 1) {
+    stop("prob must be between 0 and 1")
+  }
+
+  # Calculate Weibull parameters for the given sex
+  params <- if (sex == "Male") {
+    calculate_weibull_parameters(
+      data$median_male_results,
+      data$first_quartile_male_results,
+      data$threshold_male_results
+    )
+  } else if (sex == "Female") {
+    calculate_weibull_parameters(
+      data$median_female_results,
+      data$first_quartile_female_results,
+      data$threshold_female_results
+    )
+  } else {
+    stop("Invalid sex. Please choose 'Male' or 'Female'.")
+  }
+
+  alphas <- params$alpha
+  betas <- params$beta
+  thresholds <- if (sex == "Male") data$threshold_male_results else data$threshold_female_results
+  asymptotes <- if (sex == "Male") data$asymptote_male_results else data$asymptote_female_results
+
+  x_values <- seq(1, max_age)
+
+  # Calculate cumulative densities for the specified sex
+  cumulative_density <- mapply(function(alpha, beta, threshold, asymptote) {
+    pweibull(x_values - threshold, shape = alpha, scale = beta) * asymptote
+  }, alphas, betas, thresholds, asymptotes, SIMPLIFY = FALSE)
+
+  distributions_matrix <- matrix(unlist(cumulative_density), nrow = length(x_values), byrow = FALSE)
+  mean_density <- rowMeans(distributions_matrix, na.rm = TRUE)
+
+  # Calculate credible intervals
+  lower_prob <- (1 - prob) / 2
+  upper_prob <- 1 - lower_prob
+  lower_ci <- apply(distributions_matrix, 1, quantile, probs = lower_prob)
+  upper_ci <- apply(distributions_matrix, 1, quantile, probs = upper_prob)
+
+  # Extract cumulative data from the Panelpro Database
+  dim_names <- attr(db_sim$Penetrance, "dimnames")
+  cancer_index <- which(dim_names[[1]] == cancer)
+  gene_index <- which(dim_names[[2]] == gene)
+  race_index <- which(dim_names[[3]] == race)
+  sex_index <- which(dim_names[[4]] == sex)
+  type_index <- which(dim_names[[6]] == type)
+
+  density_data <- db_sim$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
+  cumulative_density_panelpro <- cumsum(density_data)
+
+  # Create data frame for plotting
+  age_values <- seq_along(density_data)
+  min_length <- min(length(cumulative_density_panelpro), length(mean_density))
+
+  plot_df <- data.frame(
+    age = age_values[1:min_length],
+    cumulative_density_panelpro = cumulative_density_panelpro[1:min_length],
+    mean_density = mean_density[1:min_length],
+    lower_ci = lower_ci[1:min_length],
+    upper_ci = upper_ci[1:min_length]
+  )
+
+  # Plot the cumulative densities with credible intervals
+  ggplot(plot_df, aes(x = age)) +
+    geom_line(aes(y = cumulative_density_panelpro, color = "Panelpro Cumulative Density"), linewidth = 1, linetype = "solid", na.rm = TRUE) +
+    geom_line(aes(y = mean_density, color = "Weibull Mean Density"), linewidth = 1, linetype = "dotted", na.rm = TRUE) +
+    geom_ribbon(aes(ymin = lower_ci, ymax = upper_ci), alpha = 0.2, fill = "red", na.rm = TRUE) +
+    labs(title = paste("Cumulative Density Comparison for", sex, "in", race),
+         x = "Age",
+         y = "Cumulative Density") +
+    theme_minimal() +
+    scale_color_manual(values = c("Panelpro Cumulative Density" = "blue", 
+                                  "Weibull Mean Density" = "red")) +
+    scale_y_continuous(labels = scales::percent) +
+    theme(legend.title = element_blank())
+}
+
+# Plot
+plot_penetrance_comparison(
+  data = out_sim_5.41_A$combined_chains,
+  db_sim = PanelPRODatabase,
+  prob = 0.95,
+  max_age = 94,
+  cancer = "Breast",
+  gene = "BRCA1_hetero_anyPV",
+  sex = "Female",
+  race = "All_Races",
+  type = "Net"
+)
+
+plot_penetrance_comparison(
+  data = out_sim_5.41_A$combined_chains,
+  db_sim = PanelPRODatabase,
+  prob = 0.95,
+  max_age = 94,
+  cancer = "Breast",
+  gene = "BRCA1_hetero_anyPV",
+  sex = "Male",
+  race = "All_Races",
+  type = "Net"
+)
+
+```
+
+
+### Correlation Plots
+```{r acf1, echo=TRUE, cache=TRUE}
+par(mfrow = c(2, 3))
+## ACF Plots 
+acf(out_sim_5.41_A$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+acf(out_sim_5.41_A$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+acf(out_sim_5.41_A$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+acf(out_sim_5.41_A$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+acf(out_sim_5.41_A$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+acf(out_sim_5.41_A$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+```
+
+
+## MCMC with Adaptive MH - Simulation 2 with 4 Parameter Weibull
+
+### Estimation and Trance Plots
+
+```{r est2, echo=TRUE, cache=TRUE}
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional Scripts/out_sim_5.61_A.Rdata")
+out_sim_5.61_A <- out_sim_5.61
+# print summary stats
+out_sim_5.61_A$summary_stats
+plot_traceSingle(out_sim_5.61_A$results[[1]])
+```
+
+### Comparison vs. Data-Generating Penetrance
+
+```{r comp2, echo=TRUE, cache=TRUE}
+# Repeat the above function 
+plot_penetrance_comparison(
+  data = out_sim_5.61_A$combined_chains,
+  db_sim = PanelPRODatabase,
+  prob = 0.95,
+  max_age = 94,
+  cancer = "Colorectal",
+  gene = "MLH1_hetero_anyPV",
+  race = "All_Races",
+  sex = "Female",
+  type = "Net"
+  
+)
+plot_penetrance_comparison(
+  data = out_sim_5.61_A$combined_chains,
+  db_sim = PanelPRODatabase,
+  prob = 0.95,
+  max_age = 94,
+  cancer = "Colorectal",
+  gene = "MLH1_hetero_anyPV",
+  race = "All_Races",
+  sex = "Female",
+  type = "Net"
+  
+)
+```
+
+### Correlation Plots
+
+```{r acf2, echo=TRUE, cache=TRUE}
+## ACF Plots 
+par(mfrow = c(2, 2))
+acf(out_sim_5.61_A$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+acf(out_sim_5.61_A$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+acf(out_sim_5.61_A$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+acf(out_sim_5.61_A$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+acf(out_sim_5.61_A$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+acf(out_sim_5.61_A$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+```
+
+
+## MCMC with Metropolis within Gibbs - Simulation 2 with 4 Parameter Weibull
+
+### Estimation and Trace Plots
+
+```{r est3, echo=TRUE, cache=TRUE}
+load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional Scripts/out_sim_5.61.Rdata")
+# print summary stats
+out_sim_5.61$summary_stats
+plot_traceSingle(out_sim_5.61$results[[1]])
+```
+### Comparision vs. Data-Generating Penetrance
+
+```{r comp3, echo=TRUE, cache=TRUE}
+
+# Repeat the function
+plot_penetrance_comparison(
+  data = out_sim_5.61$combined_chains,
+  db_sim = PanelPRODatabase,
+  prob = 0.95,
+  max_age = 94,
+  cancer = "Colorectal",
+  gene = "MLH1_hetero_anyPV", 
+  race = "All_Races",
+  sex = "Female",
+  type = "Net"
+)
+plot_penetrance_comparison(
+  data = out_sim_5.61$combined_chains,
+  db_sim = PanelPRODatabase,
+  prob = 0.95,
+  max_age = 94,
+  cancer = "Colorectal",
+  gene = "MLH1_hetero_anyPV", 
+  race = "All_Races",
+  sex = "Male",
+  type = "Net"
+)
+
+```
+
+### Correlation Plots
+
+```{r acf3, echo=TRUE, cache=TRUE}
+## ACF Plots 
+par(mfrow = c(2, 2))
+acf(out_sim_5.61$results[[1]]$first_quartile_male_samples, main = "ACF of First Quartile - Male")
+acf(out_sim_5.61$results[[1]]$first_quartile_female_samples, main = "ACF of First Quartile - Female")
+acf(out_sim_5.61$results[[1]]$median_male_samples, main = "ACF of Median - Male")
+acf(out_sim_5.61$results[[1]]$median_female_samples, main = "ACF of Median - Female")
+acf(out_sim_5.61$results[[1]]$threshold_male_samples, main = "ACF of Threshold - Male")
+acf(out_sim_5.61$results[[1]]$threshold_female_samples, main = "ACF of Threshold - Female")
+```
+
+
+# Comparison of Methods
+
+This is the comparison the the Adaptive MH and Metriopolis within Gibbs approach for the Families 2 (Colorectal and MLH1). 
+
+```{r comp4, echo=TRUE, cache=TRUE}
+
+#load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional #Scripts/out_sim_5.61_A.Rdata")
+
+
+#load("/Users/nicolaskubista/Documents/Master Statistics/Master Thesis/Code/Submission/Additional #Scripts/out_sim_5.61.Rdata")
+# Extract data from the first method
+median_male_A <- out_sim_5.61_A$combined_chains$median_male_results
+median_female_A <- out_sim_5.61_A$combined_chains$median_female_results
+
+# Extract data from the second method
+median_male_B <- out_sim_COL_v2$combined_chains$median_male_results
+median_female_B <- out_sim_COL_v2$combined_chains$median_female_results
+
+
+# Combine data into a data frame for plotting
+data_A <- data.frame(value = c(median_male_A, median_female_A),
+                     gender = rep(c("Male", "Female"), each = length(median_male_A)),
+                     method = "Adaptive MH")
+
+data_B <- data.frame(value = c(median_male_B, median_female_B),
+                     gender = rep(c("Male", "Female"), each = length(median_male_B)),
+                     method = "Metropolis within Gibbs")
+
+combined_data <- rbind(data_A, data_B)
+
+# Plot using ggplot2
+ggplot(combined_data, aes(x = value, color = method)) +
+  geom_density() +
+  facet_wrap(~ gender, scales = "free") +
+  labs(title = "Posterior Densities Comparison - Median",
+       x = "Value",
+       y = "Density")
+
+# Function to combine data for plotting
+combine_data <- function(values_A, values_B, parameter_name) {
+  data_A <- data.frame(value = c(values_A$male, values_A$female),
+                       gender = rep(c("Male", "Female"), each = length(values_A$male)),
+                       method = "Method A",
+                       parameter = parameter_name)
+
+  data_B <- data.frame(value = c(values_B$male, values_B$female),
+                       gender = rep(c("Male", "Female"), each = length(values_B$male)),
+                       method = "Method B",
+                       parameter = parameter_name)
+
+  combined_data <- rbind(data_A, data_B)
+  return(combined_data)
+}
+
+# Extract and combine data for each parameter
+params_A <- list(
+  median = list(male = out_sim_5.61_A$combined_chains$median_male_results,
+                female = out_sim_5.61_A$combined_chains$median_female_results),
+  first_quartile = list(male = out_sim_5.61_A$combined_chains$first_quartile_male_results,
+                        female = out_sim_5.61_A$combined_chains$first_quartile_female_results),
+  threshold = list(male = out_sim_5.61_A$combined_chains$threshold_male_results,
+                   female = out_sim_5.61_A$combined_chains$threshold_female_results),
+  asymptote = list(male = out_sim_5.61_A$combined_chains$asymptote_male_results,
+                   female = out_sim_5.61_A$combined_chains$asymptote_female_results)
+)
+
+params_B <- list(
+  median = list(male = out_sim_COL_v2$combined_chains$median_male_results,
+                female = out_sim_COL_v2$combined_chains$median_female_results),
+  first_quartile = list(male = out_sim_COL_v2$combined_chains$first_quartile_male_results,
+                        female = out_sim_COL_v2$combined_chains$first_quartile_female_results),
+  threshold = list(male = out_sim_COL_v2$combined_chains$threshold_male_results,
+                   female = out_sim_COL_v2$combined_chains$threshold_female_results),
+  asymptote = list(male = out_sim_COL_v2$combined_chains$asymptote_male_results,
+                   female = out_sim_COL_v2$combined_chains$asymptote_female_results)
+)
+
+# Combine all data for plotting
+combined_data_all <- bind_rows(
+  combine_data(params_A$median, params_B$median, "Median"),
+  combine_data(params_A$first_quartile, params_B$first_quartile, "First Quartile"),
+  combine_data(params_A$threshold, params_B$threshold, "Threshold"),
+  combine_data(params_A$asymptote, params_B$asymptote, "Asymptote")
+)
+
+# Plot using ggplot2
+ggplot(combined_data_all, aes(x = value, color = method)) +
+  geom_density() +
+  facet_wrap(~ gender + parameter, scales = "free") +
+  labs(title = "Posterior Densities Comparison",
+       x = "Value",
+       y = "Density") +
+  theme_minimal()
+
+
+# Function to plot the penetrance and compare with Panelpro Database and additional data
+plot_penetrance_comparison <- function(data, db_sim, prob, max_age, cancer, gene, sex, race, type, additional_data) {
+  if (prob <= 0 || prob >= 1) {
+    stop("prob must be between 0 and 1")
+  }
+
+  # Helper function to calculate Weibull cumulative density
+  calculate_cumulative_density <- function(data, sex) {
+    params <- if (sex == "Male") {
+      calculate_weibull_parameters(
+        data$median_male_results,
+        data$first_quartile_male_results,
+        data$threshold_male_results
+      )
+    } else if (sex == "Female") {
+      calculate_weibull_parameters(
+        data$median_female_results,
+        data$first_quartile_female_results,
+        data$threshold_female_results
+      )
+    } else {
+      stop("Invalid sex. Please choose 'Male' or 'Female'.")
+    }
+
+    alphas <- params$alpha
+    betas <- params$beta
+    thresholds <- if (sex == "Male") data$threshold_male_results else data$threshold_female_results
+    asymptotes <- if (sex == "Male") data$asymptote_male_results else data$asymptote_female_results
+
+    x_values <- seq(1, max_age)
+
+    cumulative_density <- mapply(function(alpha, beta, threshold, asymptote) {
+      pweibull(x_values - threshold, shape = alpha, scale = beta) * asymptote
+    }, alphas, betas, thresholds, asymptotes, SIMPLIFY = FALSE)
+
+    distributions_matrix <- matrix(unlist(cumulative_density), nrow = length(x_values), byrow = FALSE)
+    mean_density <- rowMeans(distributions_matrix, na.rm = TRUE)
+
+    lower_prob <- (1 - prob) / 2
+    upper_prob <- 1 - lower_prob
+    lower_ci <- apply(distributions_matrix, 1, quantile, probs = lower_prob)
+    upper_ci <- apply(distributions_matrix, 1, quantile, probs = upper_prob)
+
+    list(mean_density = mean_density, lower_ci = lower_ci, upper_ci = upper_ci)
+  }
+
+  # Calculate Weibull cumulative densities for both data sets
+  main_density <- calculate_cumulative_density(data, sex)
+  additional_density <- calculate_cumulative_density(additional_data, sex)
+
+  # Extract cumulative data from the Panelpro Database
+  dim_names <- attr(db_sim$Penetrance, "dimnames")
+  cancer_index <- which(dim_names[[1]] == cancer)
+  gene_index <- which(dim_names[[2]] == gene)
+  race_index <- which(dim_names[[3]] == race)
+  sex_index <- which(dim_names[[4]] == sex)
+  type_index <- which(dim_names[[6]] == type)
+
+  density_data <- db_sim$Penetrance[cancer_index, gene_index, race_index, sex_index, , type_index]
+  cumulative_density_panelpro <- cumsum(density_data)
+
+  # Create data frame for plotting
+  age_values <- seq_along(density_data)
+  min_length <- min(length(cumulative_density_panelpro), length(main_density$mean_density), length(additional_density$mean_density))
+
+  plot_df <- data.frame(
+    age = age_values[1:min_length],
+    cumulative_density_panelpro = cumulative_density_panelpro[1:min_length],
+    main_mean_density = main_density$mean_density[1:min_length],
+    main_lower_ci = main_density$lower_ci[1:min_length],
+    main_upper_ci = main_density$upper_ci[1:min_length],
+    additional_mean_density = additional_density$mean_density[1:min_length],
+    additional_lower_ci = additional_density$lower_ci[1:min_length],
+    additional_upper_ci = additional_density$upper_ci[1:min_length]
+  )
+
+  # Plot the cumulative densities with credible intervals
+  ggplot(plot_df, aes(x = age)) +
+    geom_line(aes(y = cumulative_density_panelpro, color = "PanelPro Cumulative Density"), linewidth = 1, linetype = "solid", na.rm = TRUE) +
+    geom_line(aes(y = main_mean_density, color = "Weibull Mean Density (Estimated PanelPRO)"), linewidth = 1, linetype = "dotted", na.rm = TRUE) +
+    geom_ribbon(aes(ymin = main_lower_ci, ymax = main_upper_ci), alpha = 0.2, fill = "red", na.rm = TRUE) +
+    geom_line(aes(y = additional_mean_density, color = "Weibull Mean Density (Estimated CoH)"), linewidth = 1, linetype = "dashed", na.rm = TRUE) +
+    geom_ribbon(aes(ymin = additional_lower_ci, ymax = additional_upper_ci), alpha = 0.2, fill = "green", na.rm = TRUE) +
+    labs(title = paste("Cumulative Density Comparison for", sex, "in", race),
+         x = "Age",
+         y = "Cumulative Density") +
+    theme_minimal() +
+    scale_color_manual(values = c("PanelPro Cumulative Density" = "blue", 
+                                  "Weibull Mean Density (Estimated PanelPro)" = "red",
+                                  "Weibull Mean Density (Estimated CoH)" = "green")) +
+    scale_y_continuous(labels = scales::percent) +
+    theme(legend.title = element_blank())
+}
+
+
+
+plot_penetrance_comparison(
+  data = out_sim_5.61_A$combined_chains,
+  db_sim = PanelPRODatabase,
+  prob = 0.95,
+  max_age = 94,
+  cancer = "Colorectal",
+  gene = "MLH1_hetero_anyPV", 
+  race = "All_Races",
+  sex = "Male",
+  type = "Net",
+  additional_data = out_sim_COL_v2$combined_chains
+)
+
+plot_penetrance_comparison(
+  data = out_sim_5.61_A$combined_chains,
+  db_sim = PanelPRODatabase,
+  prob = 0.95,
+  max_age = 94,
+  cancer = "Colorectal",
+  gene = "MLH1_hetero_anyPV", 
+  race = "All_Races",
+  sex = "Female",
+  type = "Net",
+  additional_data = out_sim_COL_v2$combined_chains
+  
+)
+```
+
+
+# Analysis 
+
+```{r a1, echo=TRUE, cache=TRUE}
+# Function to calculate Weibull parameters
+calculate_weibull_parameters <- function(given_median, given_first_quartile, delta) {
+  # Calculate alpha
+  alpha <- log(-log(0.5) / -log(0.75)) / log((given_median - delta) / (given_first_quartile - delta))
+  
+  # Calculate beta using the median (M)
+  beta <- (given_median - delta) / (-log(0.5))^(1 / alpha)
+  
+  return(list(alpha = alpha, beta = beta))
+}
+
+# Adding alpha and beta parameters to the out object
+calculate_and_add_params <- function(out) {
+  alphas_male <- numeric(length(out$median_male_results))
+  betas_male <- numeric(length(out$median_male_results))
+  alphas_female <- numeric(length(out$median_female_results))
+  betas_female <- numeric(length(out$median_female_results))
+  
+  for (i in seq_along(out$median_male_results)) {
+    male_params <- calculate_weibull_parameters(out$median_male_results[i], out$first_quartile_male_results[i], out$threshold_male_results[i])
+    alphas_male[i] <- male_params$alpha
+    betas_male[i] <- male_params$beta
+    
+    female_params <- calculate_weibull_parameters(out$median_female_results[i], out$first_quartile_female_results[i], out$threshold_female_results[i])
+    alphas_female[i] <- female_params$alpha
+    betas_female[i] <- female_params$beta
+  }
+  
+  out$alpha_male <- alphas_male
+  out$beta_male <- betas_male
+  out$alpha_female <- alphas_female
+  out$beta_female <- betas_female
+  
+  return(out)
+}
+
+# Example usage:
+out_sim_5.61_paras <- calculate_and_add_params(out_sim_5.61_A$combined_chains)
+
+# Plotting trace plots for alpha, beta, gamma, and delta
+library(ggplot2)
+library(gridExtra)
+
+# Creating the trace plot function
+create_trace_plot <- function(parameter_values, parameter_name, gender) {
+  data <- data.frame(iteration = 1:length(parameter_values), value = parameter_values)
+  ggplot(data, aes(x = iteration, y = value)) +
+    geom_line() +
+    labs(title = paste("Trace Plot for", parameter_name), x = "Iteration", y = parameter_name) +
+    theme_minimal()
+}
+
+# Trace plots for male parameters
+trace_alpha_male <- create_trace_plot(out_sim_5.61_paras$alpha_male, "Alpha (Shape) - Male")
+trace_beta_male <- create_trace_plot(out_sim_5.61_paras$beta_male, "Beta (Scale) - Male")
+trace_gamma_male <- create_trace_plot(out_sim_5.61_paras$median_male_results, "Gamma (Asymptote) - Male")
+trace_delta_male <- create_trace_plot(out_sim_5.61_paras$threshold_male_results, "Delta (Threshold) - Male")
+
+# Trace plots for female parameters
+trace_alpha_female <- create_trace_plot(out_sim_5.61_paras$alpha_female, "Alpha (Shape) - Female")
+trace_beta_female <- create_trace_plot(out_sim_5.61_paras$beta_female, "Beta (Scale) - Female")
+trace_gamma_female <- create_trace_plot(out_sim_5.61_paras$median_female_results, "Gamma (Asymptote) - Female")
+trace_delta_female <- create_trace_plot(out_sim_5.61_paras$threshold_female_results, "Delta (Threshold) - Female")
+
+# Arrange plots in a grid
+grid.arrange(trace_alpha_male, trace_beta_male, trace_gamma_male, trace_delta_male, ncol = 2)
+grid.arrange(trace_alpha_female, trace_beta_female, trace_gamma_female, trace_delta_female, ncol = 2)
+```
+

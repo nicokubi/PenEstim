@@ -178,6 +178,7 @@ prepAges <- function(data, removeProband = FALSE) {
         }
 
         # Calculate max cancer age only for columns that exist in the data
+        # Current Age cannot be lower than the max. cancer age
         cancer_ages_cols <- paste0("Age", cancer_types)
         cancer_ages_cols <- intersect(cancer_ages_cols, colnames(data[[i]]))
         cancer_ages <- data[[i]][cancer_ages_cols]
@@ -203,37 +204,105 @@ prepAges <- function(data, removeProband = FALSE) {
 #' # Transform a data frame
 #' transformed_df <- transformDF(input_df)
 transformDF <- function(df, cancer_type, gene_input) {
-    # Check if the cancer type is valid
-    if (!cancer_type %in% CANCER_NAME_MAP$long) {
-        stop("Cancer type '", cancer_type, "' is not supported. Please choose from the supported list.")
+  # Check if the cancer type is valid
+  if (!cancer_type %in% CANCER_NAME_MAP$long) {
+    stop("Cancer type '", cancer_type, "' is not supported. Please choose from the supported list.")
+  }
+  
+  # Get the abbreviation for the cancer type
+  cancer_index <- which(CANCER_NAME_MAP$long == cancer_type)
+  cancer_type_short <- CANCER_NAME_MAP$short[cancer_index]
+  
+  # Construct column names based on cancer type and gene input
+  aff_col_name <- paste0("isAff", cancer_type_short)
+  age_col_name <- paste0("Age", cancer_type_short)
+  
+  # Rename and transform columns
+  df$individual <- df$SubjectID
+  df$family <- df$PedigreeID
+  df$mother <- df$MotherID
+  df$father <- df$FatherID
+  df$aff <- df[[aff_col_name]]
+  df$sex <- ifelse(df$Sex == 0, 2, df$Sex) # Convert 0s to 2s in sex, keep 1s as is
+  
+  # Apply row-wise logic to assign age based on aff column
+  df$age <- apply(df, 1, function(row) {
+    aff <- as.numeric(row[[aff_col_name]])
+    if (aff == 1) {
+      return(as.numeric(row[[age_col_name]]))
+    } else {
+      return(as.numeric(row[["CurAge"]]))
     }
-
-    # Get the abbreviation for the cancer type
-    cancer_index <- which(CANCER_NAME_MAP$long == cancer_type)
-    cancer_type_short <- CANCER_NAME_MAP$short[cancer_index]
-
-    # Construct column names based on cancer type and gene input
-    aff_col_name <- paste0("isAff", cancer_type_short)
-    age_col_name <- paste0("Age", cancer_type_short)
-
-    # Rename and transform columns
-    df$individual <- df$SubjectID
-    df$family <- df$PedigreeID
-    df$mother <- df$MotherID
-    df$father <- df$FatherID
-    df$aff <- df[[aff_col_name]]
-    df$sex <- ifelse(df$Sex == 0, 2, df$Sex) # Convert 0s to 2s in sex, keep 1s as is
-    df$age <- df[[age_col_name]]
-    df$geno <- df[[gene_input]]
-
-    # Process 'geno' column
-    df$geno <- ifelse(is.na(df$geno), "", ifelse(df$geno == 1, "1/2", ifelse(df$geno == 0, "1/1", df$geno)))
-
-    # Select only the necessary columns
-    df <- df[c("individual", "family", "mother", "father", "aff", "sex", "age", "geno")]
-
-    return(df)
+  })
+  
+  df$geno <- df[[gene_input]]
+  
+  # Process 'geno' column
+  df$geno <- ifelse(is.na(df$geno), "", ifelse(df$geno == 1, "1/2", ifelse(df$geno == 0, "1/1", df$geno)))
+  
+  # Select only the necessary columns
+  df <- df[c("individual", "family", "mother", "father", "aff", "sex", "age", "geno")]
+  
+  return(df)
 }
 
+
+# Function to calculate empirical density for non-affected individuals
+calculateEmpiricalDensity <- function(data, aff_column = "aff", age_column = "age", n_points = 10000) {
+  # Filter the data to include only non-affected individuals (aff == 0)
+  non_affected_data <- subset(data, data[[aff_column]] == 0)
+  
+  # Remove NA values from the age column of the filtered data
+  cleaned_non_affected_ages <- na.omit(non_affected_data[[age_column]])
+  
+  # Estimate the empirical density of the age data
+  age_density <- density(cleaned_non_affected_ages, n = n_points)
+  
+  return(age_density)
+}
+
+# Function to initialize ages using uniform distribution
+imputeAgesInit <- function(data, threshold, max_age) {
+  na_indices <- which(is.na(data$age))
+  data$age[na_indices] <- runif(length(na_indices), threshold, max_age)
+  return(list(data = data, na_indices = na_indices))
+}
+
+# Function to initialize ages using uniform distribution
+imputeAgesInit <- function(data, threshold, max_age) {
+  na_indices <- which(is.na(data$age))
+  data$age[na_indices] <- runif(length(na_indices), threshold, max_age)
+  return(list(data = data, na_indices = na_indices))
+}
+
+# Function to impute ages using Weibull distribution for aff = 1 and empirical distribution for aff = 0
+imputeAges <- function(data, na_indices, age_density, alpha_male, beta_male, delta_male, gamma_male,
+                       alpha_female, beta_female, delta_female, gamma_female) {
+  for (i in na_indices) {
+    u <- runif(1)
+    if (data$aff[i] == 1) {
+      # Use Weibull distribution
+      if (data$sex[i] == 1) {  # Assuming 1 is male and 2 is female
+        if (u < gamma_male) {
+          age <- delta_male + beta_male * (-log(1 - u / gamma_male))^(1 / alpha_male)
+        } else {
+          age <- delta_male + beta_male * (-log(1 - (gamma_male - 1e-10) / gamma_male))^(1 / alpha_male)
+        }
+      } else if (data$sex[i] == 2) {
+        if (u < gamma_female) {
+          age <- delta_female + beta_female * (-log(1 - u / gamma_female))^(1 / alpha_female)
+        } else {
+          age <- delta_female + beta_female * (-log(1 - (gamma_female - 1e-10) / gamma_female))^(1 / alpha_female)
+        }
+      }
+      data$age[i] <- max(1, round(age))
+    } else {
+      # Sample from the empirical distribution for aff = 0
+      age <- sample(age_density$x, size = 1, replace = TRUE, prob = age_density$y)
+      data$age[i] <- max(1, round(age))
+    }
+  }
+  return(data)
+}
 
 
