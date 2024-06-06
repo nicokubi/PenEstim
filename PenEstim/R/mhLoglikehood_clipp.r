@@ -142,7 +142,7 @@ lik.fn <- function(i, data, alpha_male, alpha_female, beta_male, beta_female,
     delta <- ifelse(data$sex[i] == 1, delta_male, delta_female)
 
     if (data$age[i] == 0 || data$age[i] == 1)  {
-        lik.i <- c(1, 1) # Assuming people aged 0 years are all unaffected
+        lik.i <- c(1, 1) # Assuming people aged 0 or 1 years are all unaffected
     } else {
         # Ensure age is within the valid range
         age_index <- min(max_age, data$age[i])
@@ -274,14 +274,6 @@ mhLogLikelihood_clipp <- function(paras, families, max_age, cancer_type, db, af,
     # Handle -Inf values
    if (is.infinite(loglik) && loglik == -Inf) {
             loglik <- -50000
-    } else {
-       cat(
-            "Parameters:", given_median_male, given_median_female, given_first_quartile_male,
-            given_first_quartile_female, alpha_male, alpha_female, beta_male, beta_female, delta_male,
-            delta_female, gamma_male, gamma_female, "\n"
-        )
-       cat("Log Likelihood:", loglik, "\n")
-   }
-
+    } 
     return(loglik)
 }

@@ -36,24 +36,36 @@
 # Main mhChain_v7.2 function with age imputation
 mhChain_v7.2 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
                          prior_distributions, cancer_type, gene_input, af,
-                         median_max, max_penetrance, homozygote, SeerNC, priors, var) {
+                         median_max, max_penetrance, homozygote, SeerNC, priors, var, 
+                         ageImputation) {
   
   # Set seed
   set.seed(seed)
-  
   # Calculate Empirical density
   age_density <- calculateEmpiricalDensity(data, aff_column = "aff", age_column = "age")
   
-  # Initialize ages
-  threshold <- priors$threshold$min
-  init_result <- imputeAgesInit(data, threshold, max_age)
-  data <- init_result$data
-  na_indices <- init_result$na_indices
-  
+  if (ageImputation) {
+    data <- calcPedDegree(data)
+    # Initialize ages
+    threshold <- priors$threshold$min
+    init_result <- imputeAgesInit(data, threshold, max_age)
+    data <- init_result$data
+    na_indices <- init_result$na_indices
+  }
+
   # Calculate SEER baseline and midpoint
   SEER_baseline <- calculate_lifetime_risk(
     cancer = cancer_type, gene = "SEER",
     race = "All_Races", type = "Net", db = db
+  )
+  # Normalize CDF for males and females
+  SEER_male <- data.frame(
+    age = as.numeric(names(SEER_baseline$cumulative_risk$male)),
+    cum_prob = SEER_baseline$cumulative_risk$male / max(SEER_baseline$cumulative_risk$male)
+  )
+  SEER_female <- data.frame(
+    age = as.numeric(names(SEER_baseline$cumulative_risk$female)),
+    cum_prob = SEER_baseline$cumulative_risk$female / max(SEER_baseline$cumulative_risk$female)
   )
   midpoint_prob_male <- SEER_baseline$lifetime_risk$male / 2
   midpoint_prob_female <- SEER_baseline$lifetime_risk$female / 2
@@ -194,17 +206,17 @@ mhChain_v7.2 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
     alpha_male <-  weibull_params_male$alpha
     beta_male <- weibull_params_male$beta
     delta_male <- params_current$threshold_male
-    gamma_male <- params_current$asymptote_male
     
     weibull_params_female <- calculate_weibull_parameters(params_current$median_female, params_current$first_quartile_female, params_current$threshold_female)
     alpha_female <- weibull_params_female$alpha
     beta_female <- weibull_params_female$beta
     delta_female <- params_current$threshold_female
-    gamma_female <- params_current$asymptote_female
     
-    data <- imputeAges(data, na_indices, age_density, alpha_male, beta_male, delta_male, gamma_male,
-                       alpha_female, beta_female, delta_female, gamma_female)
-    
+    # Impute ages 
+    if (ageImputation) {
+    data <- imputeAges(data, na_indices, SEER_male, SEER_female, alpha_male, beta_male, delta_male,
+                       alpha_female, beta_female, delta_female)
+    }
     
     params_vector <- c(
       params_current$asymptote_male, params_current$asymptote_female,
@@ -411,7 +423,6 @@ mhChain_v7.2 <- function(seed, n_iter, burn_in, chain_id, data, max_age, db,
 #' @return A list containing combined results from all chains, along with optional
 #' statistics and plots.
 #' @importFrom stats rbeta runif
-#' @importFrom parallel makeCluster stopCluster parLapply
 #' @examples
 #' # Example usage:
 #' result <- PenEstim(
@@ -429,6 +440,7 @@ PenEstim_v7.2 <- function(data, cancer_type, gene_input, n_chains = 1,
                           sex = "NA",
                           max_age = 94,
                           removeProband = FALSE,
+                          ageImputation = FALSE,
                           median_max = TRUE,
                           homozygote = TRUE,
                           SeerNC = TRUE,
@@ -468,11 +480,11 @@ PenEstim_v7.2 <- function(data, cancer_type, gene_input, n_chains = 1,
     stop("Error: 'n_chains' exceeds the number of available CPU cores.")
   }
   
-  # create the seeds for the individual chains
+  # Create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
   
   # Apply the prepAges function to treat missing data
-  data <- prepAges(data, removeProband)
+  data <- prepAges(data)
   
   # Apply the transformation to adjust the format for the clipp package
   data <- do.call(rbind, lapply(data, transformDF,
@@ -480,7 +492,11 @@ PenEstim_v7.2 <- function(data, cancer_type, gene_input, n_chains = 1,
                                 gene = gene_input
   ))
   
-  #  Create the prior distributions
+  if (removeProband) {
+    data <- data[data$isProband != 1, ]
+  }
+  
+  # Create the prior distributions
   prop <- makePriors(
     data = distribution_data,
     sample_size = sample_size,
@@ -489,6 +505,7 @@ PenEstim_v7.2 <- function(data, cancer_type, gene_input, n_chains = 1,
     prior_params = prior_params,
     risk_proportion = risk_proportion
   )
+  
   cores <- parallel::detectCores()
   
   if (n_chains > cores) {
@@ -509,8 +526,8 @@ PenEstim_v7.2 <- function(data, cancer_type, gene_input, n_chains = 1,
   parallel::clusterExport(cl, c(
     "mhChain_v7.2", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
-    "transformDF", "makePriors", "lik.fn", "mvrnorm", "priors", "var", "imputeAges", "imputeAgesInit",
-    "seeds", "n_iter_per_chain", "sex", "burn_in", "calculateEmpiricalDensity",
+    "transformDF", "makePriors", "lik.fn", "mvrnorm", "priors", "var", "calculateEmpiricalDensity",
+    "seeds", "n_iter_per_chain", "sex", "burn_in", "imputeAges", "imputeAgesInit", "draw_age_from_seer",
     "data", "prop", "af", "max_age", "homozygote", "SeerNC", "median_max",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
     "GENE_TYPES", "CANCER_NAME_MAP"
@@ -533,11 +550,10 @@ PenEstim_v7.2 <- function(data, cancer_type, gene_input, n_chains = 1,
                  median_max = median_max,
                  homozygote = homozygote,
                  SeerNC = SeerNC,
-                 var = var
+                 var = var,
+                 ageImputation = ageImputation
     )
   })
-  
-  parallel::stopCluster(cl)
   
   # Check rejection rates and issue a warning if they are all above 90%
   all_high_rejections <- all(sapply(results, function(x) x$rejection_rate > 0.9))

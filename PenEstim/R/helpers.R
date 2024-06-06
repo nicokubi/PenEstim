@@ -131,7 +131,7 @@ validate_weibull_parameters <-
 #' data <- list(df1, df2) # df1, df2 are data frames with appropriate columns
 #' result <- prepAges(data)
 #'
-prepAges <- function(data, removeProband = FALSE) {
+prepAges <- function(data) {
     # Define the list of genes
     genes <- c(
         "APC", "ATM", "BARD1", "BMPR1A", "BRCA1", "BRCA2", "BRIP1", "CDH1", "CDK4",
@@ -146,26 +146,6 @@ prepAges <- function(data, removeProband = FALSE) {
     )
 
     for (i in seq_along(data)) {
-        # If removeProband is TRUE, set genes, ages, and affections to NA for probands
-        if (removeProband) {
-            proband_rows <- data[[i]]$Proband == 1
-            for (gene in genes) {
-                if (gene %in% colnames(data[[i]])) {
-                    data[[i]][proband_rows, gene] <- NA
-                }
-            }
-            for (cancer in cancer_types) {
-                age_col <- paste0("Age", cancer)
-                aff_col <- paste0("isAff", cancer)
-                if (age_col %in% colnames(data[[i]])) {
-                    data[[i]][proband_rows, age_col] <- NA
-                }
-                if (aff_col %in% colnames(data[[i]])) {
-                    data[[i]][proband_rows, aff_col] <- NA
-                }
-            }
-        }
-
         for (cancer in cancer_types) {
             age_col <- paste0("Age", cancer)
             aff_col <- paste0("isAff", cancer)
@@ -193,16 +173,18 @@ prepAges <- function(data, removeProband = FALSE) {
 
 #' Transform Data Frame
 #'
-#' This function transforms a data frame from the standard format we have in Panelpro
-#' into the required format which conforms to the requirements of PenEstim (and clipp)
+#' This function transforms a data frame from the standard format used in PanelPRO
+#' into the required format which conforms to the requirements of PenEstim (and clipp).
 #'
 #' @param df The input data frame in the usual PanelPRO format.
+#' @param cancer_type The specific type of cancer to transform data for.
+#' @param gene_input The column name in the data frame representing gene information.
 #'
 #' @return The transformed data frame in the format required for clipp.
 #'
 #' @examples
 #' # Transform a data frame
-#' transformed_df <- transformDF(input_df)
+#' transformed_df <- transformDF(input_df, "Breast Cancer", "BRCA1")
 transformDF <- function(df, cancer_type, gene_input) {
   # Check if the cancer type is valid
   if (!cancer_type %in% CANCER_NAME_MAP$long) {
@@ -218,7 +200,8 @@ transformDF <- function(df, cancer_type, gene_input) {
   age_col_name <- paste0("Age", cancer_type_short)
   
   # Rename and transform columns
-  df$individual <- df$SubjectID
+  df$individual <- df$ID
+  df$isProband <- df$isProband
   df$family <- df$PedigreeID
   df$mother <- df$MotherID
   df$father <- df$FatherID
@@ -241,64 +224,88 @@ transformDF <- function(df, cancer_type, gene_input) {
   df$geno <- ifelse(is.na(df$geno), "", ifelse(df$geno == 1, "1/2", ifelse(df$geno == 0, "1/1", df$geno)))
   
   # Select only the necessary columns
-  df <- df[c("individual", "family", "mother", "father", "aff", "sex", "age", "geno")]
+  df <- df[c("individual", "isProband", "family", "mother", "father", "aff", "sex", "age", "geno")]
   
   return(df)
 }
 
 
-# Function to calculate empirical density for non-affected individuals
-calculateEmpiricalDensity <- function(data, aff_column = "aff", age_column = "age", n_points = 10000) {
-  # Filter the data to include only non-affected individuals (aff == 0)
-  non_affected_data <- subset(data, data[[aff_column]] == 0)
-  
-  # Remove NA values from the age column of the filtered data
-  cleaned_non_affected_ages <- na.omit(non_affected_data[[age_column]])
-  
-  # Estimate the empirical density of the age data
-  age_density <- density(cleaned_non_affected_ages, n = n_points)
-  
-  return(age_density)
+#' Inverse CDF Function to Draw Ages
+#'
+#' This function draws an age based on the inverse cumulative distribution function (CDF)
+#' using the provided SEER data.
+#'
+#' @param seer_data A data frame containing SEER age and cumulative probability data.
+#'
+#' @return A drawn age based on the SEER data.
+#'
+#' @examples
+#' # Draw an age from SEER data
+#' age <- draw_age_from_seer(seer_data)
+draw_age_from_seer <- function(seer_data) {
+  u <- runif(1)
+  age <- approx(seer_data$cum_prob, seer_data$age, xout = u)$y
+  return(age)
 }
 
-# Function to initialize ages using uniform distribution
-imputeAgesInit <- function(data, threshold, max_age) {
-  na_indices <- which(is.na(data$age))
-  data$age[na_indices] <- runif(length(na_indices), threshold, max_age)
-  return(list(data = data, na_indices = na_indices))
-}
 
-# Function to initialize ages using uniform distribution
-imputeAgesInit <- function(data, threshold, max_age) {
-  na_indices <- which(is.na(data$age))
-  data$age[na_indices] <- runif(length(na_indices), threshold, max_age)
-  return(list(data = data, na_indices = na_indices))
-}
-
-# Function to impute ages using Weibull distribution for aff = 1 and empirical distribution for aff = 0
-imputeAges <- function(data, na_indices, age_density, alpha_male, beta_male, delta_male, gamma_male,
+#' Impute Ages
+#'
+#' This function imputes ages for individuals in the data based on their affection status.
+#' For affected individuals, ages are drawn using a Weibull distribution. For unaffected individuals,
+#' ages are drawn from SEER data distributions.
+#'
+#' @param data The data frame containing individual information.
+#' @param na_indices A vector of indices where age needs to be imputed.
+#' @param SEER_male SEER data for males.
+#' @param SEER_female SEER data for females.
+#' @param allele_freq The frequency of the allele.
+#' @param alpha_male The alpha parameter for the Weibull distribution for males.
+#' @param beta_male The beta parameter for the Weibull distribution for males.
+#' @param delta_male The delta parameter for the Weibull distribution for males.
+#' @param gamma_male The gamma parameter for the Weibull distribution for males.
+#' @param alpha_female The alpha parameter for the Weibull distribution for females.
+#' @param beta_female The beta parameter for the Weibull distribution for females.
+#' @param delta_female The delta parameter for the Weibull distribution for females.
+#' @param gamma_female The gamma parameter for the Weibull distribution for females.
+#'
+#' @return The data frame with imputed ages.
+#'
+#' @examples
+#' # Impute ages for a data frame
+#' data <- imputeAges(data, na_indices, SEER_male, SEER_female, 0.01, 1.2, 2.3, 1.1, 0.9, 1.5, 2.0, 1.3, 1.0)
+imputeAges <- function(data, na_indices, SEER_male, SEER_female, allele_freq, alpha_male, beta_male, delta_male, gamma_male,
                        alpha_female, beta_female, delta_female, gamma_female) {
+  
+  carrier_prob <- allele_freq / (1 + allele_freq)  # Simplified calculation for demonstration
+  
   for (i in na_indices) {
     u <- runif(1)
     if (data$aff[i] == 1) {
-      # Use Weibull distribution
-      if (data$sex[i] == 1) {  # Assuming 1 is male and 2 is female
-        if (u < gamma_male) {
-          age <- delta_male + beta_male * (-log(1 - u / gamma_male))^(1 / alpha_male)
-        } else {
-          age <- delta_male + beta_male * (-log(1 - (gamma_male - 1e-10) / gamma_male))^(1 / alpha_male)
+      is_carrier <- runif(1) < carrier_prob
+      if (is_carrier) {
+        # Carrier: Use Weibull distribution
+        if (data$sex[i] == 1) {  # 1 is male and 2 is female
+          age <- delta_male + beta_male * (-log(1 - u))^(1 / alpha_male)
+        } else if (data$sex[i] == 2) {
+          age <- delta_female + beta_female * (-log(1 - u))^(1 / alpha_female)
         }
-      } else if (data$sex[i] == 2) {
-        if (u < gamma_female) {
-          age <- delta_female + beta_female * (-log(1 - u / gamma_female))^(1 / alpha_female)
-        } else {
-          age <- delta_female + beta_female * (-log(1 - (gamma_female - 1e-10) / gamma_female))^(1 / alpha_female)
+      } else {
+        # Non-carrier: Use SEER distribution
+        if (data$sex[i] == 1) {
+          age <- draw_age_from_seer(SEER_male)
+        } else if (data$sex[i] == 2) {
+          age <- draw_age_from_seer(SEER_female)
         }
       }
       data$age[i] <- max(1, round(age))
     } else {
-      # Sample from the empirical distribution for aff = 0
-      age <- sample(age_density$x, size = 1, replace = TRUE, prob = age_density$y)
+      # Unaffected: Use SEER distribution
+      if (data$sex[i] == 1) {
+        age <- draw_age_from_seer(SEER_male)
+      } else if (data$sex[i] == 2) {
+        age <- draw_age_from_seer(SEER_female)
+      }
       data$age[i] <- max(1, round(age))
     }
   }
@@ -306,3 +313,23 @@ imputeAges <- function(data, na_indices, age_density, alpha_male, beta_male, del
 }
 
 
+#' Initialize Ages Using Uniform Distribution
+#'
+#' This function initializes ages using a uniform distribution within a given range.
+#'
+#' @param data The data frame containing individual information.
+#' @param threshold The lower bound of the uniform distribution.
+#' @param max_age The upper bound of the uniform distribution.
+#'
+#' @return A list containing the updated data frame and the indices of imputed ages.
+#'
+#' @examples
+#' # Initialize ages for a data frame
+#' result <- imputeAgesInit(data, 18, 100)
+#' data <- result$data
+#' na_indices <- result$na_indices
+imputeAgesInit <- function(data, threshold, max_age) {
+  na_indices <- which(is.na(data$age))
+  data$age[na_indices] <- runif(length(na_indices), threshold, max_age)
+  return(list(data = data, na_indices = na_indices))
+}
