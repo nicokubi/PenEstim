@@ -48,6 +48,7 @@ distribution_data_default <- data.frame(
 )
 
 #  Function to create the prior distributions
+# Function to create the prior distributions
 makePriors <- function(
     data,
     sample_size,
@@ -89,21 +90,11 @@ makePriors <- function(
     beta <- at_risk - alpha
     return(list(g1 = alpha, g2 = beta))
   }
-  
-  compute_parameters_asymptote <- function(stat, at_risk) {
-  max_age_norm <- normalize_median(stat)
-  alpha <- max_age_norm * at_risk
-  beta <- alpha
-  return(list(g1 = alpha, g2 = beta))
-  }
 
   # Main logic for setting the parameters of the prior distribution
-  # Setting 1: When there is no user input in the data_distribution, then the default parameter settings are applied.
-  # Setting 2: If the user has modified the prior_params_default object, the customized parameter settings will be applied.
   if (is.null(data) || all(is.na(data))) {
     prior_params <- prior_params
   } else {
-    # Setting 3: Extracting the user inputs from the data_distribution_default dataframe for the prior elicitation.
     # Check if all age entries are present
     if (any(is.na(data$age)) || any(!sapply(data$age, is.numeric))) {
       stop("Missing or non-numeric age entries in the data. Add numeric ages.")
@@ -169,12 +160,13 @@ makePriors <- function(
     qbeta(runif(n), prior_params$first_quartile$q1, prior_params$first_quartile$q2)
   }
 
-  # Create a list with the distributions
+  # Create a list with the distributions and parameters
   prior_distributions <- list(
     asymptote_distribution = asymptote_distribution,
     threshold_distribution = threshold_distribution,
     median_distribution = median_distribution,
-    first_quartile_distribution = first_quartile_distribution
+    first_quartile_distribution = first_quartile_distribution,
+    prior_params = prior_params
   )
 
   # Return the prior_distributions list
