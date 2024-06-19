@@ -1,0 +1,261 @@
+library(PPP)
+library(tidyverse)
+library(parallel)
+
+set.seed(23)
+
+MH_LogLikelihood <- function(paras, data, PanelPRODatabase) {
+
+  # set age, same as in DB
+  age <- seq(1, 94, 1)
+
+  # use same BRCA1 frequency (not estimated)
+  BRCA1freq <- 0.9
+  PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",1]] <- BRCA1freq
+  PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",2]] <- BRCA1freq
+  PanelPRODatabase$AlleleFrequency[["BRCA1_anyPV",3]] <- BRCA1freq
+
+  # Parameters, drawn from prior/proposal
+  given_median <- paras[1]
+  given_first_quartile <- paras[2]
+  gamma <- paras[3]
+  delta <- paras[4]
+
+  calculate_weibull_parameters <- function(given_median, given_first_quartile, delta) {
+    # Calculate alpha
+    alpha <- log(-log((gamma-0.25)/gamma) / -log((gamma-0.5)/gamma)) /
+      log((given_first_quartile - delta) / (given_median - delta))
+
+    # Calculate beta using the median (M)
+    beta <- (given_median - delta) / (log(2)^(1 / alpha))
+
+    return(list(alpha = alpha, beta = beta))
+  }
+
+  params <- calculate_weibull_parameters(given_median, given_first_quartile, delta)
+  alpha <- params$alpha
+  beta <- params$beta
+
+  # Now use alpha and beta in your simulation
+  penetrance.mod.f <- dweibull(age - delta, alpha, beta) * gamma
+
+  # For now focus on just one vector of penetrance estimates
+  gene <- "BRCA1_hetero_anyPV"
+  cancer <- "Breast"
+  race <- "All_Races"
+  female <- "Female"
+  male <- "Male"
+  type <- "Net"
+
+  # Find the indices for the resp. attributes
+  dim_names <- attr(PanelPRODatabase$Penetrance, "dimnames")
+  gene_index <- which(dim_names$Gene == gene)
+  cancer_index <- which(dim_names$Cancer == cancer)
+  race_index <- which(dim_names$Race == race)
+  sex_index <- which(dim_names$Sex == female)
+  type_index <- which(dim_names$PenetType == type)
+
+
+  # overwrite the penetrance in the PanelPro Database
+  PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, ,] <- penetrance.mod.f
+
+  # Male Penetrance
+  sex_index <- which(dim_names$Sex == male)
+
+  # Male penetrance funciton
+  penetrance.mod.m <- 0
+  # overwrite the penetrance in the PanelPro Database
+  PanelPRODatabase$Penetrance[cancer_index, gene_index, race_index, sex_index, ,] <- penetrance.mod.m
+
+  # Storing the estimates
+  log_likelihood <- 0
+
+  for (i in 1:length(families)) {
+    data <- families[[i]]  # Get the data for the current family
+
+    # Access the posterior probabilities (not normalized) and estimates for BRCA1 gene in Breast cancer
+    postprobs <- PPP(data, genes = c("BRCA1"), cancers = "Breast", database= PanelPRODatabase)$posterior.prob[[1]]  # check bug
+    estimate <- postprobs[postprobs$genes=="BRCA1_hetero_anyPV","estimate"]
+
+    if (is.nan(estimate) || estimate <=0) {
+      # Handle NaN or zero probabilities by adding a small value and/or penalizing
+      estimate <- 1e-28
+      ll <- log(estimate)
+      log_likelihood <- log_likelihood + ll
+      cat("NaN or zero encountered:", alpha, beta, gamma, delta, ll, log_likelihood, estimate, "\n")
+    } else {
+      ll <- log(estimate)
+      log_likelihood <- log_likelihood + ll
+      cat(given_median, given_first_quartile, alpha, beta, gamma, delta, ll, log_likelihood, estimate, "\n")
+    }
+  }
+
+  # return the log-likelihood
+  return(log_likelihood)
+}
+
+
+MH_Chain <- function(seed, n_iter, chain_id, data, PanelPRODatabase,save_interval) {
+  set.seed(seed)
+
+  # Define prior values
+  # Beta parameters to be chosen based on previous studies
+  m1 <- 2
+  m2 <- 2
+  max.age <- 94
+
+  # Shift Prior
+  shift_prior_min <- 0
+  shift_prior_max <- 25
+  s1 <- 50
+  s2 <- 5
+
+  # First Quartile Prior
+  p0 <- 0.15 # Lifetime risk for SEER
+  q1 <- 6
+  q2 <- 3
+
+  # Asymptote prior (parameters for beta)
+  g1 <- 9
+  g2 <- 1
+
+  # Initialize parameters
+  median_current <- 60
+  asymptote_current <- .8
+  shift_current <- 25
+  first_quartile_current <- 55
+
+  median_samples <- numeric(n_iter)
+  first_quartile_samples <- numeric(n_iter)
+  asymptote_samples <- numeric(n_iter)
+  shift_samples <- numeric(n_iter)
+
+  num_rejections <- 0
+
+  cat("Starting Chain", chain_id, "\n")
+
+  for (i in 1:n_iter) {
+    # Propose new values using the prior distributions
+    # generate aysmptote parameter (gamma)
+    asymptote_proposal <- rbeta(1,g1,g2)
+    asymptote_proposal <- p0 + asymptote_proposal *(1-p0)
+
+    # generate shift parameter (delta)
+    shift_proposal <- runif(1,shift_prior_min,shift_prior_max)
+
+    # generate median
+    median_proposal <- rbeta(1,m1,m2)
+    median_proposal <- (median_proposal)*(max.age-shift_proposal) + shift_proposal
+
+    # generate first quartile
+    first_quartile_proposal <- rbeta(1,q1,q2)
+    first_quartile_proposal <- (first_quartile_proposal)*(median_proposal-shift_proposal) + shift_proposal
+
+    # Compute the likelihood for the current and proposed
+    loglikelihood_current <- MH_LogLikelihood(paras = c(median_current,first_quartile_current,asymptote_current,
+                                                        shift_current), families = data,PanelPRODatabase = PanelPRODatabase)
+    loglikelihood_proposal <- MH_LogLikelihood(paras = c(median_proposal,first_quartile_proposal,
+                                                         asymptote_proposal,shift_proposal),
+                                               families = data,PanelPRODatabase = PanelPRODatabase)
+
+    # Compute the acceptance ratio (likelihood ratio)
+    acceptance_ratio <- exp(loglikelihood_proposal - loglikelihood_current)
+
+    # Accept or reject the proposal
+    if (runif(1) < acceptance_ratio) {
+      median_current <- median_proposal
+      shift_current <- shift_proposal
+      first_quartile_current <- first_quartile_proposal
+      asymptote_current <- asymptote_proposal
+    } else {
+      num_rejections <- num_rejections + 1  # Increment the rejection counter
+    }
+
+    # Store the samples
+    median_samples[i] <- median_current
+    shift_samples[i] <- shift_current
+    first_quartile_samples[i] <- first_quartile_current
+    asymptote_samples[i] <- asymptote_current
+
+    if (i %% save_interval == 0) {
+      save_file_name <- paste0("MH_chain_state_", chain_id, "_iter_", i, ".RDS")
+      save_state <- list(median_samples = median_samples[1:i],
+                         shift_samples = shift_samples[1:i],
+                         first_quartile_samples = first_quartile_samples[1:i],
+                         asymptote_samples = asymptote_samples[1:i])
+      saveRDS(save_state, save_file_name)
+      cat("Saved state at iteration", i, "\n")
+    }
+
+  }
+    # Return the result as a list
+    list(median_samples = median_samples,
+         shift_samples = shift_samples,
+         first_quartile_samples = first_quartile_samples,
+         asymptote_samples = asymptote_samples,
+         rejection_rate = num_rejections / n_iter)
+}
+
+# Multiple Chains
+n_chains <- 2
+seeds <- sample.int(1000, n_chains)  # Generate 4 random seeds
+n_iter_per_chain <- 1  # Number of iterations per chain
+
+
+# Create a deep copy of PanelPRODatabase for each thread, if required
+
+
+  # Create a cluster with 4 worker nodes
+  cl <- makeCluster(n_chains)
+
+  # Load necessary libraries on each worker node
+  clusterEvalQ(cl, {
+    library(PPP)
+    PanelPRODatabase
+  })
+
+  save_interval <- 600
+
+
+  # Export required variables and functions to each worker node
+  clusterExport(cl, c("MH_Chain", "MH_LogLikelihood", "seeds", "n_iter_per_chain",
+                      "simFamilies_C_1000_nocen", "save_interval"))
+
+  # Run your parallel code
+  results17 <- parLapply(cl, 1:n_chains, function(i) {
+    MH_Chain(seeds[i], n_iter = n_iter_per_chain, chain_id = i,
+             data = simFamilies_C_1000_nocen,
+             PanelPRODatabase = PanelPRODatabase,
+             save_interval = save_interval)
+  })
+
+  # Stop the cluster
+  stopCluster(cl)
+  saveRDS(results17, "results17.RDS")
+
+  # Generate trace plots for each chain
+  plot_trace(results17, 4)
+
+  # Extract and summarize the data
+  extracted_data <- extract_samples(results17)
+  summary_stats <- generate_summary(extracted_data)
+  print(summary_stats)
+  # Print rejection rates
+  rejection_rates <- sapply(results17, function(x) x$rejection_rate)
+  cat("Rejection rates: ", rejection_rates, "\n")
+
+  # Generate density plots
+  generate_density_plots(extracted_data)
+
+  # Burn-in process
+  burn_in <- 0.10
+  burned_in_data <- lapply(extracted_data, function(samples) {
+    do.call(c, lapply(samples, function(x) burn_in_chain(x, burn_in)))
+  })
+
+  # Generate burned-in density plots
+  generate_density_plots(burned_in_data, " (Burned-in)")
+
+
+
+

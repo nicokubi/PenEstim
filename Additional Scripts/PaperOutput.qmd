@@ -1,0 +1,295 @@
+---
+title: "PenEstim"
+subtitle: "Paper Output Figures"
+format: 
+  html:
+    toc: true
+    toc-location: body
+date: 5-24-2024
+theme: lightly
+author:
+  - name: "Nicolas Kubista"
+    affiliations: "Harvard University"
+embed-resources: true
+toc: true
+toc-expand: 2
+toc-title: Contents
+page-layout: full
+code-fold: true
+editor: visual
+---
+
+# Piors 
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(GGally)
+
+# Function to calculate Weibull parameters
+calculate_weibull_parameters <- function(given_median, given_first_quartile, delta) {
+  # Calculate alpha
+  alpha <- log(-log(0.5) / -log(0.75)) / log((given_median - delta) / (given_first_quartile - delta))
+  
+  # Calculate beta using the median (M)
+  beta <- (given_median - delta) / (-log(0.5))^(1 / alpha)
+  
+  return(list(alpha = alpha, beta = beta))
+}
+
+# Function to draw samples from prior distributions
+draw_samples <- function(n, prior_params, max_age) {
+  # Draw samples from the asymptote (beta distribution) and scale by 100
+  asymptote_samples <- rbeta(n, prior_params$asymptote$g1, prior_params$asymptote$g2) 
+  
+  # Draw samples from the threshold (uniform distribution)
+  threshold_samples <- runif(n, prior_params$threshold$min, prior_params$threshold$max)
+  
+  # Draw samples from the median (beta distribution)
+  median_samples <- rbeta(n, prior_params$median$m1, prior_params$median$m2)
+  
+  # Draw samples from the first quartile (beta distribution)
+  first_quartile_samples <- rbeta(n, prior_params$first_quartile$q1, prior_params$first_quartile$q2)
+  
+  # Scale median and first quartile
+  scaled_median_samples <- (median_samples * (max_age - threshold_samples)) + threshold_samples
+  scaled_first_quartile_samples <- (first_quartile_samples * (scaled_median_samples - threshold_samples)) + threshold_samples
+  
+  # Calculate Weibull parameters for each sample
+  weibull_params <- mapply(calculate_weibull_parameters, 
+                           given_median = scaled_median_samples, 
+                           given_first_quartile = scaled_first_quartile_samples, 
+                           delta = threshold_samples, 
+                           SIMPLIFY = FALSE)
+  
+  # Extract alpha and beta from Weibull parameters
+  alpha_samples <- sapply(weibull_params, function(x) x$alpha)
+  beta_samples <- sapply(weibull_params, function(x) x$beta)
+  
+  # Create a data frame with all samples
+  samples_df <- data.frame(asymptote = asymptote_samples, 
+                           threshold = threshold_samples, 
+                           median = scaled_median_samples, 
+                           first_quartile = scaled_first_quartile_samples, 
+                           alpha = alpha_samples, 
+                           beta = beta_samples)
+  
+  return(samples_df)
+}
+
+# Default prior parameters
+prior_params_default <- list(
+  asymptote = list(g1 = 1, g2 = 1),
+  threshold = list(min = 15, max = 25),
+  median = list(m1 = 2, m2 = 2),
+  first_quartile = list(q1 = 6, q2 = 3)
+)
+
+# Number of samples
+n <- 1000
+max_age <- 94
+
+# Draw samples
+samples_df <- draw_samples(n, prior_params_default, max_age)
+
+# Create pair plots
+pairs_plot <- ggpairs(samples_df, 
+                      columns = c("alpha", "beta", "threshold", "asymptote", "median", "first_quartile"),
+                      title = "Pair Plot of Parameters",
+                      lower = list(continuous = wrap("points", size = 0.25)))
+
+
+# Display the plot
+print(pairs_plot)
+
+
+```
+````{r}
+library(GGally)
+library(ggplot2)
+
+# Function to calculate Weibull parameters
+calculate_weibull_parameters <- function(given_median, given_first_quartile, delta) {
+  # Calculate alpha
+  alpha <- log(-log(0.5) / -log(0.75)) / log((given_median - delta) / (given_first_quartile - delta))
+  
+  # Calculate beta using the median (M)
+  beta <- (given_median - delta) / (-log(0.5))^(1 / alpha)
+  
+  return(list(alpha = alpha, beta = beta))
+}
+
+# Function to create pair plots from MCMC chain results for males
+plot_mcmc_results_male <- function(mcmc_results) {
+  # Calculate Weibull parameters for each sample in the MCMC chain
+  weibull_params <- mapply(calculate_weibull_parameters, 
+                           given_median = mcmc_results$median_male_results, 
+                           given_first_quartile = mcmc_results$first_quartile_male_results, 
+                           delta = mcmc_results$threshold_male_results, 
+                           SIMPLIFY = FALSE)
+  
+  alpha_male <- sapply(weibull_params, function(x) x$alpha)
+  beta_male <- sapply(weibull_params, function(x) x$beta)
+  
+  # Create a data frame with the MCMC chain results and calculated Weibull parameters for males
+  mcmc_df_male <- data.frame(
+    asymptote_male = mcmc_results$asymptote_male_results, 
+    threshold_male = mcmc_results$threshold_male_results, 
+    median_male = mcmc_results$median_male_results, 
+    first_quartile_male = mcmc_results$first_quartile_male_results,
+    alpha_male = alpha_male,
+    beta_male = beta_male
+  )
+  
+  # Create pair plots with smaller dot sizes for males
+  pairs_plot_male <- ggpairs(mcmc_df_male, 
+                             columns = c("alpha_male", "beta_male", "threshold_male", "asymptote_male", "median_male", "first_quartile_male"),
+                             title = "Pair Plot of MCMC Results (Male)",
+                             lower = list(continuous = wrap("points", size = 0.5)))
+                             
+  
+  # Display the plot
+  print(pairs_plot_male)
+}
+
+# Function to create pair plots from MCMC chain results for females
+plot_mcmc_results_female <- function(mcmc_results) {
+  # Calculate Weibull parameters for each sample in the MCMC chain
+  weibull_params <- mapply(calculate_weibull_parameters, 
+                           given_median = mcmc_results$median_female_results, 
+                           given_first_quartile = mcmc_results$first_quartile_female_results, 
+                           delta = mcmc_results$threshold_female_results, 
+                           SIMPLIFY = FALSE)
+  
+  alpha_female <- sapply(weibull_params, function(x) x$alpha)
+  beta_female <- sapply(weibull_params, function(x) x$beta)
+  
+  # Create a data frame with the MCMC chain results and calculated Weibull parameters for females
+  mcmc_df_female <- data.frame(
+    asymptote_female = mcmc_results$asymptote_female_results, 
+    threshold_female = mcmc_results$threshold_female_results, 
+    median_female = mcmc_results$median_female_results, 
+    first_quartile_female = mcmc_results$first_quartile_female_results,
+    alpha_female = alpha_female,
+    beta_female = beta_female
+  )
+  
+  # Create pair plots with smaller dot sizes for females
+  pairs_plot_female <- ggpairs(mcmc_df_female, 
+                               columns = c("alpha_female", "beta_female", "threshold_female", "asymptote_female", "median_female", "first_quartile_female"),
+                               title = "Pair Plot of MCMC Results (Female)",
+                               lower = list(continuous = wrap("points", size = 0.5)))
+                               
+  
+  # Display the plot
+  print(pairs_plot_female)
+}
+
+# Example usage
+# Assuming out_sim_COL_v2$combined_chains contains the MCMC results as described
+plot_mcmc_results_male(out_sim_COL_v4.1$combined_chains)
+plot_mcmc_results_female(out_sim_COL_v2$combined_chains)
+
+length(out_sim_COL_v2$combined_chains$asymptote_male_results)
+
+
+````
+
+
+```{r}
+
+
+# Function to calculate penetrance with confidence intervals
+calculate_penetrance <- function(data, ages = c(35, 50, 70), sex = "NA") {
+  params_male <- calculate_weibull_parameters(
+    data$median_male_results,
+    data$first_quartile_male_results,
+    data$threshold_male_results
+  )
+
+  params_female <- calculate_weibull_parameters(
+    data$median_female_results,
+    data$first_quartile_female_results,
+    data$threshold_female_results
+  )
+
+  alphas_male <- params_male$alpha
+  betas_male <- params_male$beta
+  thresholds_male <- data$threshold_male_results
+  alphas_female <- params_female$alpha
+  betas_female <- params_female$beta
+  thresholds_female <- data$threshold_female_results
+
+  asymptotes_male <- data$asymptote_male_results
+  asymptotes_female <- data$asymptote_female_results
+
+  cumulative_prob <- function(alphas, betas, thresholds, asymptotes, age) {
+    probs <- mapply(function(alpha, beta, threshold, asymptote) {
+      pweibull(age - threshold, shape = alpha, scale = beta) * asymptote
+    }, alphas, betas, thresholds, asymptotes, SIMPLIFY = FALSE)
+    mean_prob <- mean(unlist(probs), na.rm = TRUE)
+    ci_lower <- quantile(unlist(probs), probs = 0.025, na.rm = TRUE)
+    ci_upper <- quantile(unlist(probs), probs = 0.975, na.rm = TRUE)
+    return(list(mean = mean_prob, lower = ci_lower, upper = ci_upper))
+  }
+
+  results <- list()
+
+  if (sex == "Male" || sex == "NA") {
+    results$Male <- sapply(ages, function(age) cumulative_prob(alphas_male, betas_male, thresholds_male, asymptotes_male, age))
+  }
+
+  if (sex == "Female" || sex == "NA") {
+    results$Female <- sapply(ages, function(age) cumulative_prob(alphas_female, betas_female, thresholds_female, asymptotes_female, age))
+  }
+
+  return(results)
+}
+
+# Example data
+data <- list(
+  median_male_results = c(60),
+  first_quartile_male_results = c(45),
+  threshold_male_results = c(30),
+  asymptote_male_results = c(0.9),
+  median_female_results = c(55),
+  first_quartile_female_results = c(40),
+  threshold_female_results = c(25),
+  asymptote_female_results = c(0.8)
+)
+
+# Calculate penetrance results
+penetrance_results <- calculate_penetrance(out_sim_COL_v9$combined_chains)
+
+# Format results for LaTeX
+ages <- c(35, 50, 70)
+results_male <- penetrance_results$Male
+results_female <- penetrance_results$Female
+
+print(results_female)
+print(results_male)
+
+cat("\\begin{table}[h]\n")
+cat("\\centering\n")
+cat("\\begin{tabular}{ccccccc}\n")
+cat("\\toprule\n")
+cat("Age & \\multicolumn{3}{c}{Male} & \\multicolumn{3}{c}{Female} \\\\\n")
+cat("& Probability & Lower CI & Upper CI & Probability & Lower CI & Upper CI \\\\\n")
+cat("\\midrule\n")
+for (i in 1:length(ages)) {
+  cat(ages[i], "&",
+      round(results_male[[i]]$mean * 100, 2), "&", 
+      round(results_male[[i]]$lower * 100, 2), "&", 
+      round(results_male[[i]]$upper * 100, 2), "&",
+      round(results_female[[i]]$mean * 100, 2), "&", 
+      round(results_female[[i]]$lower * 100, 2), "&", 
+      round(results_female[[i]]$upper * 100, 2), "\\\\\n")
+}
+cat("\\bottomrule\n")
+cat("\\end{tabular}\n")
+cat("\\caption{Cumulative probabilities of developing cancer by age for males and females with 95\\% confidence intervals}\n")
+cat("\\label{table:penetrance}\n")
+cat("\\end{table}\n")
+
+
+````

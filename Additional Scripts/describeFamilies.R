@@ -22,11 +22,13 @@ describeFamilies <- function(fams, cancer, gene) {
   curAgesMale <- c()
   curAgesFemale <- c()
   cancerAges <- c()
-  pbCancerAges <- c()
-  pbCurAges <- c()
+  pbCancerAgesMale <- c()
   pbCancerAgesFemale <- c()
+  pbCurAges <- c()
   affectedFemaleProbands <- 0
+  affectedMaleProbands <- 0
   geneFemaleProbands <- 0 
+  geneMaleProbands <- 0
   cancerAgesFemale <- c()
   cancerAgesMale <- c()
   total_individuals <- 0
@@ -62,8 +64,8 @@ describeFamilies <- function(fams, cancer, gene) {
     gene_individuals <- gene_individuals + nrow(ff)
     affected_individuals <- affected_individuals + nrow(fa)
     
-    cancerAge_female <- fa %>% filter(Sex == 0) %>% pull(!!sym(age_col_name))
-    cancerAge_male <- fa %>% filter(Sex == 1) %>% pull(!!sym(age_col_name))
+    cancerAge_female <- fa %>% filter(Sex == 0,isProband == 0) %>% pull(!!sym(age_col_name))
+    cancerAge_male <- fa %>% filter(Sex == 1, isProband == 0) %>% pull(!!sym(age_col_name))
     
     # Count NA values for cancer age
     na_cancerAge_male <- na_cancerAge_male + sum(is.na(cancerAge_male))
@@ -87,6 +89,7 @@ describeFamilies <- function(fams, cancer, gene) {
     
     pb <- fams[[i]] %>% filter(isProband == 1)
     pbfemale <- fams[[i]] %>% filter(isProband == 1, Sex == 0)
+    pbmale <- fams[[i]] %>% filter(isProband == 1, Sex == 1)
     
     if (nrow(pbfemale) > 0) {
       pbCancerAgesFemale <- c(pbCancerAgesFemale, pbfemale[[age_col_name]])
@@ -100,7 +103,18 @@ describeFamilies <- function(fams, cancer, gene) {
       }
     }
     
-    pbCancerAges <- c(pbCancerAges, pb[[age_col_name]])
+    if (nrow(pbmale) > 0) {
+      pbCancerAgesMale <- c(pbCancerAgesMale, pbmale[[age_col_name]])
+      if (any(pbmale[[aff_col_name]] == 1)) {
+        affectedMaleProbands <- affectedMaleProbands + 1
+      }
+      if (!is.na(pbmale[[gene]])) {
+        if (any(pbmale[[gene]] == 1)) {
+          geneMaleProbands <- geneMaleProbands + 1
+        }
+      }
+    }
+    
     pbCurAges <- c(pbCurAges, pb$CurAge)
     
     if (any(pb[[aff_col_name]] == 1)) {
@@ -131,15 +145,20 @@ describeFamilies <- function(fams, cancer, gene) {
   print(paste0("Number of families with more than 1 affected individual (", cancer, "): ", multipleAffectedFamilies))
   print(paste0("Number of families with affected probands (", cancer, "): ", affectedProbands))
   print(paste0("Number of families with affected female probands (", cancer, "): ", affectedFemaleProbands))
+  print(paste0("Number of families with affected male probands (", cancer, "): ", affectedMaleProbands))
   print(paste0("Number of families with relatives with PV (and not the proband) (", gene, "): ", geneFamilies))
   print(paste0("Number of probands with PV (", gene, "): ", geneProbands))
   print(paste0("Number of female probands with PV (", gene, "): ", geneFemaleProbands))
+  print(paste0("Number of male probands with PV (", gene, "): ", geneMaleProbands))
   print(paste0("Number of individuals with PV (", gene, "): ", gene_individuals))
-  
-  print("Summary of Cancer Age of (female) probands")
+  print("Summary of Cancer Age of females (excl. probands)")
+  print(summary(cancerAgesFemale))
+  print("Summary of Cancer Age of males (excl. probands)")
+  print(summary(cancerAgesMale))
+  print("Summary of Cancer Age of female probands")
   print(summary(pbCancerAgesFemale))
-  print("Summary of Cancer Age in affected (non-proband) individuals")
-  print(summary(pbCancerAges))
+  print("Summary of Cancer Age of male probands")
+  print(summary(pbCancerAgesMale))
   print(paste0("Number of individuals with NA Cancer Age (Male): ", na_cancerAge_male))
   print(paste0("Number of individuals with NA Cancer Age (Female): ", na_cancerAge_female))
   

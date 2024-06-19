@@ -1,8 +1,5 @@
+# Unexported internal parameters
 #' Currently supported cancer types
-#'
-#' A vector containing the names of currently supported cancer types.
-#'
-#' @keywords internal
 CANCER_TYPES <- c(
     "Brain", "Breast", "Colorectal", "Endometrial",
     "Gastric", "Kidney", "Leukemia", "Melanoma", "Ovarian",
@@ -12,26 +9,15 @@ CANCER_TYPES <- c(
 )
 
 #' Mapping of short and long cancer names
-#'
-#' A list mapping short cancer names to their corresponding long names.
-#'
-#' @keywords internal
-CANCER_NAME_MAP <- list(
-    short = c(
-        "BRA", "BC", "COL", "ENDO",
-        "GAS", "KID", "LEUK", "MELA", "OC",
-        "OST", "PANC", "PROS", "SI",
-        "STS", "THY", "UB",
-        "HEP", "CBC"
-    ),
-    long = CANCER_TYPES
-)
+CANCER_NAME_MAP <- list(short = c(
+    "BRA", "BC", "COL", "ENDO",
+    "GAS", "KID", "LEUK", "MELA", "OC",
+    "OST", "PANC", "PROS", "SI",
+    "STS", "THY", "UB",
+    "HEP", "CBC"
+), long = CANCER_TYPES)
 
 #' Currently supported gene types
-#'
-#' A vector containing the names of currently supported gene types.
-#'
-#' @keywords internal
 GENE_TYPES <- c(
     "ATM", "BARD1", "BRCA1", "BRCA2",
     "BRIP1", "CDH1", "CDK4", "CDKN2A", "CHEK2", "EPCAM",
@@ -40,10 +26,6 @@ GENE_TYPES <- c(
 )
 
 #' Mapping of genes to supported variants
-#'
-#' A list mapping gene names to their supported variant types.
-#'
-#' @keywords internal
 ALL_GENE_VARIANT_TYPES <- list(
     ATM = "ATM_hetero_anyPV",
     BARD1 = "BARD1_hetero_anyPV",

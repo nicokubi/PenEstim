@@ -37,23 +37,26 @@
 mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
                          prior_distributions, cancer_type, gene_input, af,
                          median_max, max_penetrance, SeerNC, var,
-                         ageImputation) {
-  
+                         ageImputation, removeProband) {
   # Set seed
   set.seed(seed)
+  # Calculate Empirical density
+  age_density <- calculateEmpiricalDensity(data, aff_column = "aff", age_column = "age")
   
   if (ageImputation) {
-    # Calculate the degree of relationship for each pedigree
     data <- calcPedDegree(data)
-    # Calculate Empirical density used for the age imputation
-    empirical_density <- calculateEmpiricalDensity(data, aff_column = "aff", age_column = "age")
     # Initialize ages
     threshold <- prior_distributions$prior_params$threshold$min
     init_result <- imputeAgesInit(data, threshold, max_age)
     data <- init_result$data
     na_indices <- init_result$na_indices
   }
-
+  
+  # Remove the proband after doing the age-imputation which needs the proband data
+  if (removeProband) {
+    data <- data[data$isProband != 1, ]
+  }
+  
   # Calculate SEER baseline and midpoint
   SEER_baseline <- calculate_lifetime_risk(
     cancer = cancer_type, gene = "SEER",
@@ -219,7 +222,7 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
     # Impute ages 
     if (ageImputation) {
     data <- imputeAges(data, na_indices, SEER_male, SEER_female, alpha_male, beta_male, delta_male,
-                       alpha_female, beta_female, delta_female, empirical_density)
+                       alpha_female, beta_female, delta_female)
     }
     
     params_vector <- c(
@@ -402,7 +405,7 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 1,
                           burn_in = 0,
                           thinning_factor = 1,
                           distribution_data = distribution_data_default,
-                          af = 0.001,
+                          af = PPP::PanelPRODatabase$AlleleFrequency[paste0(gene_input, "_anyPV"), "nonAJ"],
                           max_penetrance = 1,
                           sample_size = NULL,
                           ratio = NULL,
@@ -445,10 +448,6 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 1,
                                 gene = gene_input
   ))
   
-  if (removeProband) {
-    data <- data[data$isProband != 1, ]
-  }
-  
   # Create the prior distributions
   prop <- makePriors(
     data = distribution_data,
@@ -474,14 +473,15 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 1,
     library(MASS)
     library(dplyr)
     library(parallel)
+    library(kinship2)
   })
   
   parallel::clusterExport(cl, c(
-    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
+    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen", "calcPedDegree",
     "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
     "transformDF", "makePriors", "lik.fn", "mvrnorm", "var", "calculateEmpiricalDensity",
-    "seeds", "n_iter_per_chain", "sex", "burn_in", "imputeAges", "imputeAgesInit", "draw_age_from_seer",
-    "data", "prop", "af", "max_age", "SeerNC", "median_max", "ncores",
+    "seeds", "n_iter_per_chain", "sex", "burn_in", "imputeAges", "imputeAgesInit", "drawSeer",  
+    "data", "prop", "af", "max_age", "SeerNC", "median_max", "ncores","removeProband",
     "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
     "GENE_TYPES", "CANCER_NAME_MAP"
   ), envir = environment())
@@ -503,7 +503,8 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 1,
                  median_max = median_max,
                  SeerNC = SeerNC,
                  var = var,
-                 ageImputation = ageImputation
+                 ageImputation = ageImputation,
+                 removeProband = removeProband
     )
   })
   
