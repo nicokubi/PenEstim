@@ -177,54 +177,34 @@ prepAges <- function(data) {
 #' into the required format which conforms to the requirements of PenEstim (and clipp).
 #'
 #' @param df The input data frame in the usual PanelPRO format.
-#' @param cancer_type The specific type of cancer to transform data for.
-#' @param gene_input The column name in the data frame representing gene information.
 #'
 #' @return The transformed data frame in the format required for clipp.
 #'
 #' @examples
 #' # Transform a data frame
-#' transformed_df <- transformDF(input_df, "Breast Cancer", "BRCA1")
-transformDF <- function(df, cancer_type, gene_input) {
-  # Check if the cancer type is valid
-  if (!cancer_type %in% CANCER_NAME_MAP$long) {
-    stop("Cancer type '", cancer_type, "' is not supported. Please choose from the supported list.")
-  }
-  
-  # Get the abbreviation for the cancer type
-  cancer_index <- which(CANCER_NAME_MAP$long == cancer_type)
-  cancer_type_short <- CANCER_NAME_MAP$short[cancer_index]
-  
-  # Construct column names based on cancer type and gene input
-  aff_col_name <- paste0("isAff", cancer_type_short)
-  age_col_name <- paste0("Age", cancer_type_short)
-  
+#' transformed_df <- transformDF(input_df)
+transformDF <- function(df) {
   # Rename and transform columns
   df$individual <- df$ID
   df$isProband <- df$isProband
   df$family <- df$PedigreeID
   df$mother <- df$MotherID
   df$father <- df$FatherID
-  df$aff <- df[[aff_col_name]]
+  df$aff <- df$isAff
   df$sex <- ifelse(df$Sex == 0, 2, df$Sex) # Convert 0s to 2s in sex, keep 1s as is
   
   # Apply row-wise logic to assign age based on aff column
   df$age <- apply(df, 1, function(row) {
-    aff <- as.numeric(row[[aff_col_name]])
+    aff <- as.numeric(row[["isAff"]])
     if (aff == 1) {
-      return(as.numeric(row[[age_col_name]]))
+      return(as.numeric(row[["Age"]]))
     } else {
       return(as.numeric(row[["CurAge"]]))
     }
   })
   
-  df$geno <- df[[gene_input]]
-  
-  # Process 'geno' column
-  df$geno <- ifelse(is.na(df$geno), "", ifelse(df$geno == 1, "1/2", ifelse(df$geno == 0, "1/1", df$geno)))
-  
   # Select only the necessary columns
-  df <- df[c("individual", "isProband", "family", "mother", "father", "aff", "sex", "age", "geno")]
+  df <- df[c("individual", "isProband", "family", "mother", "father", "aff", "sex", "age")]
   
   return(df)
 }
