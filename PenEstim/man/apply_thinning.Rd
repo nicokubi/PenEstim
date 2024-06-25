@@ -17,7 +17,3 @@ A list of results with thinning applied.
 \description{
 Apply Thinning
 }
-\examples{
-thinned_results <- apply_thinning(mcmc_results, thinning_factor = 2)
-
-}

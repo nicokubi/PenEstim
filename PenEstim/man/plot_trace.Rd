@@ -14,7 +14,3 @@ plot_trace(results, n_chains)
 \description{
 Plot Trace
 }
-\examples{
-plot_trace(mcmc_results, n_chains = 4)
-
-}

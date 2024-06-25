@@ -1,8 +1,8 @@
 Package: PenEstim
 Type: Package
-Title: Penetrance Estimation for BRCA1 
+Title: Penetrance Estimation in Family-based Cancer Penetrance Studies
 Version: 0.1.0
-Depends: R (>= 3.5.0), stats, clipp, parallel, stats4, MASS,dplyr
+Depends: R (>= 3.5.0), stats, clipp, parallel, stats4, MASS, dplyr
 Authors@R: c(
     person("BayesMendel", "Lab", email = "bmendel@jimmy.harvard.edu", role = c("aut", "cre")),
     person("Nicolas", "Kubista", role = "aut"))

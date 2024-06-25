@@ -4,27 +4,20 @@
 \alias{calculate_lifetime_risk}
 \title{Calculate Lifetime Risk of Cancer}
 \usage{
-calculate_lifetime_risk(
-  cancer_type,
-  gene,
-  race = "All_Races",
-  sex = "Female",
-  type = "Crude",
-  data = PanelPRODatabase
-)
+calculate_lifetime_risk(cancer_type, gene, race, sex, type, db)
 }
 \arguments{
 \item{cancer_type}{The type of cancer for which the risk is being calculated.}
 
 \item{gene}{The gene of interest for which the risk is being calculated.}
 
-\item{race}{The race of the individual, with a default value of "All_Races".}
+\item{race}{The race of the individual.}
 
-\item{sex}{The sex of the individual, with a default value of "Female".}
+\item{sex}{The sex of the individual, Female or Male.}
 
-\item{type}{The type of calculation, with a default value of "Crude".}
+\item{type}{The type of penetrance calculation, Net or Crude.}
 
-\item{data}{The dataset used for the calculation, defaulting to PanelPRODatabase.}
+\item{db}{The dataset used for the calculation.}
 }
 \value{
 A list containing the cumulative risk (\code{cumulative_risk}) and the total
@@ -32,9 +25,5 @@ probability (\code{total_prob}) of developing the specified cancer.
 }
 \description{
 This function calculates the lifetime risk of a specific type of cancer based
-on genetic and demographic factors using data from the PanelPRO Database.
-}
-\examples{
-calculate_lifetime_risk("Breast_Cancer", "BRCA1")
-
+on genetic and demographic factors using data in the format of the PanelPRO Database.
 }

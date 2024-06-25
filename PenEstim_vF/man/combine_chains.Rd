@@ -11,7 +11,7 @@ combine_chains(results)
 \item{results}{A list of MCMC chain results.}
 }
 \value{
-A list with combined results, including median, shift, first quartile, and asymptote values.
+A list with combined results, including median, threshold, first quartile, and asymptote values.
 }
 \description{
 Combine Chains

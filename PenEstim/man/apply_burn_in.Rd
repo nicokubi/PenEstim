@@ -17,7 +17,3 @@ A list of results with burn-in applied.
 \description{
 Apply Burn-In
 }
-\examples{
-burned_results <- apply_burn_in(mcmc_results, burn_in = 0.1)
-
-}

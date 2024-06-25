@@ -4,8 +4,6 @@
 #' @param results A list of MCMC chain results.
 #'
 #' @return A list with combined results, including median, threshold, first quartile, and asymptote values.
-#' @examples
-#' combine_results <- combine_chains(mcmc_results)
 #'
 combine_chains <- function(results) {
   list(
@@ -38,9 +36,6 @@ combine_chains <- function(results) {
 #'
 #' @return A summary data frame containing Median, threshold, First Quartile, and Asymptote Value.
 #'
-#' @examples
-#' summary_stats <- generate_summary(combine_results)
-#'
 generate_summary <- function(data) {
   summary_data <- data.frame(
     Median_Male = data$median_male_results,
@@ -60,9 +55,6 @@ generate_summary <- function(data) {
 #' Generates histograms of the posterior samples for the different parameters
 #'
 #' @param data A list with combined results.
-#'
-#' @examples
-#' generate_density_plots(combine_results)
 #'
 generate_density_plots <- function(data) {
   # Set the plotting parameters
@@ -118,9 +110,6 @@ generate_density_plots <- function(data) {
 #' Plot Trace
 #' @param results A list of MCMC chain results.
 #' @param n_chains The number of chains.
-#'
-#' @examples
-#' plot_trace(mcmc_results, n_chains = 4)
 #'
 plot_trace <- function(results, n_chains) {
   par(mfrow = c(n_chains, 4)) # Set up a grid for the plots
@@ -196,9 +185,6 @@ running_variance <- function(res) {
 #' Print Rejection Rates
 #' @param results A list of MCMC chain results.
 #'
-#' @examples
-#' printRejectionRates(mcmc_results)
-#'
 printRejectionRates <- function(results) {
   rejection_rates <- sapply(results, function(x) x$rejection_rate)
   cat("Rejection rates: ", rejection_rates, "\n")
@@ -210,9 +196,6 @@ printRejectionRates <- function(results) {
 #' @param burn_in The fraction roportion of results to discard as burn-in (0 to 1). The default is no burn-in, burn_in=0.
 #'
 #' @return A list of results with burn-in applied.
-#'
-#' @examples
-#' burned_results <- apply_burn_in(mcmc_results, burn_in = 0.1)
 #'
 apply_burn_in <- function(results, burn_in) {
   # Ensure 'results' is a list and has at least one chain
@@ -250,9 +233,6 @@ apply_burn_in <- function(results, burn_in) {
 #'
 #' @return A list of results with thinning applied.
 #'
-#' @examples
-#' thinned_results <- apply_thinning(mcmc_results, thinning_factor = 2)
-#'
 apply_thinning <- function(results, thinning_factor) {
   # Ensure 'results' is a list and has at least one chain
   if (!is.list(results) || length(results) < 1) {
@@ -282,17 +262,22 @@ apply_thinning <- function(results, thinning_factor) {
 
 #' Plot Weibull Distribution with Credible Intervals
 #'
-#' @param data A list with combined results from MCMC.
-#' @param prob The probability for the credible interval (between 0 and 1).
+#' This function plots the Weibull distribution with credible intervals for the given data. 
+#' It allows for visualization of penetrance curves for individuals based on their genetic 
+#' and demographic information.
 #'
-#' @examples
-#' plot_weibull_distribution(combine_results, prob = 0.95)
+#' @param data Data frame, containing individual demographic and genetic information. Must include columns for 'sex', 'age', 'aff' (affection status), and 'geno' (genotype).
+#' @param prob Numeric, the probability level for the credible intervals. Must be between 0 and 1.
+#' @param max_age Integer, the maximum age considered in the analysis.
+#' @param sex Character, specifying the sex of the individuals for the plot ("Male", "Female", or "NA" for not applicable). Default is "NA".
+#'
+#' @return A plot showing the Weibull distribution with credible intervals.
 #'
 plot_penetrance <- function(data, prob, max_age, sex = "NA") {
   if (prob <= 0 || prob >= 1) {
     stop("prob must be between 0 and 1")
   }
-
+  
   params_male <- calculate_weibull_parameters(
     data$median_male_results,
     data$first_quartile_male_results,

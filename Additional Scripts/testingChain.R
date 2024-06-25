@@ -15,20 +15,13 @@ library(ggplot2)
 library(dplyr)
 
 # Data
-dat <- load("/Users/nicolaskubista/Dropbox (Partners HealthCare)/CCGCRN Hispanic Cohort Data/PenEstim/Data/carrierProbandFamilies_cohPedigree_MLH1_ages.RData")
-dat <- carrierProbandFamilies_cohPedigree_MLH1_ages
+dat <- load("/Users/nicolaskubista/Dropbox (Partners HealthCare)/CCGCRN Hispanic Cohort Data/PenEstim/Data/carrierProbandFamilies_cohPedigree_MLH1.RData")
+dat <- carrierProbandFamilies_cohPedigree_MLH1
 
-# Data Prep
+
 for (i in seq_along(dat)) {
   if ("ID" %in% colnames(dat[[i]])) {
     colnames(dat[[i]])[colnames(dat[[i]]) == "PedigreeID"] <- "FamilyID"
-  }
-}
-
-#  Data Prep
-for (i in seq_along(dat)) {
-  if ("ID" %in% colnames(dat[[i]])) {
-    colnames(dat[[i]])[colnames(dat[[i]]) == "ID"] <- "SubjectID"
   }
 }
 
@@ -37,10 +30,27 @@ for (i in seq_along(dat)) {
   dat[[i]]$PedigreeID <- i
 }
 
-data <- do.call(rbind, lapply(dat, transformDF,
-                              cancer_type = "Breast",
-                              gene = "BRCA1"
-))
+# Change "isAffCOL" to "isAff" if "isAffCOL" is a column
+for (i in seq_along(dat)) {
+  if ("isAffCOL" %in% colnames(dat[[i]])) {
+    colnames(dat[[i]])[colnames(dat[[i]]) == "isAffCOL"] <- "isAff"
+  }
+}
+
+for (i in seq_along(dat)) {
+  if ("AgeCOL" %in% colnames(dat[[i]])) {
+    colnames(dat[[i]])[colnames(dat[[i]]) == "AgeCOL"] <- "Age"
+  }
+}
+
+for (i in seq_along(dat)) {
+  if ("MLH1" %in% colnames(dat[[i]])) {
+    colnames(dat[[i]])[colnames(dat[[i]]) == "MLH1"] <- "geno"
+  }
+}
+
+
+data <- do.call(rbind, lapply(dat, transformDF))
 
 head(data)
 data
@@ -56,17 +66,15 @@ prior_params <- list(
 
 # Run Estimation procedure with default prior setting 
 # Main Estimation for Female
-system.time(out_sim_COL <- PenEstim_v7(
-    data = dat,
-    cancer_type = "Colorectal", gene_input = "MLH1", n_chains = 1, n_iter_per_chain = 10, 
-    prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max = TRUE, priors = prior_params
+system.time(out_sim_COL <- PenEstim(
+    data = dat, n_chains = 1, n_iter_per_chain = 10, af = PPP::PanelPRODatabase$AlleleFrequency[paste0("MLH1", "_anyPV"), "nonAJ"],
+ ageImputation = TRUE,
+    prior_params = prior_params, burn_in = 0.1, median_max = TRUE
 ))
 
-system.time(out_sim_COL <- PenEstim_v10(
-  data = dat,
-  cancer_type = "Colorectal", gene_input = "MLH1", ncores = 2, n_iter_per_chain = 5,
-  prior_params = prior_params, af = 0.1, burn_in = 0.1, median_max = TRUE, priors = prior_params
-))
+PenEstim()
+
+
 
 # Prop 
 prop <- makePriors(
@@ -78,12 +86,14 @@ prop <- makePriors(
   risk_proportion = risk_proportion_default
 )
 
+
 set.seed(2)
-out25 <-mhChain_vMWG(
-  seed =1, n_iter=10, burn_in = 0.1, chain_id=1, data=data,
-  max_age=94, db=PanelPRODatabase,
-  prior_distributions = prop, cancer_type = "Breast", gene_input = "BRCA1", af = 0.1,
-  median_max = TRUE, max_penetrance = 1, homozygote = TRUE, SeerNC = TRUE, priors = prior_params, var = c(0.1,0.1,2,2,5,5,5,5))
+out25 <-mhChain(
+  seed =1, n_iter=10, burn_in = 0.1, chain_id=1, data=data, ncores = 4,
+  max_age=94, af = PPP::PanelPRODatabase$AlleleFrequency[paste0("MLH1", "_anyPV"), "nonAJ"],
+  baseline_data =  baseline_data_default,
+  prior_distributions = prop, removeProband = FALSE,
+  median_max = TRUE, max_penetrance = 1, ageImputation = FALSE, BaselineNC  = TRUE, var = c(0.1,0.1,2,2,5,5,5,5))
 
 out25
 $out22$summary_stats

@@ -10,12 +10,8 @@ generate_summary(data)
 \item{data}{A list with combined results.}
 }
 \value{
-A summary data frame containing Median, Shift, First Quartile, and Asymptote Value.
+A summary data frame containing Median, threshold, First Quartile, and Asymptote Value.
 }
 \description{
 Function to generate summary statistics
-}
-\examples{
-summary_stats <- generate_summary(combine_results)
-
 }

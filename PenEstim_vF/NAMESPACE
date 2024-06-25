@@ -1,5 +1,4 @@
 export(PenEstim)
-importFrom(PPP,PPP)
 importFrom(parallel,clusterEvalQ)
 importFrom(parallel,clusterExport)
 importFrom(parallel,makeCluster)

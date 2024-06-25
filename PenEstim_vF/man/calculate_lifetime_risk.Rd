@@ -4,14 +4,7 @@
 \alias{calculate_lifetime_risk}
 \title{Calculate Lifetime Risk of Cancer}
 \usage{
-calculate_lifetime_risk(
-  cancer_type,
-  gene,
-  race = "All_Races",
-  sex = "Female",
-  type = "Crude",
-  data = PanelPRODatabase
-)
+calculate_lifetime_risk(cancer_type, gene, race, type, db)
 }
 \arguments{
 \item{cancer_type}{The type of cancer for which the risk is being calculated.}
@@ -20,9 +13,9 @@ calculate_lifetime_risk(
 
 \item{race}{The race of the individual, with a default value of "All_Races".}
 
-\item{sex}{The sex of the individual, with a default value of "Female".}
-
 \item{type}{The type of calculation, with a default value of "Crude".}
+
+\item{sex}{The sex of the individual, with a default value of "Female".}
 
 \item{data}{The dataset used for the calculation, defaulting to PanelPRODatabase.}
 }

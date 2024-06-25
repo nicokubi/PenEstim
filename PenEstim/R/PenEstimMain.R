@@ -2,82 +2,78 @@
 #'
 #' Performs a single chain execution in the Metropolis-Hastings algorithm for Bayesian inference,
 #' specifically tailored for cancer risk estimation. It estimates parameters related to cancer penetrance
-#' based on family data, genetic information, and SEER database estimates.
+#' based on family data, genetic information, and baseline database estimates.
 #'
-#' @param seed Seed value for random number generation.
-#' @param n_iter Number of iterations for the chain.
-#' @param burn_in Fraction of iterations to discard as burn-in (0 to 1).
-#' @param chain_id Identifier for the chain.
-#' @param data List of families data.
-#' @param max_age Maximum age to be considered.
-#' @param db Database containing baseline risk estimates.
-#' @param prior_distributions List of the parameters for the distributions of the proposal, including asymptote, threshold, median, and first quartile distributions.
-#' @param cancer_type Type of cancer for which risk is being estimated.
-#' @param gene_input Gene information for risk estimation.
-#' @param af Allele frequency for the risk allele.
-#' @param median_max Boolean indicating whether to use SEER median or max_age as an upper bound for the median proposal. Defaults to TRUE, i.e., using the SEER median.
-#' @param max_penetrance Maximum penetrance considered for analysis.
-#' @param SeerNC Boolean indicating if non-carrier penetrance is assumed to be the SEER penetrance.
-#' @param sex Specifies the sex for which the estimation is performed; can be "NA" (default), "Female", or "Male".
-#' @param var Variance-covariance matrix used in the proposal distribution.
-#' @param ageImputation Boolean indicating whether to impute ages for missing data.
+#' @param seed Integer, the seed for the random number generator to ensure reproducibility.
+#' @param n_iter Integer, the number of iterations to perform in the Metropolis-Hastings algorithm.
+#' @param burn_in Integer, the number of initial iterations to discard (burn-in period).
+#' @param chain_id Integer, the identifier for the chain being executed.
+#' @param ncores Integer, the number of cores to use for parallel computation.
+#' @param data Data frame, containing family and genetic information used in the analysis.
+#' @param max_age Integer, the maximum age considered in the analysis.
+#' @param baseline_data Numeric matrix, containing baseline risk estimates for different ages and sexes.
+#' @param prior_distributions List, containing prior distributions for the parameters being estimated.
+#' @param af Numeric, the allele frequency of the risk allele in the population.
+#' @param median_max Numeric, the maximum median age for the Weibull distribution.
+#' @param max_penetrance Numeric, the maximum penetrance value allowed.
+#' @param BaselineNC Logical, indicates if non-carrier penetrance should be based on SEER data.
+#' @param var Numeric, the variance for the proposal distribution in the Metropolis-Hastings algorithm.
+#' @param ageImputation Logical, indicates if age imputation should be performed.
+#' @param removeProband Logical, indicates if the proband should be removed from the analysis.
+#'
 #' @return A list containing samples, log likelihoods, acceptance ratio, and rejection rate for each iteration.
-#' @importFrom stats set.seed
-#' @importFrom parallel makeCluster stopCluster parLapply
-#' @examples
-#' result <- mhChain(
-#'   seed = 123, n_iter = 1000, burn_in = 0.1, chain_id = 1, data = familyData,
-#'   max_age = 90, db = database,
-#'   prior_distributions = propDist, cancer_type = "breast",
-#'   gene_input = "BRCA1", af = 0.0001, median_max = TRUE,
-#'   max_penetrance = 1, SeerNC = TRUE, sex = "NA",
-#'   var = c(0.1, 0.1, 2, 2, 5, 5, 5, 5), ageImputation = FALSE
-#' )
 #' @export
-mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
-                         prior_distributions, cancer_type, gene_input, af,
-                         median_max, max_penetrance, SeerNC, var,
-                         ageImputation) {
-  
-  # Set seed
+mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, baseline_data,
+                    prior_distributions, af, median_max, max_penetrance, BaselineNC, var,
+                    ageImputation, removeProband) {
+  # Set seed for the chain
   set.seed(seed)
   
+  # Calculate empirical age density for affected individuals
+  age_density <- calculateEmpiricalDensity(data, aff_column = "aff", age_column = "age")
+  
+  # Prepare initial age imputation if enabled
   if (ageImputation) {
-    # Calculate the degree of relationship for each pedigree
     data <- calcPedDegree(data)
-    # Calculate Empirical density used for the age imputation
-    empirical_density <- calculateEmpiricalDensity(data, aff_column = "aff", age_column = "age")
     # Initialize ages
     threshold <- prior_distributions$prior_params$threshold$min
     init_result <- imputeAgesInit(data, threshold, max_age)
     data <- init_result$data
     na_indices <- init_result$na_indices
+  } else {
+    # If age imputation is disabled, set unknown ages to 1 so they are disregarded in likelihood calculation
+    data$age[is.na(data$age)] <- 1
   }
-
-  # Calculate SEER baseline and midpoint
-  SEER_baseline <- calculate_lifetime_risk(
-    cancer = cancer_type, gene = "SEER",
-    race = "All_Races", type = "Net", db = db
+  
+  # Option to remove the proband after age imputation
+  if (removeProband) {
+    data <- data[data$isProband != 1, ]
+  }
+  
+  # Process baseline risk data
+  baseline_male <- as.numeric(baseline_data[,"Male"])
+  baseline_female <- as.numeric(baseline_data[,"Female"])
+  
+  baseline_male_cum <- cumsum(baseline_male)
+  baseline_female_cum <- cumsum(baseline_female)
+  
+  baseline_male_df <- data.frame(
+    age = 1:length(baseline_male),
+    cum_prob = baseline_male_cum / max(baseline_male_cum)
   )
-  # Normalize CDF for males and females
-  SEER_male <- data.frame(
-    age = as.numeric(names(SEER_baseline$cumulative_risk$male)),
-    cum_prob = SEER_baseline$cumulative_risk$male / max(SEER_baseline$cumulative_risk$male)
+  baseline_female_df <- data.frame(
+    age = 1:length(baseline_female),
+    cum_prob = baseline_female_cum / max(baseline_female_cum)
   )
-  SEER_female <- data.frame(
-    age = as.numeric(names(SEER_baseline$cumulative_risk$female)),
-    cum_prob = SEER_baseline$cumulative_risk$female / max(SEER_baseline$cumulative_risk$female)
-  )
-  midpoint_prob_male <- SEER_baseline$lifetime_risk$male / 2
-  midpoint_prob_female <- SEER_baseline$lifetime_risk$female / 2
-  midpoint_index_male <-
-    which(SEER_baseline$cumulative_risk$male >= midpoint_prob_male)[1]
-  midpoint_index_female <-
-    which(SEER_baseline$cumulative_risk$female >= midpoint_prob_female)[1]
-  baseline_mid_male <-
-    as.numeric(names(SEER_baseline$cumulative_risk$male)[midpoint_index_male])
-  baseline_mid_female <-
-    as.numeric(names(SEER_baseline$cumulative_risk$female)[midpoint_index_female])
+  
+  midpoint_prob_male <- baseline_male_cum[length(baseline_male_cum)] / 2
+  midpoint_prob_female <- baseline_female_cum[length(baseline_female_cum)] / 2
+  
+  midpoint_index_male <- which(baseline_male_cum >= midpoint_prob_male)[1]
+  midpoint_index_female <- which(baseline_female_cum >= midpoint_prob_female)[1]
+  
+  baseline_mid_male <- midpoint_index_male
+  baseline_mid_female <- midpoint_index_female
   
   # Function to initialize the Weibull parameters using empirical data
   draw_initial_params <- function(data, prior_distributions) {
@@ -113,8 +109,8 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
                                     min(quantile(data_female_affected$age, probs = 0.25, na.rm = TRUE), median_female - 1), NA
     )
     
-    asymptote_male <- runif(1,SEER_baseline$cumulative_risk$male[length(SEER_baseline$cumulative_risk$male)],1)
-    asymptote_female <- runif(1,SEER_baseline$cumulative_risk$female[length(SEER_baseline$cumulative_risk$female)],1)
+    asymptote_male <- runif(1, max(baseline_male_cum), 1)
+    asymptote_female <- runif(1, max(baseline_female_cum), 1)
     
     return(list(
       asymptote_male = asymptote_male,
@@ -128,7 +124,7 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
     ))
   }
   
-  # Initialize Parameters
+  # Initialize Parameters using the function draw_initial_params
   initial_params <- draw_initial_params(data = data, prior_distributions = prior_distributions)
   params_current <- initial_params
   current_states <- list()
@@ -167,47 +163,49 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
   num_rejections <- 0
   cat("Starting Chain", chain_id, "\n")
   
+  # Function to calculate the (log) prior probabilities using the fixed prior distributions and specified prior parameters. 
   calculate_log_prior <- function(params, prior_distributions, max_age) {
     prior_params <- prior_distributions$prior_params
-
+    
     scaled_asymptote_male <- params$asymptote_male
     scaled_asymptote_female <- params$asymptote_female
-
+    
     scaled_threshold_male <- params$threshold_male
     scaled_threshold_female <- params$threshold_female
-
+    
     scaled_median_male <- (params$median_male - params$threshold_male) / (max_age - params$threshold_male)
     scaled_median_female <- (params$median_female - params$threshold_female) / (max_age - params$threshold_female)
-
+    
     scaled_first_quartile_male <- (params$first_quartile_male - params$threshold_male) /
       (params$median_male - params$threshold_male)
     scaled_first_quartile_female <- (params$first_quartile_female - params$threshold_female) /
       (params$median_female - params$threshold_female)
-
+    
     log_prior_asymptote_male <- dbeta(scaled_asymptote_male, prior_params$asymptote$g1, prior_params$asymptote$g2, log = TRUE)
     log_prior_asymptote_female <- dbeta(scaled_asymptote_female, prior_params$asymptote$g1, prior_params$asymptote$g2, log = TRUE)
-
+    
     log_prior_threshold_male <- dunif(scaled_threshold_male, prior_params$threshold$min, prior_params$threshold$max, log = TRUE)
     log_prior_threshold_female <- dunif(scaled_threshold_female, prior_params$threshold$min, prior_params$threshold$max, log = TRUE)
-
+    
     log_prior_median_male <- dbeta(scaled_median_male, prior_params$median$m1, prior_params$median$m2, log = TRUE)
     log_prior_median_female <- dbeta(scaled_median_female, prior_params$median$m1, prior_params$median$m2, log = TRUE)
-
+    
     log_prior_first_quartile_male <- dbeta(scaled_first_quartile_male, prior_params$first_quartile$q1, prior_params$first_quartile$q2, log = TRUE)
     log_prior_first_quartile_female <- dbeta(scaled_first_quartile_female, prior_params$first_quartile$q1, prior_params$first_quartile$q2, log = TRUE)
-
+    
     log_prior_total <- log_prior_asymptote_male + log_prior_asymptote_female +
       log_prior_threshold_male + log_prior_threshold_female +
       log_prior_median_male + log_prior_median_female +
       log_prior_first_quartile_male + log_prior_first_quartile_female
-
+    
     return(log_prior_total)
   }
-
   
+  # Run n_iter iterations of the adaptive Metropolis-Hastings algorithm
   for (i in 1:n_iter) {
+    # Calculate Weibull parameters from current parameters
     weibull_params_male <- calculate_weibull_parameters(params_current$median_male, params_current$first_quartile_male, params_current$threshold_male)
-    alpha_male <-  weibull_params_male$alpha
+    alpha_male <- weibull_params_male$alpha
     beta_male <- weibull_params_male$beta
     delta_male <- params_current$threshold_male
     
@@ -216,12 +214,15 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
     beta_female <- weibull_params_female$beta
     delta_female <- params_current$threshold_female
     
-    # Impute ages 
+    # Impute ages at each iteration based on current parameters
     if (ageImputation) {
-    data <- imputeAges(data, na_indices, SEER_male, SEER_female, alpha_male, beta_male, delta_male,
-                       alpha_female, beta_female, delta_female, empirical_density)
+      data <- imputeAges(
+        data, na_indices, baseline_male_df, baseline_female_df, alpha_male, beta_male, delta_male,
+        alpha_female, beta_female, delta_female
+      )
     }
     
+    # Store the current parameter values
     params_vector <- c(
       params_current$asymptote_male, params_current$asymptote_female,
       params_current$threshold_male, params_current$threshold_female,
@@ -229,12 +230,16 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
       params_current$first_quartile_male, params_current$first_quartile_female
     )
     
+    # Generate the proposal parameters from a multivariate normal distribution centered around current parameters
     proposal_vector <- mvrnorm(1, mu = params_vector, Sigma = C)
     
-    proposal_vector[1] <- ifelse(proposal_vector[1] < 0, -proposal_vector[1], 
-                                 ifelse(proposal_vector[1] > 1, 2 - proposal_vector[1], proposal_vector[1]))
-    proposal_vector[2] <- ifelse(proposal_vector[2] < 0, -proposal_vector[2], 
-                                 ifelse(proposal_vector[2] > 1, 2 - proposal_vector[2], proposal_vector[2]))
+    # Ensure the proposals for the asymptote fall within the 0 to 1 range
+    proposal_vector[1] <- ifelse(proposal_vector[1] < 0, -proposal_vector[1],
+                                 ifelse(proposal_vector[1] > 1, 2 - proposal_vector[1], proposal_vector[1])
+    )
+    proposal_vector[2] <- ifelse(proposal_vector[2] < 0, -proposal_vector[2],
+                                 ifelse(proposal_vector[2] > 1, 2 - proposal_vector[2], proposal_vector[2])
+    )
     
     out$asymptote_male_proposals[i] <- proposal_vector[1]
     out$asymptote_female_proposals[i] <- proposal_vector[2]
@@ -256,13 +261,13 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
       first_quartile_female = proposal_vector[8]
     )
     
+    # Evaluate the current set of parameters
     loglikelihood_current <- mhLogLikelihood_clipp(
       params_current, data, max_age,
-      cancer_type, db, af, SeerNC, ncores
+      baseline_data, af, BaselineNC, ncores
     )
-    
     logprior_current <- calculate_log_prior(params_current, prior_distributions, max_age)
-    
+    # Record the outputs of the evaluation for the current set of parameters
     out$loglikelihood_current[i] <- loglikelihood_current
     out$logprior_current[i] <- logprior_current
     
@@ -270,18 +275,19 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
     out$logprior_proposal[i] <- NA
     out$acceptance_ratio[i] <- NA
     
+    # Check that the proposed parameters satisfy the basic requirements
     is_rejected <- FALSE
     if (
       proposal_vector[1] < 0 || proposal_vector[1] > 1 ||
       proposal_vector[2] < 0 || proposal_vector[2] > 1 ||
       proposal_vector[3] < 0 || proposal_vector[3] > 100 ||
       proposal_vector[4] < 0 || proposal_vector[4] > 100 ||
-      proposal_vector[5] < proposal_vector[7] || 
-      (median_max && proposal_vector[5] > baseline_mid_male) || 
-      (!median_max && proposal_vector[5] > max_age) || 
-      proposal_vector[6] < proposal_vector[8] || 
-      (median_max && proposal_vector[6] > baseline_mid_female) || 
-      (!median_max && proposal_vector[6] > max_age) || 
+      proposal_vector[5] < proposal_vector[7] ||
+      (median_max && proposal_vector[5] > baseline_mid_male) ||
+      (!median_max && proposal_vector[5] > max_age) ||
+      proposal_vector[6] < proposal_vector[8] ||
+      (median_max && proposal_vector[6] > baseline_mid_female) ||
+      (!median_max && proposal_vector[6] > max_age) ||
       proposal_vector[7] < proposal_vector[3] || proposal_vector[7] > proposal_vector[5] ||
       proposal_vector[8] < proposal_vector[4] || proposal_vector[8] > proposal_vector[6]) {
       is_rejected <- TRUE
@@ -289,7 +295,7 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
     } else {
       loglikelihood_proposal <- mhLogLikelihood_clipp(
         params_proposal, data, max_age,
-        cancer_type, db, af, SeerNC, ncores
+        baseline_data, af, BaselineNC, ncores
       )
       logprior_proposal <- calculate_log_prior(params_proposal, prior_distributions, max_age)
       
@@ -339,89 +345,75 @@ mhChain <- function(seed, n_iter, burn_in, chain_id, ncores, data, max_age, db,
 #' penetrance estimation of cancer risk. It utilizes parallel computing to run multiple
 #' chains and provides various options for analyzing and visualizing the results.
 #'
-#' @param data The pedigree data in the required format. A data frame of
-#' family history information with the following columns.
-#' * `ID`: A numeric value; ID for each individual. There should not be any duplicated entries.
-#' * `Sex`: A numeric value; `0` for female and `1` for male. Missing entries are not currently supported.
-#' * `MotherID`: A numeric value; unique ID for someone's mother.
-#' * `FatherID`: A numeric value; unique ID for someone's father.
-#' * `isProband`: A numeric value; `1` if someone is a proband, `0` otherwise.
-#' * `CurAge`: A numeric value; the age of censoring (current age if the person is alive or age of death if the person is dead). Ages ranging from `1` to `94` are allowed.
-#' * `isAffX`: A numeric value; the affection status of cancer `X`, where `X` is a `short` cancer code (see Details). Affection status should be encoded as `1` if the individual was diagnosed, `0` otherwise. Missing entries are not currently supported.
-#' * `AgeX`: A numeric value; the age of diagnosis for cancer `X`, where `X` is a `short` cancer code (see Details). Ages ranging from `1` to `94` are allowed. If the individual was not diagnosed for a given cancer, their affection age should be encoded as `NA`.
-#' * `isDead`: A numeric value; `1` if someone is dead, `0` otherwise. Missing entries are assumed to be `0`.
-#' * Columns for germline testing results (e.g., `BRCA1`, `MLH1`) or tumor marker testing results. Positive results should be coded as `1`, negative results should be coded as `0`, and unknown results should be coded as `NA`.
-#' * Optional: `race`: A character string; expected values are `"All_Races"`, `"AIAN"`, `"Asian"`, `"Black"`, `"White"`, `"Hispanic"`, `"WH"`, and `"WNH"`.
-#' * Optional: `Ancestry`: A character string; expected values are `"AJ"`, `"nonAJ"`, and `"Italian"`.
-#' * `Twins`: A numeric value; `0` for non-identical/single births, `1` for the first set of identical twins/multiple births in the family, `2` for the second set, etc.
-#' @param cancer_type The type of cancer for which to estimate penetrance.
-#' @param gene_input Gene information used for risk estimation.
-#' @param n_chains Number of chains for parallel computation.
-#' @param n_iter_per_chain Number of iterations for each chain.
-#' @param db Database for the baseline risk estimates.
-#' @param max_age Maximum age considered for analysis, default is 94.
-#' @param removeProband Logical, indicating whether to remove probands from the analysis (default is FALSE).
-#' @param median_max Boolean indicating whether to use SEER median age or max_age as an upper bound for the median proposal. Defaults to TRUE.
-#' @param sex Option to run the estimation for each sex separately. The default is estimation of one penetrance curve for both sexes (sex = "NA").
-#' @param SeerNC Boolean indicating that the non-carrier penetrance is assumed to be the SEER penetrance. Default is TRUE.
+#' @param data A data frame containing the pedigree data in the required format. It should include the following columns:
+#'   - `ID`: A numeric value representing the unique identifier for each individual. There should be no duplicated entries.
+#'   - `Sex`: A numeric value where `0` indicates female and `1` indicates male. Missing entries are not currently supported.
+#'   - `MotherID`: A numeric value representing the unique identifier for an individual's mother.
+#'   - `FatherID`: A numeric value representing the unique identifier for an individual's father.
+#'   - `isProband`: A numeric value where `1` indicates the individual is a proband and `0` otherwise.
+#'   - `CurAge`: A numeric value indicating the age of censoring (current age if the person is alive or age at death if the person is deceased). Allowed ages range from `1` to `94`.
+#'   - `isAff`: A numeric value indicating the affection status of cancer, with `1` for diagnosed individuals and `0` otherwise. Missing entries are not supported.
+#'   - `Age`: A numeric value indicating the age of cancer diagnosis, encoded as `NA` if the individual was not diagnosed. Allowed ages range from `1` to `94`.
+#'   - `isDead`: A numeric value where `1` indicates the individual is deceased and `0` indicates the individual is alive. Missing entries are assumed to be `0`.
+#'   - `geno`: A column for germline testing or tumor marker testing results. Positive results should be coded as `1`, negative results as `0`, and unknown results as `NA` or left empty.
+#'   - Optional: `race`: A character string with expected values `"All_Races"`, `"AIAN"`, `"Asian"`, `"Black"`, `"White"`, `"Hispanic"`, `"WH"`, and `"WNH"`.
+#'   - Optional: `Ancestry`: A character string with expected values `"AJ"`, `"nonAJ"`, and `"Italian"`.
+#'   - `Twins`: A numeric value where `0` indicates non-identical/single births, `1` indicates the first set of identical twins/multiple births in the family, `2` indicates the second set, and so on.
+#' @param n_chains Number of chains for parallel computation. Default is 1.
+#' @param n_iter_per_chain Number of iterations for each chain. Default is 10000.
+#' @param ncores Number of cores for parallel computation. Default is 6.
+#' @param baseline_data Data for the baseline risk estimates (probability of developing cancer), such as population-level risk from a cancer registry. Default is the allele frequency for MLH1 from the PanelPRO database.
+#' @param max_age Maximum age considered for analysis. Default is 94.
+#' @param removeProband Logical, indicating whether to remove probands from the analysis. Default is FALSE.
+#' @param ageImputation Logical, indicating whether to perform age imputation. Default is FALSE.
+#' @param median_max Boolean indicating whether to use the baseline median age or max_age as an upper bound for the median proposal. Default is TRUE.
+#' @param BaselineNC Boolean indicating that the non-carrier penetrance is assumed to be the baseline penetrance. Default is TRUE.
+#' @param var Vector of variances for the proposal distribution. Default is c(0.1, 0.1, 2, 2, 5, 5, 5, 5).
 #' @param burn_in Fraction of results to discard as burn-in (0 to 1). Default is 0 (no burn-in).
-#' @param thinning_factor Factor by which to thin the results, default is 1 (no thinning).
+#' @param thinning_factor Factor by which to thin the results. Default is 1 (no thinning).
 #' @param distribution_data Data for generating prior distributions.
-#' @param af Allele frequency for risk allele, default is 0.0001.
-#' @param max_penetrance Maximum penetrance considered for analysis, default is 1.
+#' @param af Allele frequency for the risk allele. Default is 0.0001.
+#' @param max_penetrance Maximum penetrance considered for analysis. Default is 1.
 #' @param sample_size Optional sample size for distribution generation.
 #' @param ratio Optional ratio parameter for distribution generation.
 #' @param prior_params Parameters for prior distributions.
 #' @param risk_proportion Proportion of risk for distribution generation.
-#' @param summary_stats Boolean to include summary statistics in the output.
-#' @param rejection_rates Boolean to include rejection rates in the output.
-#' @param density_plots Boolean to include density plots in the output.
-#' @param penetrance_plot Boolean to include penetrance plots in the output.
-#' @param probCI Probability level for confidence intervals in penetrance plots (default is 0.95).
+#' @param summary_stats Boolean indicating whether to include summary statistics in the output. Default is TRUE.
+#' @param rejection_rates Boolean indicating whether to include rejection rates in the output. Default is TRUE.
+#' @param density_plots Boolean indicating whether to include density plots in the output. Default is TRUE.
+#' @param penetrance_plot Boolean indicating whether to include penetrance plots in the output. Default is TRUE.
+#' @param probCI Probability level for confidence intervals in penetrance plots. Default is 0.95.
 #' @return A list containing combined results from all chains, along with optional statistics and plots.
 #' @importFrom stats rbeta runif
-#' @examples
-#' result <- PenEstim(
-#'   data = familyData, cancer_type = "Breast", gene_input = "BRCA1",
-#'   n_chains = 4, n_iter_per_chain = 1000, max_age = 90,
-#'   burn_in = 0.1, thinning_factor = 2, summary_stats = TRUE,
-#'   rejection_rates = TRUE, density_plots = TRUE, penetrance_plot = TRUE
-#' )
+#' @importFrom parallel makeCluster stopCluster parLapply
 #' @export
-PenEstim <- function(data, cancer_type, gene_input, n_chains = 1,
-                          n_iter_per_chain = 10000,
-                          db = PPP::PanelPRODatabase,
-                          ncores = 6,
-                          sex = "NA",
-                          max_age = 94,
-                          removeProband = FALSE,
-                          ageImputation = FALSE,
-                          median_max = TRUE,
-                          SeerNC = TRUE,
-                          var = c(0.1, 0.1, 2, 2, 5, 5, 5, 5),
-                          burn_in = 0,
-                          thinning_factor = 1,
-                          distribution_data = distribution_data_default,
-                          af = 0.001,
-                          max_penetrance = 1,
-                          sample_size = NULL,
-                          ratio = NULL,
-                          prior_params = prior_params_default,
-                          risk_proportion = risk_proportion_default,
-                          summary_stats = TRUE,
-                          rejection_rates = TRUE,
-                          density_plots = TRUE,
-                          penetrance_plot = TRUE,
-                          probCI = 0.95) {
+PenEstim <- function(data, n_chains = 1,
+                     n_iter_per_chain = 10000,
+                     ncores = 6,
+                     max_age = 94,
+                     baseline_data = baseline_data_default,
+                     removeProband = FALSE,
+                     ageImputation = FALSE,
+                     median_max = TRUE,
+                     BaselineNC = TRUE,
+                     var = c(0.1, 0.1, 2, 2, 5, 5, 5, 5),
+                     burn_in = 0,
+                     thinning_factor = 1,
+                     distribution_data = distribution_data_default,
+                     af = 0.0001,
+                     max_penetrance = 1,
+                     sample_size = NULL,
+                     ratio = NULL,
+                     prior_params = prior_params_default,
+                     risk_proportion = risk_proportion_default,
+                     summary_stats = TRUE,
+                     rejection_rates = TRUE,
+                     density_plots = TRUE,
+                     penetrance_plot = TRUE,
+                     probCI = 0.95) {
   # Validate inputs
   if (missing(data)) {
     stop("Error: 'data' parameter is missing. Please provide a valid list of pedigrees.")
-  }
-  if (!(cancer_type %in% CANCER_TYPES)) {
-    stop(paste("Error: Cancer type", shQuote(cancer_type), "is not supported. Please choose from the supported list."))
-  }
-  if (!(gene_input %in% GENE_TYPES)) {
-    stop(paste("Error: Gene type", shQuote(gene_input), "is not supported. Please choose from the supported list."))
   }
   if (missing(n_chains) || !is.numeric(n_chains) || n_chains <= 0) {
     stop("Error: 'n_chains' parameter is missing or invalid. Please specify a positive integer.")
@@ -432,87 +424,72 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 1,
   if (n_chains > parallel::detectCores()) {
     stop("Error: 'n_chains' exceeds the number of available CPU cores.")
   }
-  
+
   # Create the seeds for the individual chains
   seeds <- sample.int(1000, n_chains)
-  
-  # Apply the prepAges function to treat missing data
-  data <- prepAges(data)
-  
+
   # Apply the transformation to adjust the format for the clipp package
-  data <- do.call(rbind, lapply(data, transformDF,
-                                cancer_type = cancer_type,
-                                gene = gene_input
-  ))
-  
-  if (removeProband) {
-    data <- data[data$isProband != 1, ]
-  }
-  
+  data <- do.call(rbind, lapply(data, transformDF))
+
   # Create the prior distributions
   prop <- makePriors(
     data = distribution_data,
     sample_size = sample_size,
-    cancer = cancer_type,
     ratio = ratio,
     prior_params = prior_params,
-    risk_proportion = risk_proportion
+    risk_proportion = risk_proportion, 
+    baseline_data = baseline_data
   )
-  
+
   cores <- parallel::detectCores()
-  
+
   if (n_chains > cores) {
     stop("Error: 'n_chains exceeds the number of available CPU cores.")
   }
   cl <- parallel::makeCluster(n_chains)
-  
+
   # Load required packages to the clusters
   parallel::clusterEvalQ(cl, {
-    library(PPP)
     library(clipp)
     library(stats4)
     library(MASS)
-    library(dplyr)
     library(parallel)
+    library(kinship2)
   })
-  
+
   parallel::clusterExport(cl, c(
-    "mhChain", "mhLogLikelihood_clipp", "calculate_lifetime_risk", "calculateNCPen",
-    "calculate_weibull_parameters", "validate_weibull_parameters", "calculateBaseline", "prior_params",
-    "transformDF", "makePriors", "lik.fn", "mvrnorm", "var", "calculateEmpiricalDensity",
-    "seeds", "n_iter_per_chain", "sex", "burn_in", "imputeAges", "imputeAgesInit", "draw_age_from_seer",
-    "data", "prop", "af", "max_age", "SeerNC", "median_max", "ncores",
-    "PanelPRODatabase", "cancer_type", "gene_input", "CANCER_TYPES",
-    "GENE_TYPES", "CANCER_NAME_MAP"
+    "mhChain", "mhLogLikelihood_clipp", "calculate_weibull_parameters", "validate_weibull_parameters", "prior_params",
+    "transformDF", "lik.fn", "mvrnorm", "var", "calculateEmpiricalDensity", "baseline_data", "calcPedDegree",
+    "seeds", "n_iter_per_chain", "burn_in", "imputeAges", "imputeAgesInit", "drawBaseline", "calculateNCPen",
+    "data", "prop", "af", "max_age", "BaselineNC", "median_max", "ncores", "removeProband"
   ), envir = environment())
-  
+
   results <- parallel::parLapply(cl, 1:n_chains, function(i) {
     mhChain(seeds[i],
-                 n_iter = n_iter_per_chain,
-                 burn_in = burn_in,
-                 chain_id = i,
-                 data = data,
-                 db = db,
-                 ncores = ncores,
-                 prior_distributions = prop,
-                 max_age = max_age,
-                 cancer_type = cancer_type,
-                 gene_input = gene_input,
-                 af = af,
-                 max_penetrance = max_penetrance,
-                 median_max = median_max,
-                 SeerNC = SeerNC,
-                 var = var,
-                 ageImputation = ageImputation
+      n_iter = n_iter_per_chain,
+      burn_in = burn_in,
+      chain_id = i,
+      data = data,
+      ncores = ncores,
+      prior_distributions = prop,
+      max_age = max_age,
+      af = af,
+      max_penetrance = max_penetrance,
+      median_max = median_max,
+      baseline_data = baseline_data,
+      BaselineNC = BaselineNC,
+      var = var,
+      ageImputation = ageImputation,
+      removeProband = removeProband
     )
   })
-  
+
   # Check rejection rates and issue a warning if they are all above 90%
   all_high_rejections <- all(sapply(results, function(x) x$rejection_rate > 0.9))
   if (all_high_rejections) {
     warning("Low acceptance rate. Please consider running the chain longer.")
   }
-  
+
   # Apply burn-in and thinning
   if (burn_in > 0) {
     results <- apply_burn_in(results, burn_in)
@@ -520,30 +497,30 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 1,
   if (thinning_factor > 1) {
     results <- apply_thinning(results, thinning_factor)
   }
-  
+
   # Extract samples from the chains
   combined_chains <- combine_chains(results)
-  
+
   # Initialize variables
   output <- list()
-  
+
   tryCatch(
     {
       if (rejection_rates) {
         # Generate rejection rates
         output$rejection_rates <- printRejectionRates(results)
       }
-      
+
       if (summary_stats) {
         # Generate summary statistics
         output$summary_stats <- generate_summary(combined_chains)
       }
-      
+
       if (density_plots) {
         # Generate density plots
         output$density_plots <- generate_density_plots(combined_chains)
       }
-      
+
       if (penetrance_plot) {
         # Generate penetrance plot
         output$penetrance_plot <- plot_penetrance(combined_chains, prob = probCI, max_age = max_age)
@@ -554,10 +531,11 @@ PenEstim <- function(data, cancer_type, gene_input, n_chains = 1,
       cat("An error occurred in the output display: ", e$message, "\n")
     }
   )
-  
+
   output$combined_chains <- combined_chains
   output$results <- results
   output$data <- data
-  
+
   return(output)
 }
+

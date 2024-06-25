@@ -12,7 +12,3 @@ printRejectionRates(results)
 \description{
 Print Rejection Rates
 }
-\examples{
-printRejectionRates(mcmc_results)
-
-}

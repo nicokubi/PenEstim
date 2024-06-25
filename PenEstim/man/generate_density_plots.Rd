@@ -2,7 +2,7 @@
 % Please edit documentation in R/outputHelpers.R
 \name{generate_density_plots}
 \alias{generate_density_plots}
-\title{Generate Density Plots}
+\title{Generate Posterior Density Plots}
 \usage{
 generate_density_plots(data)
 }
@@ -10,9 +10,5 @@ generate_density_plots(data)
 \item{data}{A list with combined results.}
 }
 \description{
-Generate Density Plots
-}
-\examples{
-generate_density_plots(combine_results)
-
+Generates histograms of the posterior samples for the different parameters
 }
