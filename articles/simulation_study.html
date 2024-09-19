@@ -66,10 +66,11 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Simulation Study with penetrance</h1>
-                        <h4 data-toc-skip class="author">BayesMendel Lab</h4>
+                        <h4 data-toc-skip class="author">BayesMendel
+Lab</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/nicokubi/penetrance/blob/HEAD/vignettes/simulation_study.Rmd" class="external-link"><code>vignettes/simulation_study.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicokubi/penetrance/blob/main/vignettes/simulation_study.Rmd" class="external-link"><code>vignettes/simulation_study.Rmd</code></a></small>
       <div class="d-none name"><code>simulation_study.Rmd</code></div>
     </div>
 
@@ -78,28 +79,36 @@
 <div class="section level2">
 <h2 id="goal">Goal<a class="anchor" aria-label="anchor" href="#goal"></a>
 </h2>
-<p>Here we apply the penetrance package to simulated families where the data-generating penetrance function is known and illustrate the estimation of the parameters of the Weibull distribution.</p>
+<p>Here we apply the penetrance package to simulated families where the
+data-generating penetrance function is known and illustrate the
+estimation of the parameters of the Weibull distribution.</p>
 </div>
 <div class="section level2">
 <h2 id="simulated-data">Simulated Data<a class="anchor" aria-label="anchor" href="#simulated-data"></a>
 </h2>
-<p>The data used for the simulation is available as <code>sim_fam.Rdata</code>. Recall the parameterization of the Weibull distribution.For the function <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">f(x; \alpha, \beta, \delta, \gamma)</annotation></semantics></math> we define:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left"><mi>γ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mi>α</mi><mi>β</mi></mfrac><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mi>α</mi><mo>−</mo><mn>1</mn></mrow></msup><msup><mi>e</mi><mrow><mo>−</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mi>α</mi></msup></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mtd><mtd columnalign="left"><mi>x</mi><mo>≥</mo><mi>δ</mi></mtd></mtr><mtr><mtd columnalign="left"><mn>0</mn><mo>,</mo></mtd><mtd columnalign="left"><mi>x</mi><mo>&lt;</mo><mi>δ</mi></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">
+<p>The data used for the simulation is available as
+<code>sim_fam.Rdata</code>. Recall the parameterization of the Weibull
+distribution.For the function
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">f(x; \alpha, \beta, \delta, \gamma)</annotation></semantics></math>
+we define:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left" style="text-align: left"><mi>γ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mi>α</mi><mi>β</mi></mfrac><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mi>α</mi><mo>−</mo><mn>1</mn></mrow></msup><msup><mi>e</mi><mrow><mo>−</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mi>α</mi></msup></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>x</mi><mo>≥</mo><mi>δ</mi></mtd></mtr><mtr><mtd columnalign="left" style="text-align: left"><mn>0</mn><mo>,</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>x</mi><mo>&lt;</mo><mi>δ</mi></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">
 f(x; \alpha, \beta, \delta, \gamma) = 
 \begin{cases} 
 \gamma \left( \frac{\alpha}{\beta} \left( \frac{x - \delta}{\beta} \right)^{\alpha - 1} e^{-\left( \frac{x - \delta}{\beta} \right)^\alpha } \right), &amp; x \geq \delta \\
 0, &amp; x &lt; \delta
 \end{cases}
 </annotation></semantics></math></p>
-<p>And for the cumulative distribution function <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(x; \alpha, \beta, \delta, \gamma)</annotation></semantics></math>:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left"><mi>γ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo>−</mo><msup><mi>e</mi><mrow><mo>−</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mi>α</mi></msup></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mtd><mtd columnalign="left"><mi>x</mi><mo>≥</mo><mi>δ</mi></mtd></mtr><mtr><mtd columnalign="left"><mn>0</mn><mo>,</mo></mtd><mtd columnalign="left"><mi>x</mi><mo>&lt;</mo><mi>δ</mi></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">
+<p>And for the cumulative distribution function
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">F(x; \alpha, \beta, \delta, \gamma)</annotation></semantics></math>:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>F</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left" style="text-align: left"><mi>γ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo>−</mo><msup><mi>e</mi><mrow><mo>−</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mi>α</mi></msup></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>x</mi><mo>≥</mo><mi>δ</mi></mtd></mtr><mtr><mtd columnalign="left" style="text-align: left"><mn>0</mn><mo>,</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>x</mi><mo>&lt;</mo><mi>δ</mi></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">
 F(x; \alpha, \beta, \delta, \gamma) =
 \begin{cases} 
 \gamma \left( 1 - e^{-\left( \frac{x - \delta}{\beta} \right)^\alpha } \right), &amp; x \geq \delta \\
 0, &amp; x &lt; \delta
 \end{cases}
 </annotation></semantics></math></p>
-<p>The data-generating penetrance was constructed using the following parameters for the Weibull distribution.</p>
+<p>The data-generating penetrance was constructed using the following
+parameters for the Weibull distribution.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Create generating_penetrance data frame</span></span>
 <span><span class="va">age</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">94</span></span>
@@ -160,7 +169,9 @@ F(x; \alpha, \beta, \delta, \gamma) =
 <div class="section level2">
 <h2 id="comparison-of-estimated-curves-vs--data-generating-curves">Comparison of estimated curves vs. data-generating curves<a class="anchor" aria-label="anchor" href="#comparison-of-estimated-curves-vs--data-generating-curves"></a>
 </h2>
-<p>We then plot the respective penetrance curves from the data-generating distribution defined above and the penetrance curves (including credible intervals) from the estimation procedure.</p>
+<p>We then plot the respective penetrance curves from the
+data-generating distribution defined above and the penetrance curves
+(including credible intervals) from the estimation procedure.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Function to calculate Weibull cumulative density</span></span>
 <span><span class="va">weibull_cumulative</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span>, <span class="va">alpha</span>, <span class="va">beta</span>, <span class="va">threshold</span>, <span class="va">asymptote</span><span class="op">)</span> <span class="op">{</span></span>
@@ -287,7 +298,7 @@ F(x; \alpha, \beta, \delta, \gamma) =
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
 </div>
 
     </footer>

@@ -66,55 +66,138 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Using penetrance</h1>
-                        <h4 data-toc-skip class="author">BayesMendel Lab</h4>
+                        <h4 data-toc-skip class="author">BayesMendel
+Lab</h4>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/nicokubi/penetrance/blob/HEAD/vignettes/using_penetrance.Rmd" class="external-link"><code>vignettes/using_penetrance.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/nicokubi/penetrance/blob/main/vignettes/using_penetrance.Rmd" class="external-link"><code>vignettes/using_penetrance.Rmd</code></a></small>
       <div class="d-none name"><code>using_penetrance.Rmd</code></div>
     </div>
 
     
     
-<p>The R package <code>penetrance</code> provides an estimation of age-specific penetrance for complex family-based studies in a format compatible with with the PanelPRO R package.</p>
-<p>This vignette demonstrates the process of age imputation and penetrance estimation using the<code>penetrance</code> package based on family data and user-specified inputs.</p>
+<p>The R package <code>penetrance</code> provides an estimation of
+age-specific penetrance for complex family-based studies in a format
+compatible with with the PanelPRO R package.</p>
+<p>This vignette demonstrates the process of age imputation and
+penetrance estimation using the<code>penetrance</code> package based on
+family data and user-specified inputs.</p>
 <div class="section level3">
 <h3 id="data">Data<a class="anchor" aria-label="anchor" href="#data"></a>
 </h3>
-<p>The user must specify the <code>pedigree</code> argument as a data frame that contains the family data (see <code>test_family_1</code>). The family data must be in the correct format with the following columns:</p>
+<p>The user must specify the <code>pedigree</code> argument as a data
+frame that contains the family data (see <code>test_family_1</code>).
+The family data must be in the correct format with the following
+columns:</p>
 <ul>
-<li><p><code>ID</code>: A numeric value representing the unique identifier for each individual. There should be no duplicated entries.</p></li>
-<li><p><code>Sex</code>: A numeric value where <code>0</code> indicates female and <code>1</code> indicates male. Missing entries are not currently supported.</p></li>
-<li><p><code>MotherID</code>: A numeric value representing the unique identifier for an individual’s mother.</p></li>
-<li><p><code>FatherID</code>: A numeric value representing the unique identifier for an individual’s father.</p></li>
-<li><p><code>isProband</code>: A numeric value where <code>1</code> indicates the individual is a proband and <code>0</code> otherwise.</p></li>
-<li><p><code>CurAge</code>: A numeric value indicating the age of censoring (current age if the person is alive or age at death if the person is deceased). Allowed ages range from <code>1</code> to <code>94</code>.</p></li>
-<li><p><code>isAff</code>: A numeric value indicating the affection status of cancer, with <code>1</code> for diagnosed individuals and <code>0</code> otherwise. Missing entries are not supported.</p></li>
-<li><p><code>Age</code>: A numeric value indicating the age of cancer diagnosis, encoded as <code>NA</code> if the individual was not diagnosed. Allowed ages range from <code>1</code> to <code>94</code>.</p></li>
-<li><p><code>Geno</code>: A column for germline testing or tumor marker testing results. Positive results should be coded as <code>1</code>, negative results as <code>0</code>, and unknown results as <code>NA</code> or left empty.</p></li>
+<li><p><code>ID</code>: A numeric value representing the unique
+identifier for each individual. There should be no duplicated
+entries.</p></li>
+<li><p><code>Sex</code>: A numeric value where <code>0</code> indicates
+female and <code>1</code> indicates male. Missing entries are not
+currently supported.</p></li>
+<li><p><code>MotherID</code>: A numeric value representing the unique
+identifier for an individual’s mother.</p></li>
+<li><p><code>FatherID</code>: A numeric value representing the unique
+identifier for an individual’s father.</p></li>
+<li><p><code>isProband</code>: A numeric value where <code>1</code>
+indicates the individual is a proband and <code>0</code>
+otherwise.</p></li>
+<li><p><code>CurAge</code>: A numeric value indicating the age of
+censoring (current age if the person is alive or age at death if the
+person is deceased). Allowed ages range from <code>1</code> to
+<code>94</code>.</p></li>
+<li><p><code>isAff</code>: A numeric value indicating the affection
+status of cancer, with <code>1</code> for diagnosed individuals and
+<code>0</code> otherwise. Missing entries are not supported.</p></li>
+<li><p><code>Age</code>: A numeric value indicating the age of cancer
+diagnosis, encoded as <code>NA</code> if the individual was not
+diagnosed. Allowed ages range from <code>1</code> to
+<code>94</code>.</p></li>
+<li><p><code>Geno</code>: A column for germline testing or tumor marker
+testing results. Positive results should be coded as <code>1</code>,
+negative results as <code>0</code>, and unknown results as
+<code>NA</code> or left empty.</p></li>
 </ul>
 </div>
 <div class="section level2">
 <h2 id="age-imputation">Age Imputation<a class="anchor" aria-label="anchor" href="#age-imputation"></a>
 </h2>
-<p>The PenEsim also includes an option for automatic age imputation <code>AgeImputation</code>. The imputation of ages is performed based on the individual’s affected status (<code>aff</code>), sex (<code>sex</code>), and their degree of relationship to the proband, who is a carrier of the pathogenic variant (PV).</p>
-<p>To calculate the degree of relationship to the proband, we use the kinship matrix from the pedigree data. The degree of relationship between two individuals is twice the kinship coefficient. For affected individuals (<code>aff = 1</code>), if a randomly drawn value is less than the relationship probability, the age is drawn from a Weibull distribution. The Weibull distribution parameters for males and females are <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\alpha, \beta, \delta)</annotation></semantics></math>. The quantile function of the Weibull distribution is used to draw the ages (separately for males and females). If the random draw exceeds the relationship probability, the age is drawn from the SEER data using the inverse CDF method. In this case, the individual is assumed to be a non-carrier of the PV. To calculate the empirical density for non-affected individuals, filter the dataset to include only non-affected individuals and estimate the density of their ages. Then randomly draw an age from this distribution for non-affected individuals.</p>
+<p>The PenEsim also includes an option for automatic age imputation
+<code>AgeImputation</code>. The imputation of ages is performed based on
+the individual’s affected status (<code>aff</code>), sex
+(<code>sex</code>), and their degree of relationship to the proband, who
+is a carrier of the pathogenic variant (PV).</p>
+<p>To calculate the degree of relationship to the proband, we use the
+kinship matrix from the pedigree data. The degree of relationship
+between two individuals is twice the kinship coefficient. For affected
+individuals (<code>aff = 1</code>), if a randomly drawn value is less
+than the relationship probability, the age is drawn from a Weibull
+distribution. The Weibull distribution parameters for males and females
+are
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\alpha, \beta, \delta)</annotation></semantics></math>.
+The quantile function of the Weibull distribution is used to draw the
+ages (separately for males and females). If the random draw exceeds the
+relationship probability, the age is drawn from the SEER data using the
+inverse CDF method. In this case, the individual is assumed to be a
+non-carrier of the PV. To calculate the empirical density for
+non-affected individuals, filter the dataset to include only
+non-affected individuals and estimate the density of their ages. Then
+randomly draw an age from this distribution for non-affected
+individuals.</p>
 </div>
 <div class="section level2">
 <h2 id="estimation-approach">Estimation Approach<a class="anchor" aria-label="anchor" href="#estimation-approach"></a>
 </h2>
-<p>The estimation assumes a Mendelian model with a single biallelic locus. The main function <code>penetrance</code> implements a Bayesian approach to estimate the parameters of the carrier penetrance function. The estimation routine employs an Adaptive Metropolis Hastings (MH) algorithm based on Haario et al., (2001). We build on existing software implementations of the Elston-Stewart peeling algorithm in the R package clipp to efficiently compute likelihoods.</p>
-<p>To model the penetrance curve we choose the Weibull distribution which is widely used in reliability engineering and survival analysis. To provide further flexibility we extend the standard Weibull distribution to four parameters with an additional threshold parameter (<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>δ</mi><annotation encoding="application/x-tex">\delta</annotation></semantics></math>) to move the distribution along the age axis and an asymptote parameter (<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn><mo>&lt;</mo><mi>γ</mi><mo>&lt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">0 &lt; \gamma &lt; 1</annotation></semantics></math>) which allows for incomplete penetrance and is interpreted as the lifetime probability of developing cancer. Hence, we have a vector of parameters <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi><mo>=</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>γ</mi><mo>,</mo><mi>δ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\theta = (\alpha, \beta, \gamma, \delta)</annotation></semantics></math>. Specifically, we model the density <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>f</mi><annotation encoding="application/x-tex">f</annotation></semantics></math> and corresponding cumulative distribution functions <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>F</mi><annotation encoding="application/x-tex">F</annotation></semantics></math> as:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left"><mi>γ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mi>α</mi><mi>β</mi></mfrac><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mi>α</mi><mo>−</mo><mn>1</mn></mrow></msup><msup><mi>e</mi><mrow><mo>−</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mi>α</mi></msup></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow></mtd><mtd columnalign="left"><mi>x</mi><mo>≥</mo><mi>δ</mi></mtd></mtr><mtr><mtd columnalign="left"><mn>0</mn></mtd><mtd columnalign="left"><mi>x</mi><mo>&lt;</mo><mi>δ</mi></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">
+<p>The estimation assumes a Mendelian model with a single biallelic
+locus. The main function <code>penetrance</code> implements a Bayesian
+approach to estimate the parameters of the carrier penetrance function.
+The estimation routine employs an Adaptive Metropolis Hastings (MH)
+algorithm based on Haario et al., (2001). We build on existing software
+implementations of the Elston-Stewart peeling algorithm in the R package
+clipp to efficiently compute likelihoods.</p>
+<p>To model the penetrance curve we choose the Weibull distribution
+which is widely used in reliability engineering and survival analysis.
+To provide further flexibility we extend the standard Weibull
+distribution to four parameters with an additional threshold parameter
+(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>δ</mi><annotation encoding="application/x-tex">\delta</annotation></semantics></math>)
+to move the distribution along the age axis and an asymptote parameter
+(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn><mo>&lt;</mo><mi>γ</mi><mo>&lt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">0 &lt; \gamma &lt; 1</annotation></semantics></math>)
+which allows for incomplete penetrance and is interpreted as the
+lifetime probability of developing cancer. Hence, we have a vector of
+parameters
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi><mo>=</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>γ</mi><mo>,</mo><mi>δ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\theta = (\alpha, \beta, \gamma, \delta)</annotation></semantics></math>.
+Specifically, we model the density
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>f</mi><annotation encoding="application/x-tex">f</annotation></semantics></math>
+and corresponding cumulative distribution functions
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>F</mi><annotation encoding="application/x-tex">F</annotation></semantics></math>
+as:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>x</mi><mo>;</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>δ</mi><mo>,</mo><mi>γ</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left" style="text-align: left"><mi>γ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mi>α</mi><mi>β</mi></mfrac><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mi>α</mi><mo>−</mo><mn>1</mn></mrow></msup><msup><mi>e</mi><mrow><mo>−</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><mfrac><mrow><mi>x</mi><mo>−</mo><mi>δ</mi></mrow><mi>β</mi></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mi>α</mi></msup></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow></mtd><mtd columnalign="left" style="text-align: left"><mi>x</mi><mo>≥</mo><mi>δ</mi></mtd></mtr><mtr><mtd columnalign="left" style="text-align: left"><mn>0</mn></mtd><mtd columnalign="left" style="text-align: left"><mi>x</mi><mo>&lt;</mo><mi>δ</mi></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">
 f(x; \alpha, \beta, \delta, \gamma) = \begin{cases} 
 \gamma \left( \frac{\alpha}{\beta} \left( \frac{x - \delta}{\beta} \right)^{\alpha - 1} e^{ -\left( \frac{x - \delta}{\beta} \right)^\alpha } \right) &amp; x \geq \delta \\
 0 &amp; x &lt; \delta
 \end{cases}
-</annotation></semantics></math> The MCMC estimation approach allows us to sample from the posterior distribution in an efficient way in order to infer the estimates of the parameters from the Weibull distribution.</p>
+</annotation></semantics></math> The MCMC estimation approach allows us
+to sample from the posterior distribution in an efficient way in order
+to infer the estimates of the parameters from the Weibull
+distribution.</p>
 </div>
 <div class="section level2">
 <h2 id="prior-specification">Prior Specification<a class="anchor" aria-label="anchor" href="#prior-specification"></a>
 </h2>
-<p>To run the MCMC algorithm, the prior distributions for <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi><mo>=</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>γ</mi><mo>,</mo><mi>δ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\theta = (\alpha, \beta, \gamma, \delta)</annotation></semantics></math> need to be specified. The package provides the user with a flexible approach to prior specification, balancing customization with an easy-to-use workflow. The following settings for the prior distribution specification are available: - Default: The default setting employs pre-specified, uninformative priors. - Custom Parameters: The user can tune the parameters of the default setting directly by overwriting the parameters in the prior_params_default object. - Prior Elicitation from Existing Studies: The user can input data from previous penetrance studies to automatically elicit customized priors. The default setting is adjusted to reflect the additional information based on the provided inputs.</p>
+<p>To run the MCMC algorithm, the prior distributions for
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi><mo>=</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>α</mi><mo>,</mo><mi>β</mi><mo>,</mo><mi>γ</mi><mo>,</mo><mi>δ</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\theta = (\alpha, \beta, \gamma, \delta)</annotation></semantics></math>
+need to be specified. The package provides the user with a flexible
+approach to prior specification, balancing customization with an
+easy-to-use workflow. The following settings for the prior distribution
+specification are available: - Default: The default setting employs
+pre-specified, uninformative priors. - Custom Parameters: The user can
+tune the parameters of the default setting directly by overwriting the
+parameters in the prior_params_default object. - Prior Elicitation from
+Existing Studies: The user can input data from previous penetrance
+studies to automatically elicit customized priors. The default setting
+is adjusted to reflect the additional information based on the provided
+inputs.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># The default prior </span></span>
 <span><span class="va">prior_params_default</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
@@ -133,7 +216,8 @@ f(x; \alpha, \beta, \delta, \gamma) = \begin{cases}
 <div class="section level2">
 <h2 id="estimation-using-penetrance">Estimation using penetrance<a class="anchor" aria-label="anchor" href="#estimation-using-penetrance"></a>
 </h2>
-<p>There are a few ways in which a user can specify how the estimation approach is run. Available options are:</p>
+<p>There are a few ways in which a user can specify how the estimation
+approach is run. Available options are:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co">#' @param twins Identical twins or triplets in the family can be specifed. For example, to indicate that `ora024` and `ora027` are identical twins, and so are `aey063` and `aey064`, </span></span>
 <span><span class="co">#' then we can use the following as the twins arguement: twins &lt;- list(c("ora024", "ora027"), c("aey063", "aey064"))</span></span>
@@ -162,16 +246,26 @@ f(x; \alpha, \beta, \delta, \gamma) = \begin{cases}
 <span><span class="co">#' @param plot_trace Boolean indicating whether to include trace plots in the output. Default is TRUE.</span></span>
 <span><span class="co">#' @param penetrance_plot Boolean indicating whether to include penetrance plots in the output. Default is TRUE.</span></span>
 <span><span class="co">#' @param penetrance_plot_pdf Boolean indicating whether to include PDF plots in the output. Default is TRUE.</span></span>
-<span><span class="co">#' @param probCI Probability level for confidence intervals in penetrance plots. Default is 0.95.</span></span></code></pre></div>
+<span><span class="co">#' @param probCI Probability level for confidence intervals in penetrance plots. Default is 0.95.</span></span>
+<span><span class="co">#' @param sex_specific Logical, indicating whether to use sex-specific parameters in the analysis. Default is TRUE.</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
 </h3>
 <p>To run the algorithm, we require the user to input:</p>
 <ul>
-<li>A single chain with 10k iterations of the adaptive MH algorithm. The number of cores for the paralellization is set to <code>ncores = 4</code>.</li>
+<li>A single chain with 10k iterations of the adaptive MH algorithm. The
+number of cores for the paralellization is set to
+<code>ncores = 4</code>.</li>
 <li>The pedigree data are the test family 1.</li>
-<li>The allele frequency for the pathogenic variant is set at <code>af = 0.0001</code>.</li>
-<li>The <code>penetrance</code> function takes baseline age-specific probabilitie of developing cancer as as input <code>baseline_data</code>. In the default setting with <code>BaselineNC = TRUE</code> this baseline is assumed to reflect the non-carrier penetrance. For rare mutations this is considered a reasonable assumption. The baseline_data must be a data frame with baseline penetrance for females and males.</li>
+<li>The allele frequency for the pathogenic variant is set at
+<code>af = 0.0001</code>.</li>
+<li>The <code>penetrance</code> function takes baseline age-specific
+probabilitie of developing cancer as as input
+<code>baseline_data</code>. In the default setting with
+<code>BaselineNC = TRUE</code> this baseline is assumed to reflect the
+non-carrier penetrance. For rare mutations this is considered a
+reasonable assumption. The baseline_data must be a data frame with
+baseline penetrance for females and males.</li>
 </ul>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># This is exemplary SEER penetrance data for Colorectal Cancer. </span></span>
@@ -201,27 +295,40 @@ f(x; \alpha, \beta, \delta, \gamma) = \begin{cases}
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <ul>
-<li>The specified parameters for the prior distributions are as per the specification in the <code>prior_params_default</code> object (see above).</li>
-<li>The burn-in is set to <code>burn_in = 0.1</code>, which means the first 1000 iterations of the chain will be discarded (given 10k iterations of the algorithm).</li>
-<li>The median age of onset of the baseline (non-carrier) penentrance is set as the upper bound for the proposed median, given that <code>median_max = TRUE</code>.</li>
-<li>The automatic age imputation <code>AgeImputation</code> is performed (see above), given that <code>ageImputation = TRUE</code>.</li>
+<li>The specified parameters for the prior distributions are as per the
+specification in the <code>prior_params_default</code> object (see
+above).</li>
+<li>The burn-in is set to <code>burn_in = 0.1</code>, which means the
+first 1000 iterations of the chain will be discarded (given 10k
+iterations of the algorithm).</li>
+<li>The median age of onset of the baseline (non-carrier) penentrance is
+set as the upper bound for the proposed median, given that
+<code>median_max = TRUE</code>.</li>
+<li>The automatic age imputation <code>AgeImputation</code> is performed
+(see above), given that <code>ageImputation = TRUE</code>.</li>
 </ul>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">output</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/penetrance.html">penetrance</a></span><span class="op">(</span></span>
 <span>    pedigree  <span class="op">=</span> <span class="va">dat</span>, twins <span class="op">=</span> <span class="cn">NULL</span>, n_chains <span class="op">=</span> <span class="fl">1</span>, n_iter_per_chain <span class="op">=</span> <span class="fl">20000</span>, </span>
 <span>    ncores <span class="op">=</span> <span class="fl">2</span>, baseline_data <span class="op">=</span> <span class="va">baseline_data_default</span>, af  <span class="op">=</span> <span class="fl">0.0001</span>, </span>
 <span>    prior_params <span class="op">=</span> <span class="va">prior_params_default</span>, burn_in <span class="op">=</span> <span class="fl">0.1</span>, median_max <span class="op">=</span> <span class="cn">TRUE</span>,  </span>
-<span>    ageImputation <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>    ageImputation <span class="op">=</span> <span class="cn">TRUE</span>, sex_specific <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
-<p>Andrieu C, Thoms J. A tutorial on adaptive MCMC. Stat Comput. 2008; 18(3):343–373. doi: 10.1007/s11222- 008-9110-y.</p>
-<p>Golicher AR. clipp: Calculating Likelihoods by Pedigree Paring; 2023, <a href="https://CRAN.R-project.org/package=clipp" class="external-link uri">https://CRAN.R-project.org/package=clipp</a>, r package version 1.7.0.</p>
-<p>Haario H, Saksman E, Tamminen J. An adaptive Metropolis algorithm. Bernoulli. 2001; 7(2):223–242.</p>
-<p>Lange K, Elston RC. Extensions to pedigree analysis I. Likehood calculations for simple and complex pedigrees. Hum Hered. 1975;25(2):95-105.</p>
+<p>Andrieu C, Thoms J. A tutorial on adaptive MCMC. Stat Comput. 2008;
+18(3):343–373. doi: 10.1007/s11222- 008-9110-y.</p>
+<p>Golicher AR. clipp: Calculating Likelihoods by Pedigree Paring; 2023,
+<a href="https://CRAN.R-project.org/package=clipp" class="external-link uri">https://CRAN.R-project.org/package=clipp</a>, r package
+version 1.7.0.</p>
+<p>Haario H, Saksman E, Tamminen J. An adaptive Metropolis algorithm.
+Bernoulli. 2001; 7(2):223–242.</p>
+<p>Lange K, Elston RC. Extensions to pedigree analysis I. Likehood
+calculations for simple and complex pedigrees. Hum Hered.
+1975;25(2):95-105.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
@@ -234,7 +341,7 @@ f(x; \alpha, \beta, \delta, \gamma) = \begin{cases}
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.1.1.</p>
 </div>
 
     </footer>
