@@ -29,6 +29,7 @@
 <url><loc>https://nicokubi.github.io/penetrance/reference/generate_summary_noSex.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/imputeAges.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/imputeAgesInit.html</loc></url>
+<url><loc>https://nicokubi.github.io/penetrance/reference/imputeUnaffectedAges.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/index.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/lik.fn.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/lik_noSex.html</loc></url>
@@ -38,6 +39,8 @@
 <url><loc>https://nicokubi.github.io/penetrance/reference/mhLogLikelihood_clipp_noSex.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/out_sim.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/penetrance.html</loc></url>
+<url><loc>https://nicokubi.github.io/penetrance/reference/plot_acf.html</loc></url>
+<url><loc>https://nicokubi.github.io/penetrance/reference/plot_loglikelihood.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/plot_pdf.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/plot_penetrance.html</loc></url>
 <url><loc>https://nicokubi.github.io/penetrance/reference/plot_trace.html</loc></url>

@@ -84,6 +84,8 @@ chains and provides various options for analyzing and visualizing the results.</
 <span>  plot_trace <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  penetrance_plot <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  penetrance_plot_pdf <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  plot_loglikelihood <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  plot_acf <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  probCI <span class="op">=</span> <span class="fl">0.95</span>,</span>
 <span>  sex_specific <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -103,7 +105,7 @@ chains and provides various options for analyzing and visualizing the results.</
 <li><p><code>CurAge</code>: A numeric value indicating the age of censoring (current age if the person is alive or age at death if the person is deceased). Allowed ages range from <code>1</code> to <code>94</code>.</p></li>
 <li><p><code>isAff</code>: A numeric value indicating the affection status of cancer, with <code>1</code> for diagnosed individuals and <code>0</code> otherwise. Missing entries are not supported.</p></li>
 <li><p><code>Age</code>: A numeric value indicating the age of cancer diagnosis, encoded as <code>NA</code> if the individual was not diagnosed. Allowed ages range from <code>1</code> to <code>94</code>.</p></li>
-<li><p><code>Geno</code>: A column for germline testing or tumor marker testing results. Positive results should be coded as <code>1</code>, negative results as <code>0</code>, and unknown results as <code>NA</code> or left empty.</p></li>
+<li><p><code>geno</code>: A column for germline testing or tumor marker testing results. Positive results should be coded as <code>1</code>, negative results as <code>0</code>, and unknown results as <code>NA</code> or left empty.</p></li>
 </ul></dd>
 
 
@@ -209,6 +211,14 @@ chains and provides various options for analyzing and visualizing the results.</
 
 <dt id="arg-penetrance-plot-pdf">penetrance_plot_pdf<a class="anchor" aria-label="anchor" href="#arg-penetrance-plot-pdf"></a></dt>
 <dd><p>Logical, indicating whether to include PDF plots in the output. Default is TRUE.</p></dd>
+
+
+<dt id="arg-plot-loglikelihood">plot_loglikelihood<a class="anchor" aria-label="anchor" href="#arg-plot-loglikelihood"></a></dt>
+<dd><p>Logical, indicating whether to include log-likelihood plots in the output. Default is TRUE.</p></dd>
+
+
+<dt id="arg-plot-acf">plot_acf<a class="anchor" aria-label="anchor" href="#arg-plot-acf"></a></dt>
+<dd><p>Logical, indicating whether to include autocorrelation function (ACF) plots for posterior samples. Default is TRUE.</p></dd>
 
 
 <dt id="arg-probci">probCI<a class="anchor" aria-label="anchor" href="#arg-probci"></a></dt>

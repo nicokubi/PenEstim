@@ -68,9 +68,9 @@ status and sex using either Weibull, baseline, or empirical distribution.</p>
 <span>  alpha <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  beta <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delta <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  <span class="va">empirical_density</span>,</span>
 <span>  <span class="va">max_age</span>,</span>
-<span>  sex_specific <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>  sex_specific <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  max_attempts <span class="op">=</span> <span class="fl">100</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -134,17 +134,16 @@ status and sex using either Weibull, baseline, or empirical distribution.</p>
 <dd><p>Numeric, location parameter for the Weibull distribution (used for non-sex-specific analysis).</p></dd>
 
 
-<dt id="arg-empirical-density">empirical_density<a class="anchor" aria-label="anchor" href="#arg-empirical-density"></a></dt>
-<dd><p>A density object or list of density objects containing the empirical density of ages,
-possibly sex-specific. If sex-specific, it should be a list with elements 'male' and 'female'.</p></dd>
-
-
 <dt id="arg-max-age">max_age<a class="anchor" aria-label="anchor" href="#arg-max-age"></a></dt>
 <dd><p>Integer, the maximum age considered in the analysis.</p></dd>
 
 
 <dt id="arg-sex-specific">sex_specific<a class="anchor" aria-label="anchor" href="#arg-sex-specific"></a></dt>
 <dd><p>Logical, indicating whether the imputation should be sex-specific. Default is TRUE.</p></dd>
+
+
+<dt id="arg-max-attempts">max_attempts<a class="anchor" aria-label="anchor" href="#arg-max-attempts"></a></dt>
+<dd><p>Integer, the maximum number of attempts to get a valid age. Default is 100.</p></dd>
 
 </dl></div>
     <div class="section level2">
